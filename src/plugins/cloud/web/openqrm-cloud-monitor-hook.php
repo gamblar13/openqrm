@@ -2183,12 +2183,12 @@ function openqrm_cloud_monitor() {
 						// memory
 						$new_vm_memory = 256;
 						if ($ca_cr->ram_req != 0) {
-							$new_vm_memory = $cr->ram_req;
+							$new_vm_memory = $ca_cr->ram_req;
 						}
 						// disk size
 						$new_vm_disk = 5000;
 						if ($ca_cr->disk_req != 0) {
-							$new_vm_disk = $cr->disk_req;
+							$new_vm_disk = $ca_cr->disk_req;
 						}
 
 						// here we start the new vm !
