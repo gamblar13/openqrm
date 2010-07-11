@@ -65,14 +65,16 @@ function equallogic_parse_lun_output() {
 
     # we need to fix this and turn it back to one line, and we do this with bash.. yay
 
-    OUTPUT_FILE=$1
-    OUTPUT_START=0
-    OUTPUT_END=0
-    OLD_IFS=$IFS
-IFS='
+    local OUTPUT_FILE=$1
+    local OUTPUT_START=0
+    local OUTPUT_END=0
+    local OLD_IFS=$IFS
+    local IFS='
 '
+    local LINE=''
+
     # get a new line
-    for LINE in `cat $TMPLISTFILE`; do
+    for LINE in `cat $OUTPUT_FILE`; do
 
         if [ "$OUTPUT_START" == "0" ]; then
             if echo $LINE | grep "Name" 1>/dev/null; then
@@ -96,8 +98,8 @@ IFS='
             fi
 	    if echo "$LINE" | grep "^  " 1>/dev/null; then
                  # this line is the remainder of the previous LUN definition
-                 ADDTOLUN=`echo $LINE | awk '{ print $1 }'`
-                 LUNNAME=${LUNNAME}${ADDTOLUN}
+                 local ADDTOLUN=`echo $LINE | awk '{ print $1 }'`
+                 local LUNNAME=${LUNNAME}${ADDTOLUN}
 	    else
                   # spit out the old variables when there weren't any appendable lines in the output
 		   if [ "x$LUNNAME" != "x" ]; then
@@ -105,13 +107,13 @@ IFS='
                    fi
                    # this is a lun definition line, set the variables
                    # $1 = lun_name, $2 = size, $3 = snapshots, $4= state (off/online), $5 = write (ro/rw), $6 is conns, $7 = TP
-                   LUNNAME=`echo $LINE | awk '{ print $1 }'`
-                   LUNSIZE=`echo $LINE | awk '{ print $2 }'`
-                   LUNSNAP=`echo $LINE | awk '{ print $3 }'`
-                   LUNSTAT=`echo $LINE | awk '{ print $4 }'`
-                   LUNRW=`echo $LINE | awk '{ print $5 }'`
-                   LUNCON=`echo $LINE | awk '{ print $6 }'`
-                   LUNTP=`echo $LINE | awk '{ print $7 }'`
+                   local LUNNAME=`echo $LINE | awk '{ print $1 }'`
+                   local LUNSIZE=`echo $LINE | awk '{ print $2 }'`
+                   local LUNSNAP=`echo $LINE | awk '{ print $3 }'`
+                   local LUNSTAT=`echo $LINE | awk '{ print $4 }'`
+                   local LUNRW=`echo $LINE | awk '{ print $5 }'`
+                   local LUNCON=`echo $LINE | awk '{ print $6 }'`
+                   local LUNTP=`echo $LINE | awk '{ print $7 }'`
 	    fi
         fi
     done
@@ -132,15 +134,16 @@ function equallogic_parse_access_output() {
     # note: initiator access filed is empty, but not used by openqrm.
     # if it is used elsewhere, this might lead to unexpected results.
 
-    OUTPUT_FILE=$1
-    OUTPUT_START=0
-    OUTPUT_END=0
-    OLD_IFS=$IFS
-    ITERATION=0
-IFS='
+    local OUTPUT_FILE=$1
+    local OUTPUT_START=0
+    local OUTPUT_END=0
+    local OLD_IFS=$IFS
+    local ITERATION=0
+    local IFS='
 '
+    local LINE=''
     # get a new line
-    for LINE in `cat $TMPLISTFILE`; do
+    for LINE in `cat $OUTPUT_FILE`; do
         let ITERATION=$ITERATION+1
 
         if [ "$OUTPUT_START" == "0" ]; then
@@ -165,8 +168,8 @@ IFS='
             fi
 	    if echo "$LINE" | grep "^  " 1>/dev/null; then
                  # this line is the remainder of the previous username definition
-                 ADDTOUSER=`echo $LINE | awk '{ print $1 }'`
-                 AUTHUSER=${AUTHUSER}${ADDTOUSER}
+                 local ADDTOUSER=`echo $LINE | awk '{ print $1 }'`
+                 local AUTHUSER=${AUTHUSER}${ADDTOUSER}
 	    else
                   # spit out the old variables when there weren't any appendable lines in the output
 		   if [ "x$AUTHUSER" != "x" ]; then
@@ -174,11 +177,11 @@ IFS='
                    fi
 
                    # this is a access definition line, set the variables
-                   AUTHID=`echo $LINE | awk '{ print $1 }'`
-                   AUTHIP=`echo $LINE | awk '{ print $2 }'`
-                   AUTHMETH=`echo $LINE | awk '{ print $3 }'`
-                   AUTHUSER=`echo $LINE | awk '{ print $4 }'`
-                   AUTHAPPLY=`echo $LINE | awk '{ print $5 }'`
+                   local AUTHID=`echo $LINE | awk '{ print $1 }'`
+                   local AUTHIP=`echo $LINE | awk '{ print $2 }'`
+                   local AUTHMETH=`echo $LINE | awk '{ print $3 }'`
+                   local AUTHUSER=`echo $LINE | awk '{ print $4 }'`
+                   local AUTHAPPLY=`echo $LINE | awk '{ print $5 }'`
 	    fi
         fi
     done
