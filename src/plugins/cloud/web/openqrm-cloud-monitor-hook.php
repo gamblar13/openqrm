@@ -2176,10 +2176,10 @@ function openqrm_cloud_monitor() {
 						$mac_res = new resource();
 						$mac_res->generate_mac();
 						$new_vm_mac = $mac_res->mac;
-                        // additional_nics
-                        $new_additional_nics = $cr->network_req;
+                        			// additional_nics
+			                        $new_additional_nics = $ca_cr->network_req;
 						// cpu req
-						$new_vm_cpu = $cr->cpu_req;
+						$new_vm_cpu = $ca_cr->cpu_req;
 						// memory
 						$new_vm_memory = 256;
 						if ($ca_cr->ram_req != 0) {
