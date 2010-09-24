@@ -67,7 +67,7 @@ function kvm_start() {
     fi
 
 	# be sure to have the tun device
-	if [ ! -f /dev/tun ]; then
+	if [ ! -e /dev/tun ]; then
 		mknod /dev/tun c 10 200
 	fi
 	depmod -a
