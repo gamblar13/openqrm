@@ -1,0 +1,106 @@
+#!/bin/bash
+# init script for the openQRM wakeuponlan-plugin
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2010, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+
+OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
+export OPENQRM_SOURCE_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/"
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-package-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/wakeuponlan/include/openqrm-plugin-wakeuponlan-functions
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	OPENQRM_SERVER_IP=$resource_openqrmserver
+elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+	openqrm_server_get_config
+	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+fi
+IP_MGMT_CONFIG_DIR=`dirname $OPENQRM_RESOURCE_PARAMETER_FILE`
+
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+    export WGET="wget --no-check-certificate -q"
+else
+    export WGET="wget -q"
+fi
+
+# only start in the initrd when we have ethtool availalbe
+if [ -f /etc/initrd-devices.conf ]; then
+    if ! which ethtool 1>/ethtool.log; then
+        rm -f /ethtool.log
+        exit 0
+    else
+        rm -f /ethtool.log
+    fi
+else
+    if ! which ethtool 1>/dev/null; then
+        export FORCE_INSTALL=true
+        openqrm_install_os_dependency ethtool
+    fi
+fi
+
+
+function wakeuponlan_start() {
+	echo "Starting the openQRM wakeuponlan plugin"
+    OPENQRM_INTERFACE=`ifconfig | grep -i $resource_mac | grep :oq | cut -d':' -f1`
+    ethtool -s $OPENQRM_INTERFACE wol g 2>/ethtool.log
+    rm -f /ethtool.log
+	echo "- enabled Wake-up-on-LAN on interface $OPENQRM_INTERFACE"
+}
+
+
+function wakeuponlan_stop() {
+	echo "Stopping the openQRM wakeuponlan plugin"
+
+}
+
+
+
+case "$1" in
+	start)
+		wakeuponlan_start
+		;;
+	stop)
+		wakeuponlan_stop
+		;;
+	restart)
+		wakeuponlan_start
+		sleep 1
+		wakeuponlan_stop
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+
+esac
+exit $?
+
+
+
+
+
+
+
+
+
+
+
+
+

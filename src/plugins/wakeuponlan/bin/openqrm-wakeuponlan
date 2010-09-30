@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2010, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+
+# this script automatically manages wakeuponlan
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/wakeuponlan/include/openqrm-plugin-wakeuponlan-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/wakeuponlan/etc/openqrm-plugin-wakeuponlan.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+# get the ip config
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export LANG=C
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+
+if ! which wakeonlan 1>/dev/null; then
+	echo "ERROR: The 'wakeonlan' utility is not installed! Please install and try again."
+	wakeuponlan_log "ERROR: The 'wakeonlan' utility is not installed! Please install and try again."
+	exit 6
+fi
+
+
+function wakeuponlan_usage() {
+	echo "Usage : $0 wakeup -m <resource-mac>"
+	exit 1
+}
+
+
+WAKEUPONLAN_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-m)
+			PARAM_WAKEUPONLAN_RESOURCE_MAC=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			wakeuponlan_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+# checks
+if [ "$WAKEUPONLAN_COMMAND" == "" ]; then
+	wakeuponlan_usage
+fi
+
+
+# main
+case "$WAKEUPONLAN_COMMAND" in
+
+	wakeup)
+        if [ "$PARAM_WAKEUPONLAN_RESOURCE_MAC" == "" ]; then
+            wakeuponlan_usage
+        fi
+        openqrm_post_event 0 "wakeup" 5 "wakeuponlan" "Waking up $PARAM_WAKEUPONLAN_RESOURCE_MAC."
+        wakeonlan $PARAM_WAKEUPONLAN_RESOURCE_MAC
+		;;
+
+
+	*)
+		wakeuponlan_usage
+		;;
+
+
+esac
+
