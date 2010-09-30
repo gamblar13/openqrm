@@ -41,6 +41,7 @@ function citrix_usage() {
 	echo "        $0 post_vm_list <-i citrix-server-ip>"
 	echo "        $0 post_template_list <-i citrix-server-ip>"
 #	echo "        $0 vm-mem-set <-i citrix-server-ip> <-n vm-name> <-m ram>"
+	echo "        $0 fence <-i citrix-server-ip> <-m mac-address>"
 	exit 1
 }
 
@@ -121,7 +122,7 @@ if [ "$CITRIX_COMMAND" == "" ]; then
 	citrix_usage
 fi
 
-if [ "$CITRIX_COMMAND" != "list" ] && [ "$CITRIX_COMMAND" != "post_template_list" ] && [ "$CITRIX_COMMAND" != "post_vm_list" ]  && [ "$CITRIX_COMMAND" != "setboot" ]; then
+if [ "$CITRIX_COMMAND" != "list" ] && [ "$CITRIX_COMMAND" != "post_template_list" ] && [ "$CITRIX_COMMAND" != "post_vm_list" ]  && [ "$CITRIX_COMMAND" != "setboot" ]   && [ "$CITRIX_COMMAND" != "fence" ]; then
 	if [ "$CITRIX_VM_NAME" == "" ]; then
 		citrix_usage
 	fi
@@ -166,7 +167,6 @@ case "$CITRIX_COMMAND" in
 		citrix_log openqrm-citrix "Creating Citrix vm $CITRIX_VM_NAME from template $CITRIX_VM_TEMPLATE"
         VM_TEMPLATE_NAME=`echo $CITRIX_VM_TEMPLATE | sed -e "s/@/ /g"`
         VM_TEMPLATE_NAME=`echo $VM_TEMPLATE_NAME`
-		citrix_log openqrm-citrix "!!!! vm $CITRIX_VM_NAME from template $VM_TEMPLATE_NAME"
 
        	if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vm-install template="$VM_TEMPLATE_NAME" new-name-label=$CITRIX_VM_NAME; then
             citrix_log openqrm-citrix "Failed to install the vm template for creating the new vm $CITRIX_VM_NAME !"
@@ -667,6 +667,51 @@ case "$CITRIX_COMMAND" in
         citrix_lock release
 		;;
 
+
+	fence)
+		if [ "$CITRIX_VM_MAC" == "" ]; then
+			citrix_usage
+		fi
+        citrix_lock aquire
+		citrix_log openqrm-citrix "Fencing Citrix XenServer vm with mac $CITRIX_VM_MAC"
+        VM_VIF_LIST=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+        VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+        VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+        # create list of vifs
+        $CITRIX_XE_BINARY vif-list -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE > $VM_VIF_LIST
+        # create list of vms
+        # skip dom0
+        FOUND_VM=1
+        $CITRIX_XE_BINARY vm-list -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE > $VM_TMPFILE1
+        for UUID in `cat $VM_TMPFILE1 | grep uuid | cut -d':' -f2 | awk {' print $1 '}`; do
+            CITRIX_VM_NAME=`grep -A 1 $UUID $VM_TMPFILE1 | grep name-label | cut -d':' -f2 | awk {' print $1 '}`
+            if [ "$CITRIX_VM_NAME" != "Control" ]; then
+                CITRIX_VM_STATE=`grep -A 2 $UUID $VM_TMPFILE1 | grep power-state | cut -d':' -f2 | awk {' print $1 '}`
+                # gather the mac address
+                CITRIX_VM_VIF_UUID=`grep -B 1 $UUID $VM_VIF_LIST | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+                VM_NIC_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+                $CITRIX_XE_BINARY vif-param-list -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE uuid=$CITRIX_VM_VIF_UUID > $VM_NIC_TMPFILE
+                CITRIX_GATHER_VM_MAC=`grep " MAC " $VM_NIC_TMPFILE | cut -d':' -f2- | awk {' print $1 '}`
+                rm -f $VM_NIC_TMPFILE
+                if [ "$CITRIX_VM_MAC" == "$CITRIX_GATHER_VM_MAC" ]; then
+                    citrix_log openqrm-citrix "Found Citrix XenServer vm with name $CITRIX_VM_NAME, mac $CITRIX_VM_MAC and vm uuid $UUID"
+                    FOUND_VM=1
+                    CITRIX_VM_UUID=$UUID
+                    break
+                fi
+            fi
+        done
+        rm -f $VM_TMPFILE1 $VM_TMPFILE2
+        if [ "$FOUND_VM" == 0 ]; then
+            citrix_log openqrm-citrix "Failed to find the Citrix XenServer vm with mac $CITRIX_VM_MAC !"
+            openqrm_post_event 0 "vm-install" 3 "openqrm-citrix" "Failed to find the Citrix XenServer vm with mac $CITRIX_VM_MAC !"
+            citrix_lock release
+            exit 1
+        fi
+        # stop hard
+		$CITRIX_XE_BINARY vm-shutdown -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE uuid=$CITRIX_VM_UUID force=true
+        citrix_lock release
+		;;
 
 
 

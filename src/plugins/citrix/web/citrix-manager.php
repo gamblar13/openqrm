@@ -321,9 +321,33 @@ if(htmlobject_request('action_table1') != '') {
                      // already authenticated ?
                     $citrix_auth_file=$_SERVER["DOCUMENT_ROOT"]."/openqrm/base/plugins/citrix/citrix-stat/citrix-host.pwd.".$citrix_server_ip;
                     if (!file_exists($citrix_auth_file)) {
-                        $strMsg .= "Citrix XenServer not yet authenticated. Please authenticate !";
-                        redirect($strMsg, "tab0");
+                        $strMsg .= "Citrix XenServer $citrix_server_id not yet authenticated. Please authenticate !";
+                        continue;
                     }
+                    // check if the resource still belongs to an appliance, if yes we do not remove it
+                    $citrix_vm_mac = $citrix_vm_mac_ar[$citrix_name];
+                    $citrix_vm_resource = new resource();
+                    $citrix_vm_resource->get_instance_by_mac($citrix_vm_mac);
+                    $citrix_vm_id=$citrix_vm_resource->id;
+                    $resource_is_used_by_appliance = "";
+                    $remove_error = 0;
+                    $appliance = new appliance();
+                    $appliance_id_list = $appliance->get_all_ids();
+                    foreach($appliance_id_list as $appliance_list) {
+                        $appliance_id = $appliance_list['appliance_id'];
+                        $app_resource_remove_check = new appliance();
+                        $app_resource_remove_check->get_instance_by_id($appliance_id);
+                        if ($app_resource_remove_check->resources == $citrix_vm_id) {
+                            $resource_is_used_by_appliance .= $appliance_id." ";
+                            $remove_error = 1;
+                        }
+                    }
+                    if ($remove_error == 1) {
+                        $strMsg .= "VM Resource id ".$citrix_vm_id." is used by appliance(s): ".$resource_is_used_by_appliance." <br>";
+                        $strMsg .= "Not removing VM resource id ".$citrix_vm_id." !<br>";
+        				continue;
+                    }
+                    // remove vm
                     // remove current stat file
                     $statfile="citrix-stat/citrix-vm.lst.".$citrix_server_ip;
                     if (file_exists($statfile)) {
@@ -333,10 +357,6 @@ if(htmlobject_request('action_table1') != '') {
                     $citrix_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/bin/openqrm-citrix remove -i $citrix_server_ip -n $citrix_name";
                     $openqrm_server->send_command($citrix_command);
                     // we should remove the resource of the vm !
-                    $citrix_vm_mac = $citrix_vm_mac_ar[$citrix_name];
-                    $citrix_vm_resource = new resource();
-                    $citrix_vm_resource->get_instance_by_mac($citrix_vm_mac);
-                    $citrix_vm_id=$citrix_vm_resource->id;
                     $citrix_vm_resource->remove($citrix_vm_id, $citrix_vm_mac);
                     // wait for statfile to appear again
                     if (!wait_for_statfile($statfile)) {
