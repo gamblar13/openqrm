@@ -31,6 +31,7 @@ require_once "$RootDir/class/image_authentication.class.php";
 require_once "$RootDir/class/storage.class.php";
 require_once "$RootDir/class/deployment.class.php";
 require_once "$RootDir/class/appliance.class.php";
+require_once "$RootDir/class/authblocker.class.php";
 require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/openqrm-server-config.php";
 
@@ -96,7 +97,13 @@ global $event;
 	
 		switch($cmd) {
 			case "start":
-
+                    // remove storage-auth-blocker if existing
+                    $authblocker = new authblocker();
+                    $authblocker->get_instance_by_image_name($image_name);
+                    if (strlen($authblocker->id)) {
+                        $event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-tmpfs-deployment-auth-hook.php", "Removing authblocker for image $image_name", "", "", 0, 0, 0);
+                        $authblocker->remove($authblocker->id);
+                    }
 		 			// authenticate the install-from-nfs export
                     $run_disable_deployment_export=0;
                     $install_from_nfs_param = trim($image->get_deployment_parameter("IMAGE_INSTALL_FROM_NFS"));
