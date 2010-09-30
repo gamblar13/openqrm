@@ -1,0 +1,46 @@
+#!/bin/sh
+# this script list the vms on the esx
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+#
+
+OPENQRM_VM_DIR=$1
+#OPENQRM_VM_DIR=/vmfs/volumes/esxdata
+
+for VMID in `vim-cmd vmsvc/getallvms | grep -v Vmid | awk {' print $1 '}`; do
+    VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+    vim-cmd vmsvc/get.summary $VMID > $VM_TMPFILE
+    # name
+    VM_NAME=`grep "name =" $VM_TMPFILE | cut -d '"' -f2`
+    # state
+    VM_STATE=`grep "powerState =" $VM_TMPFILE | cut -d '"' -f2`
+    # mem
+    VM_MEM=`grep "memorySizeMB =" $VM_TMPFILE | cut -d '=' -f2 | sed -e "s/,//g" | awk {' print $1 '}`
+    # cpu
+    VM_CPU=`grep "numCpu =" $VM_TMPFILE | cut -d '=' -f2 | sed -e "s/,//g" | awk {' print $1 '}`
+    # nics
+    VM_NET=`grep "numEthernetCards =" $VM_TMPFILE | cut -d '=' -f2 | sed -e "s/,//g" | awk {' print $1 '}`
+    # disks
+    VM_DISK=`grep "numVirtualDisks =" $VM_TMPFILE | cut -d '=' -f2 | sed -e "s/,//g" | awk {' print $1 '}`
+    # mac
+    grep 'ethernet0.address =' $OPENQRM_VM_DIR/$VM_NAME/$VM_NAME.vmx > $VM_TMPFILE
+    VM_MAC=`grep "ethernet0.address =" $VM_TMPFILE | cut -d '"' -f2`
+    echo "$VMID""@""$VM_NAME""@""$VM_MAC""@""$VM_STATE""@""$VM_MEM""@""$VM_CPU""@""$VM_NET""@""$VM_DISK"
+    rm -f $VM_TMPFILE
+done
+
+

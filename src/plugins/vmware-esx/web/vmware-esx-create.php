@@ -82,7 +82,7 @@ global $vmware_vm_vnc_port;
 
 $action=htmlobject_request('action');
 $refresh_delay=1;
-$refresh_loop_max=60;
+$refresh_loop_max=600;
 $vmware_mac_address_space = "00:50:56:20";
 
 $event = new event();
@@ -94,7 +94,7 @@ global $OPENQRM_SERVER_BASE_DIR;
 
 
 function redirect_mgmt($strMsg, $currenttab = 'tab0', $vmware_esx_id) {
-    $url = 'vmware-esx-manager.php?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab.'&action=refresh&identifier[]='.$vmware_esx_id;
+    $url = 'vmware-esx-manager.php?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab.'&vmware_esx_id='.$vmware_esx_id;
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
@@ -253,7 +253,8 @@ if(htmlobject_request('action') != '') {
                 $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/openqrm-vmware-esx create -n $vmware_esx_name -m $vmware_esx_mac -r $vmware_esx_ram -i $vmware_esx->ip -c $vmware_esx_cpus $vmware_esx_disk_parameter $vmware_esx_swap_parameter $create_vm_vnc_parameter";
                 // remove current stat file
                 $vmware_esx_resource_id = $vmware_esx->id;
-                $statfile="vmware-esx-stat/".$vmware_esx_resource_id.".vm_list";
+                $vmware_esx_resource_ip = $vmware_esx->ip;
+                $statfile="vmware-esx-stat/".$vmware_esx_resource_ip.".vm_list";
                 if (file_exists($statfile)) {
                     unlink($statfile);
                 }
@@ -280,10 +281,11 @@ if(htmlobject_request('action') != '') {
                 // and wait for the resulting statfile
                 if (!wait_for_statfile($statfile)) {
                     $strMsg .= "Error during creating the vm on VMware ESX Host $vmware_esx_id ! Please check the Event-Log<br>";
+                    redirect($strMsg, "tab0", $vmware_esx_id);
                 } else {
-                    $strMsg .="Created vm $vmware_esx_name on VMware server 2 Host $vmware_esx_id<br>";
+                    $strMsg .="Created vm $vmware_esx_name on VMware ESX Host $vmware_esx_id<br>";
+                    redirect_mgmt($strMsg, "tab0", $vmware_esx_id);
                 }
-                redirect($strMsg, "tab0", $vmware_esx_id);
             }
             break;
 

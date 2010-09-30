@@ -48,7 +48,8 @@ function vmware_esx_usage() {
 	vmware_esx_log "        $0 create <-i esx-server-ip> <-n vm-name> <-m mac-address> <-r memory> [-d disk-size ] [-c cpus ] [-s swap-size ] [-va vnc-password ] [-vp vnc-port ]"
 	vmware_esx_log "        $0 setboot <-m mac-address> <-b local/net> <-i esx-server-ip>"
 	vmware_esx_log "        $0 post_vm_list"
-	vmware_esx_log "        $0 init <-i esx-server-ip> [ -u openqrm-user ] [ -p openqrm-password ]"
+	vmware_esx_log "        $0 init <-i esx-server-ip>"
+	vmware_esx_log "        $0 fence <-m mac-address> <-i esx-server-ip>"
 	exit 1
 }
 
@@ -79,7 +80,6 @@ function vmware_esx_get_vmid() {
 		echo $VMID
 	fi	
 }
-
 
 
 VMWARE_ESX_COMMAND=$1
@@ -191,30 +191,33 @@ if [ "$VMWARE_ESX_COMMAND" == "" ]; then
 	openqrm_post_event 0 "parameter_check" 3 "openqrm-vmware-esx" "Wrong usage, no command given!"
 fi
 
-if [ "$VMWARE_ESX_COMMAND" != "list" ] && [ "$VMWARE_ESX_COMMAND" != "init" ] && [ "$VMWARE_ESX_COMMAND" != "setboot" ] && [ "$VMWARE_ESX_COMMAND" != "post_vm_list" ]; then
+if [ "$VMWARE_ESX_COMMAND" != "list" ] && [ "$VMWARE_ESX_COMMAND" != "init" ] && [ "$VMWARE_ESX_COMMAND" != "setboot" ] && [ "$VMWARE_ESX_COMMAND" != "post_vm_list" ]  && [ "$VMWARE_ESX_COMMAND" != "fence" ]; then
     if [ "$VMWARE_ESX_VM_NAME" == "" ]; then
         vmware_esx_usage
         openqrm_post_event 0 "parameter_check" 3 "openqrm-vmware-esx" "Wrong usage, vm name missing!"
     fi
 fi
 
-# here we check if a default datastore is set, if not we are trying to gather
-# the first datastore from the ESX server and use that
-if [ "$OPENQRM_VMWARE_ESX_DEFAULT_DATASTORE" != "" ]; then
-    vmware_esx_log "Using $OPENQRM_VMWARE_ESX_DEFAULT_DATASTORE as the default datastore on VMware ESX Host $VMWARE_ESX_HOST_IP ! Configured in $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf"
-    OPENQRM_VM_DIR="/vmfs/volumes/$OPENQRM_VMWARE_ESX_DEFAULT_DATASTORE/"
-else
-    OPENQRM_VMWARE_ESX_DATASTORE=`$OPENQRM_ESX_CMD $OPENQRM_VMWARE_ESX_VM_COMMAND hostsvc/datastore/listsummary | grep "name =" | head -n1 | sed -e 's/,//g;s/"//g' | cut -d'=' -f2 | awk {' print $1 '}`
-    if [ "$OPENQRM_VMWARE_ESX_DATASTORE" == "" ]; then
-        vmware_esx_log "ERROR: Could not find a default datastore on VMware ESX Host $VMWARE_ESX_HOST_IP ! Please manually configure a default datastore in $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf"
-        openqrm_post_event 0 "default-datastore-setup" 3 "openqrm-vmware-esx" "Could not find a default datastore on VMware ESX Host $VMWARE_ESX_HOST_IP ! Please manually configure a default datastore in $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf"
-        exit 1
+# get datastore only for the commands which needs it
+if [ "$VMWARE_ESX_COMMAND" ==  "create" ] || [ "$VMWARE_ESX_COMMAND" == "post_vm_list" ]; then
+    # here we check if a default datastore is set, if not we are trying to gather
+    # the first datastore from the ESX server and use that
+    if [ "$OPENQRM_VMWARE_ESX_DEFAULT_DATASTORE" != "" ]; then
+        vmware_esx_log "Using $OPENQRM_VMWARE_ESX_DEFAULT_DATASTORE as the default datastore on VMware ESX Host $VMWARE_ESX_HOST_IP ! Configured in $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf"
+        OPENQRM_VM_DIR="/vmfs/volumes/$OPENQRM_VMWARE_ESX_DEFAULT_DATASTORE/"
     else
-        vmware_esx_log "Using $OPENQRM_VMWARE_ESX_DATASTORE as the default datastore on VMware ESX Host $VMWARE_ESX_HOST_IP ! You can manually set the default datastore in $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf"
-        OPENQRM_VM_DIR="/vmfs/volumes/$OPENQRM_VMWARE_ESX_DATASTORE/"
+        OPENQRM_VMWARE_ESX_DATASTORE=`$OPENQRM_ESX_CMD $OPENQRM_VMWARE_ESX_VM_COMMAND hostsvc/datastore/listsummary | grep "name =" | head -n1 | sed -e 's/,//g;s/"//g' | cut -d'=' -f2 | awk {' print $1 '}`
+        if [ "$OPENQRM_VMWARE_ESX_DATASTORE" == "" ]; then
+            vmware_esx_log "ERROR: Could not find a default datastore on VMware ESX Host $VMWARE_ESX_HOST_IP ! Please manually configure a default datastore in $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf"
+            openqrm_post_event 0 "default-datastore-setup" 3 "openqrm-vmware-esx" "Could not find a default datastore on VMware ESX Host $VMWARE_ESX_HOST_IP ! Please manually configure a default datastore in $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf"
+            exit 1
+        else
+            vmware_esx_log "Using $OPENQRM_VMWARE_ESX_DATASTORE as the default datastore on VMware ESX Host $VMWARE_ESX_HOST_IP ! You can manually set the default datastore in $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf"
+            OPENQRM_VM_DIR="/vmfs/volumes/$OPENQRM_VMWARE_ESX_DATASTORE/"
+        fi
     fi
+    echo $OPENQRM_DATASTORE_DIR
 fi
-
 
 
 case "$VMWARE_ESX_COMMAND" in 
@@ -234,7 +237,6 @@ case "$VMWARE_ESX_COMMAND" in
         if [ "$VMWARE_ESX_VM_CPU" == "" ]; then
             VMWARE_ESX_VM_CPU=1
         fi
-
 		# creating the vmx
 		mkdir -p /tmp/vmware-esx-plugin/$VMWARE_ESX_VM_NAME/
         echo '#!/usr/bin/vmware' > /tmp/vmware-esx-plugin/$VMWARE_ESX_VM_NAME/$VMWARE_ESX_VM_NAME.vmx
@@ -496,28 +498,7 @@ EOF
 		ESX_STATS="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/$VMWARE_ESX_HOST_IP.vm_list"
 		ESX_STATS_TMP="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/$VMWARE_ESX_HOST_IP.vm_list.tmp"
         rm -f $ESX_STATS
-        > $ESX_STATS_TMP
-        for VMID in `$OPENQRM_ESX_CMD $OPENQRM_VMWARE_ESX_VM_COMMAND vmsvc/getallvms | grep -v Vmid | awk {' print $1 '}`; do
-            VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
-            $OPENQRM_ESX_CMD $OPENQRM_VMWARE_ESX_VM_COMMAND vmsvc/get.summary $VMID > $VM_TMPFILE
-            # name
-            VM_NAME=`grep "name =" $VM_TMPFILE | cut -d '"' -f2`
-            # state
-            VM_STATE=`grep "powerState =" $VM_TMPFILE | cut -d '"' -f2`
-            # mem
-            VM_MEM=`grep "memorySizeMB =" $VM_TMPFILE | cut -d '=' -f2 | sed -e "s/,//g" | awk {' print $1 '}`
-            # cpu
-            VM_CPU=`grep "numCpu =" $VM_TMPFILE | cut -d '=' -f2 | sed -e "s/,//g" | awk {' print $1 '}`
-            # nics
-            VM_NET=`grep "numEthernetCards =" $VM_TMPFILE | cut -d '=' -f2 | sed -e "s/,//g" | awk {' print $1 '}`
-            # disks
-            VM_DISK=`grep "numVirtualDisks =" $VM_TMPFILE | cut -d '=' -f2 | sed -e "s/,//g" | awk {' print $1 '}`
-            # mac
-            $OPENQRM_ESX_CMD "grep 'ethernet0.address =' $OPENQRM_VM_DIR/$VM_NAME/$VM_NAME.vmx" > $VM_TMPFILE
-            VM_MAC=`grep "ethernet0.address =" $VM_TMPFILE | cut -d '"' -f2`
-            echo "$VMID""@""$VM_NAME""@""$VM_MAC""@""$VM_STATE""@""$VM_MEM""@""$VM_CPU""@""$VM_NET""@""$VM_DISK" >> $ESX_STATS_TMP
-            rm -f $VM_TMPFILE
-        done
+        $OPENQRM_ESX_CMD "/bin/openqrm-vmware-esx-list $OPENQRM_VM_DIR" > $ESX_STATS_TMP
         /bin/mv $ESX_STATS_TMP $ESX_STATS
         chmod 777 $ESX_STATS
 		;;
@@ -579,27 +560,27 @@ EOF
             $0 post_vm_list -i $VMWARE_ESX_HOST_IP
         fi
         if [ ! -f "$ESX_STATS" ]; then
-            vmware_esx_log "Could not get a VM list for VMware Server 2 $VMWARE_ESX_HOST_IP"
+            vmware_esx_log "Could not get a VM list for VMWare ESX $VMWARE_ESX_HOST_IP"
             exit 1
         fi
         VMID=`cat $ESX_STATS | grep $VMWARE_ESX_VM_MAC | cut -d'@' -f1`
         if [ "$VMID" == "" ]; then
-    		vmware_esx_log "Cloud not find a registerd VMware Server 2 vm with mac $VMWARE_ESX_VM_MAC on this host"
+    		vmware_esx_log "Cloud not find a registerd VMWare ESX vm with mac $VMWARE_ESX_VM_MAC on this host"
             vmware_esx_lock release
             exit 1
         fi
         case "$VMWARE_ESX_VM_BOOT" in
             local)
-        		vmware_esx_log "Setting VMware-Server 2 vm $VMID with mac $VMWARE_ESX_VM_MAC to local-boot"
+        		vmware_esx_log "Setting VMWare ESX vm $VMID with mac $VMWARE_ESX_VM_MAC to local-boot"
                 ;;
             net)
-        		vmware_esx_log "Setting VMware-Server 2 vm $VMID with mac $VMWARE_ESX_VM_MAC to net-boot"
+        		vmware_esx_log "Setting VMWare ESX vm $VMID with mac $VMWARE_ESX_VM_MAC to net-boot"
                 ;;
         esac
 		# hard restart it to apply its configuration
         # we do it here because the openQRM server engine does not
         # know anything about the vm name to restart it later
-		vmware_esx_log "Restarting VMware Server 2 vm $VMID"
+		vmware_esx_log "Restarting VMWare ESX vm $VMID"
 		$OPENQRM_ESX_CMD $OPENQRM_VMWARE_ESX_VM_COMMAND vmsvc/power.off $VMID | logger
 		$OPENQRM_VMWARE_ESX_CMD_CHECK_DELAY
 		$OPENQRM_ESX_CMD $OPENQRM_VMWARE_ESX_VM_COMMAND vmsvc/power.on $VMID | logger
@@ -629,18 +610,12 @@ EOF
             echo
         fi
 		vmware_esx_lock aquire
-        # we have to add the chebang later to not depend on ash for packaging
-        echo "#\!/bin/ash" > /tmp/openqrm-vmware-esx-monitord
-        sed -i -e "s#\\\##g" /tmp/openqrm-vmware-esx-monitord
-        cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/openqrm-vmware-esx-monitord >> /tmp/openqrm-vmware-esx-monitord
-		scp /tmp/openqrm-vmware-esx-monitord $VMWARE_ESX_HOST_IP:/bin/ | logger
-        rm -f /tmp/openqrm-vmware-esx-monitord
-		$OPENQRM_ESX_CMD "chmod +x /bin/openqrm-vmware-esx-monitord"
-		$OPENQRM_ESX_BACKGROUND_CMD "/bin/openqrm-vmware-esx-monitord start $OPENQRM_SERVER_IP_ADDRESS $VMWARE_ESX_HOST_IP $OPENQRM_USERNAME $OPENQRM_PASSWORD"
+		scp $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/openqrm-vmware-esx-monitord $VMWARE_ESX_HOST_IP:/bin/ | logger
+		scp $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/openqrm-vmware-esx-init $VMWARE_ESX_HOST_IP:/bin/ | logger
+		scp $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/openqrm-vmware-esx-list $VMWARE_ESX_HOST_IP:/bin/ | logger
+		scp $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/init.d/openqrm-esx-monitord $VMWARE_ESX_HOST_IP:/etc/init.d/ | logger
+		$OPENQRM_ESX_CMD "/bin/openqrm-vmware-esx-init $OPENQRM_SERVER_IP_ADDRESS $VMWARE_ESX_HOST_IP $OPENQRM_USERNAME $OPENQRM_PASSWORD"
         $OPENQRM_VMWARE_ESX_CMD_CHECK_DELAY
-        $OPENQRM_VMWARE_ESX_CMD_CHECK_DELAY
-        # post_vm_list again
-        $0 post_vm_list -i $VMWARE_ESX_HOST_IP
 		vmware_esx_lock release
 		;;
 
@@ -806,6 +781,39 @@ EOF
 		;;
 
 
+
+	fence)
+       unset VMWARE_ESX_VM_NAME
+		if [ "$VMWARE_ESX_VM_MAC" == "" ]; then
+			vmware-server2_usage
+		fi
+		if [ "$VMWARE_ESX_HOST_IP" == "" ]; then
+            echo "ERROR: VMWARE_ESX_HOST_IP is empty" | logger
+			vmware_esx_usage
+		fi
+		vmware_esx_lock aquire
+		vmware_esx_log "Fencing vm with mac $VMWARE_ESX_VM_MAC"
+        # this command is is running from the openQRM engine which does
+        # not know about the vm-name
+        ESX_STATS="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/$VMWARE_ESX_HOST_IP.vm_list"
+        if [ ! -f "$ESX_STATS" ]; then
+            $0 post_vm_list -i $VMWARE_ESX_HOST_IP
+        fi
+        if [ ! -f "$ESX_STATS" ]; then
+            vmware_esx_log "Could not get a VM list for VMWare ESX $VMWARE_ESX_HOST_IP"
+            exit 1
+        fi
+        VMID=`cat $ESX_STATS | grep $VMWARE_ESX_VM_MAC | cut -d'@' -f1`
+        if [ "$VMID" == "" ]; then
+    		vmware_esx_log "Cloud not find a registerd VMWare ESX vm with mac $VMWARE_ESX_VM_MAC on this host"
+            vmware_esx_lock release
+            exit 1
+        fi
+		# stop hard
+		vmware_esx_log "Fencing VMware VMWare ESX vm $VMID"
+		$OPENQRM_ESX_CMD $OPENQRM_VMWARE_ESX_VM_COMMAND vmsvc/power.off $VMID | logger
+		vmware_esx_lock release
+		;;
 
 
 

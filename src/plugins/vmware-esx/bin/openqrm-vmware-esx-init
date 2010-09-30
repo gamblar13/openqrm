@@ -1,0 +1,107 @@
+#!/bin/sh
+# this is a very much stripped down openQRM monitor daemon
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+#
+
+OPENQRM_SERVER_IP=$1
+ESX_SERVER_IP=$2
+USER=$3
+PASSWORD=$4
+MONITORD_LOCKFILE="/var/run/openqrm-vmware-esx-monitord"
+OPENQRM_RESOURCE_PARAMETER_FILE="/var/openqrm/openqrm-resource.conf"
+export LANG=C
+
+# main
+if [ "$OPENQRM_SERVER_IP" == "" ] || [ "$ESX_SERVER_IP" == "" ] || [ "$USER" == "" ] || [ "$PASSWORD" == "" ]; then
+    echo "Usage : $0 <openqrm-server-ip> <esx-ip> <openqrm-user> <openqrm-password>"
+    exit 1
+fi
+
+
+# if we do not have a resource-parameter file yet we run integrate
+if [ ! -f "$OPENQRM_RESOURCE_PARAMETER_FILE" ]; then
+	mkdir -p `dirname $OPENQRM_RESOURCE_PARAMETER_FILE`
+	resource_id=-1
+	resource_ip="$ESX_SERVER_IP"
+	resource_mac=`vim-cmd hostsvc/net/config | grep -A5 "ipAddress" | grep -A5 $ESX_SERVER_IP | grep "mac " | cut -d'"' -f2`
+	# remove whitespaces
+	resource_mac=`echo $resource_mac`
+	echo "Using $resource_ip/$resource_mac"
+    # https will fail since busybox on the esx does not support https connections
+    # try http
+    busybox wget -q -O $OPENQRM_RESOURCE_PARAMETER_FILE "http://$OPENQRM_SERVER_IP/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_id=$resource_id&resource_mac=$resource_mac&resource_ip=$resource_ip"
+    sleep 2
+    # check if http was successfull
+    if ! grep resource_openqrmserver $OPENQRM_RESOURCE_PARAMETER_FILE 1>/dev/null 2>&1; then
+        echo "ERROR: Could not integrate the VMware ESX server into the openQRM-server at $OPENQRM_SERVER_IP!"
+        rm -f $MONITORD_LOCKFILE
+        exit 1
+    fi
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+    # https will fail since busybox on the esx does not support https connections
+    WGET_NO_CERT_CHECK=""
+    openqrm_web_protocol="http"
+
+	# gather some more details to create the appliance on the openQRM-server
+	local_server_root_device=`mount | grep ' / ' | awk {' print $1 '}`
+	local_server_root_device_type=`mount | grep ' / ' | awk {' print $5 '}`
+	local_server_kernel_version=`uname -r`
+
+	# now we integrate it via the local-sever plugin
+	if ! busybox wget -O /dev/null $WGET_NO_CERT_CHECK -q "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/action/vmware-esx-integrate.php?USER=$USER&PASSWORD=$PASSWORD&local_server_command=integrate&local_server_id=$resource_id&local_server_root_device=$local_server_root_device&local_server_root_device_type=$local_server_root_device_type&local_server_kernel_version=$local_server_kernel_version"; then
+		echo "ERROR: Could not create the appliance resource$resouce_id on the openQRM-server!"
+		sleep 2
+		echo "NOTCIE: Removing the system from openQRM because of errors !"
+		# try to remove components from the local-server appliance
+		if ! busybox wget -O /dev/null $WGET_NO_CERT_CHECK -q  "$openqrm_web_protocol://$OPENQRM_SERVER/openqrm/action/vmware-esx-integrate.php?USER=$USER&PASSWORD=$PASSWORD&local_server_command=remove&local_server_id=$resource_id"; then
+			echo "WARNING: Could not remove the appliance resource$resouce_id from the openQRM-server!"
+		fi
+		rm -f $MONITORD_LOCKFILE
+		exit 1
+	fi
+
+    # start montitord
+    if `which screen 2>/dev/null`; then
+        if [ -x /usr/bin/screen.real ]; then
+            RUNSCREEN="/usr/bin/screen.real"
+        else
+            RUNSCREEN=`which screen`
+        fi
+		SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+        OPENQRM_ESX_MONITORD_START_CMD="$RUNSCREEN -dmS openqrm-montitord /bin/openqrm-vmware-esx-monitord"
+    else
+        OPENQRM_ESX_MONITORD_START_CMD="busybox nohup /bin/openqrm-vmware-esx-monitord &"
+    fi
+    # add to init
+    # check which esx version we are running
+    if [ -f /etc/redhat-release ]; then
+        chkconfig --add openqrm-esx-monitord
+    fi
+    $OPENQRM_ESX_MONITORD_START_CMD
+
+else
+    echo "ERROR: This ESX Server is already integrated in openQRM!"
+    echo "To re-integrate it please remove : $OPENQRM_RESOURCE_PARAMETER_FILE"
+    echo "and try again"
+    exit 1
+fi
+
+
+
+
+
