@@ -117,9 +117,18 @@ buildrequirements:
 	@. $(OPENQRM_SERVER_CONF) && ./make-assistant openqrm_check_build_requirements
 	if [ -d ./thirdparty ]; then mkdir -p ../buildtmp; cp -aR ./thirdparty/* ../buildtmp/; fi
 
-update:
+updatesrc:
 	@if [ -d .svn ]; then svn update;fi
 
+update: all
+	@. $(OPENQRM_SERVER_CONF) && if [ ! -d $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/bin ]; then echo "openQRM is not installed" && exit 1; fi
+	@chmod +x make-assistant
+	@. $(OPENQRM_SERVER_CONF) && cp -f bin/openqrm-update $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update && chmod +x $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update
+	@. $(OPENQRM_SERVER_CONF) && cp -f include/openqrm-build-functions $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/include/
+	@. $(OPENQRM_SERVER_CONF) && ./make-assistant openqrm_pre_update
+	@. $(OPENQRM_SERVER_CONF) && ./make-assistant make install
+	@. $(OPENQRM_SERVER_CONF) && ./make-assistant openqrm_base_update
+	@. $(OPENQRM_SERVER_CONF) && ./make-assistant openqrm_post_update
 
-.PHONY: all configure compile install start uninstall clean realclean reinstall rpm deb debsource check initrd buildrequirements update
+.PHONY: all configure compile install start uninstall clean realclean reinstall rpm deb debsource check initrd buildrequirements updatesrc update
 
