@@ -46,7 +46,7 @@ if [ -x "/sbin/rpc.statd" ]; then
 fi
 
 
-OPENQRM_INITRD_COMPONENTS="$OPENQRM_INITRD_COMPONENTS /bin/bash /usr/bin/rsync /usr/bin/wget /sbin/modprobe /sbin/depmod /sbin/insmod /sbin/lsmod /sbin/mke2fs /sbin/sfdisk /sbin/udevd"
+OPENQRM_INITRD_COMPONENTS="$OPENQRM_INITRD_COMPONENTS /bin/bash /usr/bin/rsync /usr/bin/wget /sbin/modprobe /sbin/depmod /sbin/insmod /sbin/lsmod /sbin/mke2fs /sbin/sfdisk /sbin/udevd /sbin/lvm /usr/sbin/ethtool"
 OPENQRM_INITRD_DIRECTORIES="bin etc etc/rc.d/init.d etc/sysconfig etc/X11 lib lib/modules lib/i686 loopfs mnt old_root proc sys sysroot usr usr/lib usr/bin usr/sbin var var/lock var/lock/subsys var/log var/run /var/lib /var/lib/nfs /var/lib/nfs/statd"
 
 # colorize/emphasize terminal output
@@ -344,7 +344,10 @@ function openqrm_create_default_initrd_template() {
 	done
 	# fix wget
 	rm -f $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/usr/bin/wget
-
+    # if lvm is a link to lvm.static (e.g. on centos)
+    if [ -x /sbin/lvm.static ]; then
+        cp -a /sbin/lvm.static $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/
+    fi
 	# create default udhcpc script
 	mkdir -p $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/usr/share/udhcpc
 	cat > $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/usr/share/udhcpc/default.script << EOF
@@ -608,6 +611,7 @@ function openqrm_get_js_interface() {
 	cd $CURRENT_DIR
 }
 
+
 # function to install the jquery-bundle
 # -> this is for "make install" phase
 function openqrm_install_js_interface() {
@@ -618,6 +622,28 @@ function openqrm_install_js_interface() {
 	mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/js
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/js-interface/interface_$INTERFACE_VERSION/interface.js $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/js/
 }
+
+
+
+# function to get the htmlobjects
+# -> this is for "make " phase
+function openqrm_get_htmlobjects() {
+	CURRENT_DIR=`pwd`
+	openqrm_cache_or_download htmlobjects
+    rm -rf "$OPENQRM_BUILD_TMP_DIR/openqrm-build/htmlobjects/htmlobjects"
+	cd $OPENQRM_BUILD_TMP_DIR/openqrm-build/htmlobjects/
+    tar -xzf source/htmlobjects.tar.gz
+	cd $CURRENT_DIR
+}
+
+
+# function to install the htmlobjects
+# -> this is for "make install" phase
+function openqrm_install_htmlobjects() {
+	mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/class/htmlobjects
+	cp -aR $OPENQRM_BUILD_TMP_DIR/openqrm-build/htmlobjects/htmlobjects/* $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/class/htmlobjects/
+}
+
 
 
 
@@ -650,7 +676,7 @@ function openqrm_get_openqrm_clients() {
 # function to install the additional initrd-templates
 # -> this is for "make install" phase
 function openqrm_install_initrd_templates() {
-    CLIENT_VERSION="4.6.1"
+    CLIENT_VERSION="4.7.1"
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.centos.i386/source/openqrm-initrd-template.$CLIENT_VERSION.centos.i386.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-template.centos.i386.tgz
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.centos.x86_64/source/openqrm-initrd-template.$CLIENT_VERSION.centos.x86_64.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-template.centos.x86_64.tgz
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.debian.i386/source/openqrm-initrd-template.$CLIENT_VERSION.debian.i386.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-template.debian.i386.tgz
@@ -663,7 +689,7 @@ function openqrm_install_initrd_templates() {
 # function to install the additional openqrm-client packages
 # -> this is for "make install" phase
 function openqrm_install_openqrm_clients() {
-    CLIENT_VERSION="4.6.1"
+    CLIENT_VERSION="4.7.1"
     mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-client.centos.i386/source/openqrm-client.$CLIENT_VERSION.centos.i386.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/openqrm-client.centos.i386.tgz
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-client.centos.x86_64/source/openqrm-client.$CLIENT_VERSION.centos.x86_64.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/openqrm-client.centos.x86_64.tgz
@@ -674,6 +700,26 @@ function openqrm_install_openqrm_clients() {
 }
 
 
+
+
+# --------------------------------------------------------------------
+# ------------------------- update function --------------------------
+# --------------------------------------------------------------------
+
+# function to run commands before the update of openQRM
+function openqrm_pre_update() {
+    $OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update pre -f
+}
+
+# function to run commands after the update of openQRM
+function openqrm_post_update() {
+    $OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update post -f
+}
+
+# function to update openQRM base
+function openqrm_base_update() {
+    $OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update base -f
+}
 
 
 
