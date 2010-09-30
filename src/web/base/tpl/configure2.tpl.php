@@ -75,8 +75,7 @@ a {
 
     <div id="config_text">
     <h4>Please select a Database type</h4>
-    Select the Database type to use for storing the openQRM data. openQRM supports
-    MySQL, Postgres, Oracle and DB2 Databases.
+    Select the Database type to use for storing the openQRM data.
     </div>
 
 	<div id="config_table">

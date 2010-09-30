@@ -334,6 +334,9 @@ function openqrm_server_config_select_db() {
     $arBody[] = array(
         'oqc_db_type' => "mysql",
     );
+
+    /* disabled postgres, oracle and db2 support for now
+     * will be re-worked for version 5.0
     $arBody[] = array(
         'oqc_db_type' => "postgres",
     );
@@ -343,6 +346,7 @@ function openqrm_server_config_select_db() {
     $arBody[] = array(
         'oqc_db_type' => "db2",
     );
+     */
 	$table->id = 'Tabelle';
 	$table->css = 'htmlobject_table';
 	$table->border = 1;
