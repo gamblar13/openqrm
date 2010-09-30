@@ -97,7 +97,7 @@ create table event_info(
 	event_time VARCHAR2(50),
 	event_priority INTEGER,
 	event_source VARCHAR2(50),
-	event_description VARCHAR2(100),
+	event_description VARCHAR2(255),
 	event_comment VARCHAR2(100),
 	event_capabilities VARCHAR2(255),
 	event_status INTEGER,
@@ -162,6 +162,14 @@ create table image_authentication_info(
 	ia_image_id INTEGER,
 	ia_resource_id INTEGER,
 	ia_auth_type INTEGER
+);
+
+drop table auth_blocker_info;
+create table auth_blocker_info(
+	ab_id INTEGER NOT NULL PRIMARY KEY,
+	ab_image_id INTEGER,
+	ab_image_name VARCHAR2(50),
+	ab_start_time VARCHAR2(20)
 );
 
 drop table deployment_info;

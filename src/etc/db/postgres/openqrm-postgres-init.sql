@@ -96,7 +96,7 @@ create table event_info(
 	event_time varchar(50),
 	event_priority int8,
 	event_source varchar(50),
-	event_description varchar(100),
+	event_description varchar(255),
 	event_comment varchar(100),
 	event_capabilities varchar(255),
 	event_status int8,
@@ -160,6 +160,14 @@ create table image_authentication_info(
 	ia_image_id int8,
 	ia_resource_id int8,
 	ia_auth_type int8
+);
+
+drop table auth_blocker_info;
+create table auth_blocker_info(
+	ab_id int8 NOT NULL PRIMARY KEY,
+	ab_image_id int8,
+	ab_image_name  varchar(50),
+	ab_start_time  varchar(20)
 );
 
 drop table deployment_info;

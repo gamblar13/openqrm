@@ -108,7 +108,7 @@ create table event_info(
 	event_time VARCHAR(50),
 	event_priority INT(4),
 	event_source VARCHAR(50),
-	event_description VARCHAR(100),
+	event_description VARCHAR(255),
 	event_comment VARCHAR(100),
 	event_capabilities VARCHAR(255),
 	event_status INT(4),
@@ -171,6 +171,13 @@ create table image_authentication_info(
 	ia_auth_type INT(5)
 );
 
+# storage_authentication_blocker table
+create table auth_blocker_info(
+	ab_id INT(5) NOT NULL PRIMARY KEY,
+	ab_image_id INT(5),
+	ab_image_name VARCHAR(50),
+	ab_start_time VARCHAR(20)
+);
 
 # plugg-able deployment types
 create table deployment_info(

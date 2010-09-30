@@ -103,7 +103,7 @@ create table event_info(			\
 	event_time varchar(50),			\
 	event_priority bigint,			\
 	event_source varchar(50),		\
-	event_description varchar(100),		\
+	event_description varchar(255),		\
 	event_comment varchar(100),		\
 	event_capabilities varchar(255),	\
 	event_status bigint,			\
@@ -168,9 +168,17 @@ create table image_service (				\
 drop table image_authentication_info
 create table image_authentication_info (				\
 	ia_id bigint not null,			\
-	ia_image_id bigint		\
-	ia_resource_id bigint		\
+	ia_image_id bigint,		\
+	ia_resource_id bigint,		\
 	ia_auth_type bigint		\
+)
+
+drop table auth_blocker_info
+create table auth_blocker_info (				\
+	ab_id bigint not null,			\
+	ab_image_id bigint,		\
+	ab_image_name varchar(50),		\
+	ab_start_time varchar(20)		\
 )
 
 drop table deployment_info
