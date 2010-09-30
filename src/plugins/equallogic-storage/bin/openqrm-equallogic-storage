@@ -191,7 +191,7 @@ function equallogic_parse_access_output() {
 }
 
 
-equallogic_storage_storage_log openqrm-equallogic-storage "!!! Running: $0 $@ as `whoami` in `pwd`" | logger
+equallogic_storage_storage_log openqrm-equallogic-storage "Running: $0 $@ as `whoami` in `pwd`" | logger
 
 function eqlog() {
 	equallogic_storage_storage_log openqrm-equallogic-storage "$*" | logger
@@ -348,6 +348,12 @@ case "$EQUALLOGIC_COMMAND" in
 		eqlog "Granting access to $EQUALLOGIC_IMAGE_LUN for user $EQUALLOGIC_IMAGE_NAME"
 		$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/equallogic-storage/bin/openqrm-equallogic-cmd $EQUALLOGIC_SERVER_IP $EQUALLOGIC_USERNAME $EQUALLOGIC_PASSWORD "chapuser delete $EQUALLOGIC_IMAGE_NAME" "chapuser create $EQUALLOGIC_IMAGE_NAME password $EQUALLOGIC_IMAGE_PASSWORD" "volume select $EQUALLOGIC_IMAGE_LUN access create username $EQUALLOGIC_IMAGE_NAME"
 		equallogic_storage_lock release
+        # if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+		if [ "$OPENQRM_USERNAME" != "" ] && [ "$OPENQRM_PASSWORD" != "" ] && [ "$EQUALLOGIC_IMAGE_NAME" != "" ]; then
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$OPENQRM_USERNAME --http-password=$OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP_ADDRESS/openqrm/base/plugins/equallogic-storage/equallogic-storage-action.php?equallogic_storage_command=auth_finished&eq_image_name=$EQUALLOGIC_IMAGE_NAME"; then
+                eqlog "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP_ADDRESS!"
+            fi
+        fi
 		;;
 
 	list)

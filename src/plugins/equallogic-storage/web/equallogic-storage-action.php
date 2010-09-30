@@ -18,8 +18,6 @@
 */
 
 
-$equallogic_storage_command = $_REQUEST["equallogic_storage_command"];
-
 // error_reporting(E_ALL);
 $thisfile = basename($_SERVER['PHP_SELF']);
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
@@ -31,6 +29,7 @@ require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/class/virtualization.class.php";
 require_once "$RootDir/class/appliance.class.php";
 require_once "$RootDir/class/deployment.class.php";
+require_once "$RootDir/class/authblocker.class.php";
 require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
 // special equallogic-storage classes
@@ -45,6 +44,9 @@ global $event;
 
 // place for the storage stat files
 $StorageDir = 'storage/';
+// post params
+$equallogic_storage_command = htmlobject_request('equallogic_storage_command');
+$equallogic_storage_image_name = htmlobject_request('eq_image_name');
 
 // user/role authentication
 if ($OPENQRM_USER->role != "administrator") {
@@ -91,17 +93,29 @@ $event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 5, "equallo
 			break;
 
 		case 'clone_finished':
-		        if (!file_exists($StorageDir)) {
-		            mkdir($StorageDir);
-		        }
-		        $filename = $StorageDir."/".basename($_POST['filename']);
-		        $filedata = base64_decode($_POST['filedata']);
-		        echo "<h1>$filename</h1>";
-		        $fout = fopen($filename,"wb");
-		        fwrite($fout, $filedata);
-		        fclose($fout);
-			$event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 3, "equallogic-storage-action", "filename $filename, filedata $filedata", "", "", 0, 0, 0);
-		        break;
+            if (!file_exists($StorageDir)) {
+                mkdir($StorageDir);
+            }
+            $filename = $StorageDir."/".basename($_POST['filename']);
+            $filedata = base64_decode($_POST['filedata']);
+            echo "<h1>$filename</h1>";
+            $fout = fopen($filename,"wb");
+            fwrite($fout, $filedata);
+            fclose($fout);
+            $event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 3, "equallogic-storage-action", "filename $filename, filedata $filedata", "", "", 0, 0, 0);
+            break;
+
+        case 'auth_finished':
+            // remove storage-auth-blocker if existing
+            $authblocker = new authblocker();
+            $authblocker->get_instance_by_image_name($equallogic_storage_image_name);
+            if (strlen($authblocker->id)) {
+                $event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "equallogic-storage-action", "Removing authblocker for image $equallogic_storage_image_name", "", "", 0, 0, 0);
+                $authblocker->remove($authblocker->id);
+            }
+            break;
+
+
 		default:
 			$event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 3, "equallogic-storage-action", "No such equallogic-storage command ($equallogic_storage_command)", "", "", 0, 0, 0);
 			break;

@@ -181,9 +181,8 @@ class equallogic_storage {
 		$db=openqrm_get_db_connection();
 		unset($eq_fields["eq_id"]);
 		$result = $db->AutoExecute($this->_db_table, $eq_fields, 'UPDATE', "eq_id = $eq_id");
-    	$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "equallogic_storage.class.php", "!!! updating $this->_db_table", "", "", 0, 0, 0);
-	if (! $result) {
-			$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "equallogic_storage.class.php", "Failed updating EqualLogic Storage server $eq_id", "", "", 0, 0, 0);
+        if (! $result) {
+            $this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "equallogic_storage.class.php", "Failed updating EqualLogic Storage server $eq_id", "", "", 0, 0, 0);
 		}
 	}
 

@@ -71,6 +71,9 @@ function equallogic_storage_kernel_hook() {
         # copy libs
         cp -a $KERNEL_LOCATION/lib/libe2p.* $RESIZE_TMP_DIR/lib/
         cp -a $KERNEL_LOCATION/lib/libext2fs.* $RESIZE_TMP_DIR/lib/
+        # if there are 64bit libs avaiable this will overwrite the previous (32bit) ones
+        cp -af $KERNEL_LOCATION/lib64/libe2p.* $RESIZE_TMP_DIR/lib/ 2>/dev/null
+        cp -af $KERNEL_LOCATION/lib64/libext2fs.* $RESIZE_TMP_DIR/lib/ 2>/dev/null
         cd $RESIZE_TMP_DIR/
         rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/eq-resize.$KERNEL_NAME.tgz
         tar -czf $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/eq-resize.$KERNEL_NAME.tgz *
