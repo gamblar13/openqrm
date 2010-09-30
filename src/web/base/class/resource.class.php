@@ -311,12 +311,17 @@ function get_parameter($resource_id) {
 	global $KERNEL_INFO_TABLE;
 	global $IMAGE_INFO_TABLE;
 	global $APPLIANCE_INFO_TABLE;
+	global $STORAGE_INFO_TABLE;
+    global $DEPLOYMENT_INFO_TABLE;
 	global $BootServiceDir;
 	global $event;
 	global $OPENQRM_EXECUTION_LAYER;
     global $OPENQRM_WEB_PROTOCOL;
 	$db=openqrm_get_db_connection();
 	// resource parameter
+    if (!strlen($resource_id)) {
+        return;
+    }
 	$recordSet = &$db->Execute("select * from $RESOURCE_INFO_TABLE where resource_id=$resource_id");
 	if (!$recordSet)
 		$event->log("get_parameter", $_SERVER['REQUEST_TIME'], 2, "resource.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
@@ -349,7 +354,7 @@ function get_parameter($resource_id) {
 		$recordSet->MoveNext();
 	}
 	$recordSet->Close();
-	// storage parameter
+	// image storage parameter
 	if (strlen($image_storageid)) {
 		$storage = new storage();
 		$storage->get_instance_by_id($image_storageid);
@@ -373,12 +378,44 @@ function get_parameter($resource_id) {
 	else
 	while (!$recordSet->EOF) {
 		array_walk($recordSet->fields, 'print_array');
+        $appliance_virtualization = $recordSet->fields["appliance_virtualization"];
 		$recordSet->MoveNext();
 	}
 	$recordSet->Close();
+
+    // virtualization parameter
+    if ($appliance_virtualization > 0) {
+        $virtualization = new virtualization();
+        $virtualization->get_instance_by_id($appliance_virtualization);
+        echo "virtualization_type=\"$virtualization->type\"\n";
+        echo "virtualization_name=\"$virtualization->name\"\n";
+    }
+    // storage server parameter
+    if ($image_id<>1) {
+        $recordSet = &$db->Execute("select * from $STORAGE_INFO_TABLE where storage_resource_id=$resource_id");
+        if (!$recordSet)
+            $event->log("get_parameter", $_SERVER['REQUEST_TIME'], 2, "resource.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
+        else
+        while (!$recordSet->EOF) {
+            $storage_type = $recordSet->fields["storage_type"];
+            $recordSet1 = &$db->Execute("select deployment_storagetype from $DEPLOYMENT_INFO_TABLE where deployment_id=$storage_type");
+            if (!$recordSet1)
+                $event->log("get_parameter", $_SERVER['REQUEST_TIME'], 2, "resource.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
+            else
+            while (!$recordSet1->EOF) {
+                $deployment_storagetype = $recordSet1->fields["deployment_storagetype"];
+                echo "deployment_storagetype=$deployment_storagetype\n";
+                $recordSet1->MoveNext();
+            }
+            $recordSet1->Close();
+            $recordSet->MoveNext();
+        }
+        $recordSet->Close();
+    }
+
 	$db->Close();
 
-	// command executation layer
+	// command execution layer
 	echo "openqrm_execution_layer=\"$OPENQRM_EXECUTION_LAYER\"\n";
     // openQRM server web protocol
     echo "openqrm_web_protocol=\"$OPENQRM_WEB_PROTOCOL\"\n";
@@ -440,6 +477,9 @@ function update_info($resource_id, $resource_fields) {
 		$event->log("update_info", $_SERVER['REQUEST_TIME'], 2, "resource.class.php", "Unable to update resource $resource_id", "", "", 0, 0, 0);
 		return 1;
 	}
+    if (!strlen($resource_id)) {
+        return 1;
+    }
 	$db=openqrm_get_db_connection();
 	unset($resource_fields["resource_id"]);
 	$result = $db->AutoExecute($RESOURCE_INFO_TABLE, $resource_fields, 'UPDATE', "resource_id = $resource_id");
@@ -684,6 +724,68 @@ function send_command($resource_ip, $resource_command) {
 
 
 
+//--------------------------------------------------
+/**
+* set the capabilities of a resource
+* @access public
+* @param string $key
+* @param string $value
+*/
+//--------------------------------------------------
+function set_resource_capabilities($key, $value) {
+    $this->get_instance_by_id($this->id);
+    $resource_capabilites_parameter = $this->capabilities;
+    $key=trim($key);
+    if (strstr($resource_capabilites_parameter, $key)) {
+        // change
+        $cp1=trim($resource_capabilites_parameter);
+        $cp2 = strstr($cp1, $key);
+        $keystr="$key=\"";
+        $endmark="\"";
+        $cp3=str_replace($keystr, "", $cp2);
+        $endpos=strpos($cp3, $endmark);
+        $cp=substr($cp3, 0, $endpos);
+        $new_resource_capabilites_parameter = str_replace("$key=\"$cp\"", "$key=\"$value\"", $resource_capabilites_parameter);
+    } else {
+        // add
+        $new_resource_capabilites_parameter = "$resource_capabilites_parameter $key=\"$value\"";
+    }
+    $resource_fields=array();
+    $resource_fields["resource_capabilities"]="$new_resource_capabilites_parameter";
+    $this->update_info($this->id, $resource_fields);
+}
+
+
+
+//--------------------------------------------------
+/**
+* gets a deployment parameter of an image
+* @access public
+* @param string $key
+* @return string $value
+*/
+//--------------------------------------------------
+function get_resource_capabilities($key) {
+    $resource_capabilites_parameter = $this->capabilities;
+    $key=trim($key);
+    if (strstr($resource_capabilites_parameter, $key)) {
+        // change
+        $cp1=trim($resource_capabilites_parameter);
+        $cp2 = strstr($cp1, $key);
+        $keystr="$key=\"";
+        $endmark="\"";
+        $cp3=str_replace($keystr, "", $cp2);
+        $endpos=strpos($cp3, $endmark);
+        $cp=substr($cp3, 0, $endpos);
+        return $cp;
+    } else {
+        return "";
+    }
+}
+
+
+
+
 
 
 // returns the number of managed resource
@@ -745,6 +847,14 @@ function check_all_states() {
 		$resource_lastgood=$rs->fields['resource_lastgood'];
 		$resource_state=$rs->fields['resource_state'];
 		$check_time=$_SERVER['REQUEST_TIME'];
+        // get the HA-timeout per resource from the capabilites
+        $custom_resource_ha_timeout="";
+        $resource_hat = new resource();
+        $resource_hat->get_instance_by_id($resource_id);
+        $custom_resource_ha_timeout = $resource_hat->get_resource_capabilities("HAT");
+        if (strlen($custom_resource_ha_timeout)) {
+            $RESOURCE_TIME_OUT = $custom_resource_ha_timeout;
+        }
 
 		// resolve errors for all active resources
 		if (("$resource_state" == "active") && ($resource_id != 0)) {
