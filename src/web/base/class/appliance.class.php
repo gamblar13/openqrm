@@ -35,10 +35,14 @@ require_once "$RootDir/class/deployment.class.php";
 require_once "$RootDir/class/kernel.class.php";
 require_once "$RootDir/class/plugin.class.php";
 require_once "$RootDir/class/event.class.php";
+require_once "$RootDir/class/authblocker.class.php";
 
 global $APPLIANCE_INFO_TABLE;
 $event = new event();
 global $event;
+
+$appliance_start_timeout=360;
+global $appliance_start_timeout;
 
 class appliance {
 
@@ -326,6 +330,7 @@ function remove_by_name($appliance_name) {
 function start() {
 	global $event;
 	global $RootDir;
+    global $appliance_start_timeout;
 	
 	if ($this->resources < 1) {
 		$event->log("start", $_SERVER['REQUEST_TIME'], 1, "appliance.class.php", "No resource available for appliance $this->id", "", "", 0, 0, 0);
@@ -356,12 +361,53 @@ function start() {
 	$storage_auth_hook = "$RootDir/plugins/$deployment_plugin_name/openqrm-$deployment_type-auth-hook.php";
 	if (file_exists($storage_auth_hook)) {
 		$event->log("start", $_SERVER['REQUEST_TIME'], 5, "appliance.class.php", "Found deployment type $deployment_type handling the start auth hook.", "", "", 0, 0, $resource->id);
+        // create storage_auth_blocker if not existing already
+        $authblocker = new authblocker();
+        $authblocker->get_instance_by_image_name($image->name);
+        if (!strlen($authblocker->id)) {
+    		$event->log("start", $_SERVER['REQUEST_TIME'], 5, "appliance.class.php", "Creating new authblocker for image $image->name / app id $this->id.", "", "", 0, 0, $resource->id);
+            $ab_start_time = $_SERVER['REQUEST_TIME'];
+            $ab_create_fields['ab_image_id'] = $this->imageid;
+            $ab_create_fields['ab_image_name'] = $image->name;
+            $ab_create_fields['ab_start_time'] = $ab_start_time;
+            // get a new id
+            $ab_create_fields['ab_id'] = openqrm_db_get_free_id('ab_id', $authblocker->_db_table);
+            $authblocker->add($ab_create_fields);
+        }
+        $storage_auth_blocker_created = true;
+        // run the auth hook
 		require_once "$storage_auth_hook";
 		storage_auth_function("start", $this->id);
 	} else {
 		$event->log("start", $_SERVER['REQUEST_TIME'], 5, "appliance.class.php", "No storage-auth hook ($storage_auth_hook) available for deployment type $deployment_type for start auth hook.", "", "", 0, 0, $resource->id);
+        $storage_auth_blocker_created = false;
     }
-	
+	// delay to be sure to have the storage hook run before the reboot
+    if ($storage_auth_blocker_created) {
+        $wait_for_storage_auth_loop=0;
+        while (true) {
+            unset($check_authblocker);
+            $check_authblocker = new authblocker();
+            $check_authblocker->get_instance_by_image_name($image->name);
+            if (strlen($check_authblocker->id)) {
+                // ab still existing, check timeout
+                if ($wait_for_storage_auth_loop > $appliance_start_timeout) {
+            		$event->log("start", $_SERVER['REQUEST_TIME'], 2, "appliance.class.php", "Storage-authentication for image $image->name timed out! Not starting appliance $this->id.", "", "", 0, 0, $resource->id);
+                    // remove authblocker
+                    $check_authblocker->remove($check_authblocker->id);
+                    return;
+                }
+                sleep(1);
+                $wait_for_storage_auth_loop++;
+            } else {
+                // here we got the remove-auth-blocker message from the storage-auth hook
+                // now we can be sure that storage auth ran before rebooting the resource
+        		$event->log("start", $_SERVER['REQUEST_TIME'], 5, "appliance.class.php", "Storage authentication for image $image->name succeeded, assigning the resource now.", "", "", 0, 0, $resource->id);
+                break;
+            }
+        }
+    }
+
     // reboot resource
 	$resource->send_command("$resource->ip", "reboot");
 
@@ -592,6 +638,7 @@ function get_all_ids() {
 // find a resource fitting to the appliance
 function find_resource($appliance_virtualization) {
 	global $event;
+    $found_new_resource=0;
 	$virtualization = new virtualization();
 	$virtualization->get_instance_by_id($appliance_virtualization);
 	$event->log("find_resource", $_SERVER['REQUEST_TIME'], 5, "appliance.class.php", "Trying to find a new resource type $virtualization->name for appliance $this->name .", "", "", 0, 0, $resource_id);
@@ -663,7 +710,7 @@ function find_resource($appliance_virtualization) {
 	}	
 	// in case no resources are available log another ha-error event !
 	if ($found_new_resource == 0) {
-		$event->log("find_resource", $_SERVER['REQUEST_TIME'], 2, "appliance.class.php", "Could not find a free resource type $virtualization->name for appliance $this->name !", "", "", 0, 0, 0);
+		$event->log("find_resource", $_SERVER['REQUEST_TIME'], 4, "appliance.class.php", "Could not find a free resource type $virtualization->name for appliance $this->name !", "", "", 0, 0, 0);
 		return $this;
 	}
 
