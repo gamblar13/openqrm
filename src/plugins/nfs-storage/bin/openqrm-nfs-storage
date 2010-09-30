@@ -36,6 +36,10 @@ elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
     openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
 fi
 export LANG=C
+# how long to wait for the volume authentication, each loop is 5 secs
+MAX_VOLUME_AUTHENTICATION_LOOP=30
+export MAX_VOLUME_AUTHENTICATION_LOOP
+
 # define wget to use with https
 if [ "$openqrm_web_protocol" == "https" ]; then
     WGET_NO_CERT_CHECK="--no-check-certificate"
@@ -96,6 +100,10 @@ while [ $# -ne 0 ]; do
 			;;
 		-r)
 			NFS_IMAGE_ROOTDEVICE=$2
+			shift
+			;;
+		-t)
+			NFS_IMAGE_TYPE=$2
 			shift
 			;;
 		-u)
@@ -176,12 +184,16 @@ case "$NFS_COMMAND" in
 		fi
 		echo -n "Creating snapshot from image $NFS_IMAGE_NAME -> $NFS_IMAGE_SNAPSHOT_NAME"
 		mkdir -p $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_SNAPSHOT_NAME
+        # clreate lock for snap
+        touch $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_SNAPSHOT_NAME/syncing
 		nfs_storage_lock aquire
 		export ORG_IMAGE_NAME=$NFS_IMAGE_NAME
 		export NFS_IMAGE_NAME=$NFS_IMAGE_SNAPSHOT_NAME
 		manage_nfs add $OPENQRM_SERVER_IP
 		nfs_storage_lock release
 		rsync -a $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$ORG_IMAGE_NAME/* $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_SNAPSHOT_NAME/
+        # remove lock
+        rm -f $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_SNAPSHOT_NAME/syncing
 		if [ "$NFS_OPENQRM_USERNAME" != "" ] && [ "$NFS_OPENQRM_PASSWORD" != "" ]; then
 			$0 post_exports -u $NFS_OPENQRM_USERNAME -p $NFS_OPENQRM_PASSWORD
 		fi
@@ -189,14 +201,31 @@ case "$NFS_COMMAND" in
 
 	auth)
 		echo -n "Authenticating NFS export $NFS_IMAGE_ROOTDEVICE to $NFS_IMAGE_AUTH_IP"
+		if [ "$NFS_OPENQRM_USERNAME" != "" ] && [ "$NFS_OPENQRM_PASSWORD" != "" ] && [ "$NFS_IMAGE_NAME" != "" ]; then
+            MAX_AUTH_LOOP=0
+            while (true); do
+                # while snapping we have a lockfile to wait for
+                if [ ! -e "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME/syncing" ]; then
+                    break
+                fi
+                sleep 5
+                if [ "$MAX_AUTH_LOOP" == "$MAX_VOLUME_AUTHENTICATION_LOOP" ]; then
+                    nfs_storage_log auth "ERROR: Volume $NFS_IMAGE_ROOTDEVICE does not exists, Cannot auth to $NFS_IMAGE_AUTH_IP"
+                    exit 1
+                fi
+                MAX_AUTH_LOOP=$(( MAX_AUTH_LOOP + 1 ))
+            done
+        fi
 		# auth in exports
 		nfs_storage_lock aquire
 		manage_nfs auth $NFS_IMAGE_AUTH_IP
 		nfs_storage_lock release
-		# in case we have a username + password post the updated list to the openQRM-server
-		if [ "$NFS_OPENQRM_USERNAME" != "" ] && [ "$NFS_OPENQRM_PASSWORD" != "" ]; then
-			$0 post_exports -u $NFS_OPENQRM_USERNAME -p $NFS_OPENQRM_PASSWORD
-		fi
+        # if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+		if [ "$NFS_OPENQRM_USERNAME" != "" ] && [ "$NFS_OPENQRM_PASSWORD" != "" ] && [ "$NFS_IMAGE_NAME" != "" ]; then
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$NFS_OPENQRM_USERNAME --http-password=$NFS_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/nfs-storage/nfs-storage-action.php?nfs_storage_command=auth_finished&nfs_image_name=$NFS_IMAGE_NAME"; then
+                nfs_storage_log auth "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP!"
+            fi
+        fi
 		;;
 
 	list)

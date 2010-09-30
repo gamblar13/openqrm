@@ -31,6 +31,7 @@ require_once "$RootDir/class/image_authentication.class.php";
 require_once "$RootDir/class/storage.class.php";
 require_once "$RootDir/class/deployment.class.php";
 require_once "$RootDir/class/appliance.class.php";
+require_once "$RootDir/class/authblocker.class.php";
 require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/openqrm-server-config.php";
 
@@ -123,6 +124,13 @@ global $event;
     	$StorageDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/plugins/nfs-storage/storage';
         $statfile_manual="$StorageDir/".$storage_resource->id.".nfs.stat.manual";
         if (file_exists($statfile_manual)) {
+            // remove storage-auth-blocker if existing
+            $authblocker = new authblocker();
+            $authblocker->get_instance_by_image_name($image_name);
+            if (strlen($authblocker->id)) {
+                $event->log('storage_auth_function', $_SERVER['REQUEST_TIME'], 5, "openqrm-nfs-deployment-auth-hook.php", "Removing authblocker for image $image_name", "", "", 0, 0, 0);
+                $authblocker->remove($authblocker->id);
+            }
             $event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-nfs-deployment-auth-hook.php", "NFS Storage $storage->id is manually configured. Skipping automatic authentication hook ...", "", "", 0, 0, $appliance_id);
             return;
         }
@@ -130,8 +138,12 @@ global $event;
 
         switch($cmd) {
 			case "start":
+				// authenticate the rootfs / needs openqrm user + pass
+                $openqrm_admin_user = new user("openqrm");
+                $openqrm_admin_user->set_user();
+
 				$event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-nfs-deployment-auth-hook.php", "Authenticating $image_name to resource $resource_ip", "", "", 0, 0, $appliance_id);
-				$auth_start_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -r $image_rootdevice -i $resource_ip";
+				$auth_start_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -n $image_name -r $image_rootdevice -i $resource_ip -u $openqrm_admin_user->name -p $openqrm_admin_user->password";
 				$resource->send_command($storage_ip, $auth_start_cmd);
 
 	 			// authenticate the install-from-nfs export
