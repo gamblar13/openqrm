@@ -103,8 +103,12 @@ global $event;
 
 		switch($cmd) {
 			case "start":
-				$event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-aoe-san-deployment-auth-hook.php", "Authenticating $image_name / $root_device to resource $resource_mac", "", "", 0, 0, $appliance_id);
-				$auth_start_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -r $root_device -i $resource_mac -t aoe-san-deployment";
+				// authenticate the rootfs / needs openqrm user + pass
+                $openqrm_admin_user = new user("openqrm");
+                $openqrm_admin_user->set_user();
+
+				$event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-aoe-san-deployment-auth-hook.php", "Authenticating $image_name / $image_rootdevice to resource $resource_mac", "", "", 0, 0, $appliance_id);
+				$auth_start_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -n $image_name -r $image_rootdevice -i $resource_mac -t aoe-san-deployment  -u $openqrm_admin_user->name -p $openqrm_admin_user->password";
 				$resource->send_command($storage_ip, $auth_start_cmd);
 				// give time to settle restart of openqrm-exec daemon
 				sleep(3);

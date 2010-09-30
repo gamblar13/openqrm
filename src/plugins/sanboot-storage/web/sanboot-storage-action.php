@@ -28,6 +28,7 @@ require_once "$RootDir/class/image.class.php";
 require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/class/deployment.class.php";
 require_once "$RootDir/class/event.class.php";
+require_once "$RootDir/class/authblocker.class.php";
 require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
 
@@ -36,6 +37,7 @@ global $DEPLOYMENT_INFO_TABLE;
 global $OPENQRM_SERVER_BASE_DIR;
 
 $sanboot_storage_command = htmlobject_request('sanboot_storage_command');
+$sanboot_image_name = htmlobject_request('sanboot_image_name');
 
 // place for the storage stat files
 $StorageDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/plugins/sanboot-storage/storage';
@@ -87,6 +89,15 @@ switch ($sanboot_storage_command) {
         fclose($fout);
         break;
 
+    case 'auth_finished':
+        // remove storage-auth-blocker if existing
+        $authblocker = new authblocker();
+        $authblocker->get_instance_by_image_name($sanboot_image_name);
+        if (strlen($authblocker->id)) {
+            $event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "sanboot-storage-action", "Removing authblocker for image $sanboot_image_name", "", "", 0, 0, 0);
+            $authblocker->remove($authblocker->id);
+        }
+        break;
 
     default:
         $event->log("$sanboot_storage_command", $_SERVER['REQUEST_TIME'], 3, "sanboot-storage-action", "No such sanboot-storage command ($sanboot_storage_command)", "", "", 0, 0, 0);

@@ -20,7 +20,7 @@
 
 
 # iscsi-target config file
-IETDCONF=/etc/ietd.conf
+IETDCONF=`find /etc/ -name ietd.conf -type f | head -n1`
 # vblade config file
 VBLADECONF=/etc/vblade.conf
 # some definitions
@@ -91,7 +91,7 @@ function sanboot_storage_lock() {
 
 function check_iscsi_target() {
 	# iscsi-target installed ?
-	if ! ls $IETDCONF 1>/dev/null; then
+	if [ "$IETDCONF" == "" ]; then
 		echo "ERROR: Iscsi Enterprise Target not installed !"
 		echo "ERROR: For managing Iscsi filesystem-images please download and install from"
 		echo "       $ISCSI_TARGET_URL"

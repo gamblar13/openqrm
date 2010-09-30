@@ -46,6 +46,9 @@ fi
 # using the resource_id as the shelf-id
 AOE_SHELF=$resource_id
 export AOE_SHELF
+# how long to wait for the volume authentication, each loop is 5 secs
+MAX_VOLUME_AUTHENTICATION_LOOP=30
+export MAX_VOLUME_AUTHENTICATION_LOOP
 
 # let only root run this script
 WHOAMI=`whoami`
@@ -282,16 +285,42 @@ case "$SANBOOT_COMMAND" in
 
 	auth)
 		echo "Authenticating $SANBOOT_IMAGE_TYPE image $SANBOOT_IMAGE_ROOTDEVICE to $SANBOOT_IMAGE_AUTH"
+        # this is just for starting auth, make sure the device is there, otherwise wait
+        SANBOOT_CHECK_VOLUME_GROUP=`echo $SANBOOT_IMAGE_ROOTDEVICE | cut -d':' -f1`
+		if [ "$SANBOOT_OPENQRM_USERNAME" != "" ] && [ "$SANBOOT_OPENQRM_PASSWORD" != "" ] && [ "$SANBOOT_IMAGE_NAME" != "" ]; then
+            MAX_AUTH_LOOP=0
+            while (true); do
+                if [ -e "/dev/$SANBOOT_CHECK_VOLUME_GROUP/$SANBOOT_IMAGE_NAME" ]; then
+                    break
+                fi
+                sleep 5
+                if [ "$MAX_AUTH_LOOP" == "$MAX_VOLUME_AUTHENTICATION_LOOP" ]; then
+                    sanboot_storage_log auth "ERROR: Volume $SANBOOT_IMAGE_TYPE image $SANBOOT_IMAGE_ROOTDEVICE / /dev/$SANBOOT_CHECK_VOLUME_GROUP/$SANBOOT_IMAGE_NAME does not exists, Cannot auth to $SANBOOT_IMAGE_AUTH"
+                    exit 1
+                fi
+                MAX_AUTH_LOOP=$(( MAX_AUTH_LOOP + 1 ))
+            done
+        fi
+        export SANBOOT_IMAGE_ROOTDEVICE
 		if [ "$SANBOOT_IMAGE_TYPE" == "iscsi-san-deployment" ]; then
 			sanboot_storage_lock aquire
+            SANBOOT_IMAGE_ROOTDEVICE=`echo $SANBOOT_IMAGE_ROOTDEVICE | cut -d':' -f2`
 			manage_iscsi auth $SANBOOT_IMAGE_AUTH
 			sanboot_storage_lock release
 		elif [ "$SANBOOT_IMAGE_TYPE" == "aoe-san-deployment" ]; then
 			check_vblade
+            SANBOOT_IMAGE_ROOTDEVICE=`echo $SANBOOT_IMAGE_ROOTDEVICE | cut -d':' -f3`
 			sanboot_storage_lock aquire
 			manage_vblade auth $SANBOOT_IMAGE_AUTH
 			sanboot_storage_lock release
 		fi
+        # if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+		if [ "$SANBOOT_OPENQRM_USERNAME" != "" ] && [ "$SANBOOT_OPENQRM_PASSWORD" != "" ] && [ "$SANBOOT_IMAGE_NAME" != "" ]; then
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$SANBOOT_OPENQRM_USERNAME --http-password=$SANBOOT_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/sanboot-storage/sanboot-storage-action.php?sanboot_storage_command=auth_finished&sanboot_image_name=$SANBOOT_IMAGE_NAME"; then
+                sanboot_storage_log auth "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP!"
+            fi
+        fi
+
 		;;
 
 	list)
