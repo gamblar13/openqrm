@@ -100,12 +100,16 @@ global $event;
 	
 		switch($cmd) {
 			case "start":
+				// authenticate the rootfs / needs openqrm user + pass
+                $openqrm_admin_user = new user("openqrm");
+                $openqrm_admin_user->set_user();
+
 				// generate a password for the image
 				$image_password = $image->generatePassword(12);
 				$image_deployment_parameter = $image->deployment_parameter;
 				$image->set_deployment_parameters("IMAGE_ISCSI_AUTH", $image_password);
 				$event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-lvm-iscsi-deployment-auth-hook.php", "Authenticating $image_name / $image_location_name to resource $resource_mac", "", "", 0, 0, $appliance_id);
-				$auth_start_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -r $image_location_name -i $image_password -t lvm-iscsi-deployment";
+				$auth_start_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -n $image_name -r /dev/$volume_group/$image_location_name -i $image_password -t lvm-iscsi-deployment -u $openqrm_admin_user->name -p $openqrm_admin_user->password";
 				$resource->send_command($storage_ip, $auth_start_cmd);
 
 	 			// authenticate the install-from-nfs export
@@ -239,7 +243,7 @@ global $event;
 		$deployment_type = $deployment->type;
 		$deployment_plugin_name = $deployment->storagetype;
 	
-		$auth_stop_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -r $image_location_name -i $image_password -t lvm-iscsi-deployment";
+		$auth_stop_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -r /dev/$volume_group/$image_location_name -i $image_password -t lvm-iscsi-deployment";
 		$resource = new resource();
 		$resource->send_command($storage_ip, $auth_stop_cmd);
 		// and update the image params

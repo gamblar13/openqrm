@@ -190,7 +190,18 @@ EOF
 
 
 function remount_rootfs() {
-
+    # fix for ubuntu lucid + maverick
+    if [ -f /mnt/etc/apt/sources.list ]; then
+        if grep lucid /mnt/etc/apt/sources.list >/remountlog; then
+        	echo "lvm-aoe-storage: Skipping Re-mount $IMAGE_ROOT_DEVICE ro"
+            return
+        fi
+        if grep maverick /mnt/etc/apt/sources.list >/remountlog; then
+        	echo "lvm-aoe-storage: Skipping Re-mount $IMAGE_ROOT_DEVICE ro"
+            return
+        fi
+        rm -f /remountlog
+    fi
 	REMOUNT_LOOP=0
 	# remont /mnt ro
 	while ! mount -t $image_rootfstype -o ro,remount $IMAGE_ROOT_DEVICE /mnt; do
@@ -198,7 +209,7 @@ function remount_rootfs() {
 		sleep 1
 		REMOUNT_LOOP=$[ REMOUNT_LOOP + 1 ]
 		if [ "$REMOUNT_LOOP" == "10" ]; then
-			echo "ERROR: aoe-storage could not remount /mnt "
+			echo "ERROR: lvm-aoe-storage could not remount /mnt "
 			/bin/bash
 		fi
 	done
