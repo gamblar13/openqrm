@@ -37,7 +37,7 @@ SEQ=1
 RETRY=3
 RETRY_DELAY=10
 # defines how long commands are allowed to run
-DEFAULT_CMD_TIMEOUT=30
+DEFAULT_CMD_TIMEOUT=$OPENQRM_DEFAULT_CMD_TIMEOUT
 
 
 
@@ -73,7 +73,7 @@ function cmd_timeout() {
 
 cd $OPENQRM_COMMAND_QUEUE
 while (true); do
-	for OPENQRM_COMMAND_FILE in `ls -t openqrm-queue* 2>/dev/null`; do
+	for OPENQRM_COMMAND_FILE in `ls -tr openqrm-queue* 2>/dev/null`; do
 		chmod +x $OPENQRM_COMMAND_FILE
 		COMMAND_TOKEN=`echo $OPENQRM_COMMAND_FILE | cut -d'.' -f2`
         TIMEOUT_TOKEN=`echo $OPENQRM_COMMAND_FILE | cut -d'.' -f3`
@@ -89,10 +89,16 @@ while (true); do
         cmd_timeout $CMD_TIMEOUT ./$OPENQRM_COMMAND_FILE 2>ouput.$COMMAND_TOKEN
         COMMAND_RES=$?
 		if [ "$COMMAND_RES" != "0" ]; then
-			# put it in the failed queue
-			mv -f $OPENQRM_COMMAND_FILE failed-cmd.1.$COMMAND_TOKEN
-			OPENQRM_COMMAND_OUTPUT=`cat ouput.$COMMAND_TOKEN`
-			cmd_queue_log WARNING "Command with token $FAILED_COMMAND_TOKEN failed : $OPENQRM_COMMAND  ----- $OPENQRM_COMMAND_OUTPUT"
+            # check if we should retry
+            if [ "$OPENQRM_CMD_QUEUE_RETRY" == "true" ]; then
+                # put it in the failed queue
+                mv -f $OPENQRM_COMMAND_FILE failed-cmd.1.$COMMAND_TOKEN
+                OPENQRM_COMMAND_OUTPUT=`cat ouput.$COMMAND_TOKEN`
+                cmd_queue_log WARNING "Command with token $FAILED_COMMAND_TOKEN failed : $OPENQRM_COMMAND  ----- $OPENQRM_COMMAND_OUTPUT"
+            else
+                cmd_queue_log ERROR "Command with token $FAILED_COMMAND_TOKEN failed : $OPENQRM_COMMAND  ----- $OPENQRM_COMMAND_OUTPUT"
+                openqrm_post_event 0 "base-engine" 2 "openqrm-cmd-queue" "ERROR running token $FAILED_COMMAND_TOKEN"
+            fi
 		else
 			rm -f $OPENQRM_COMMAND_FILE
 		fi
@@ -102,7 +108,7 @@ while (true); do
 
 	# check the failed queue
 	if [ "$SEQ" == "$RETRY_DELAY" ]; then
-		for FAILED_OPENQRM_COMMAND_FILE in `ls -t failed-cmd* 2>/dev/null`; do
+		for FAILED_OPENQRM_COMMAND_FILE in `ls -tr failed-cmd* 2>/dev/null`; do
 			chmod +x $FAILED_OPENQRM_COMMAND_FILE
 			FAILED_COMMAND_RETRY_COUNT=`echo $FAILED_OPENQRM_COMMAND_FILE | cut -d'.' -f2`
 			FAILED_COMMAND_TOKEN=`echo $FAILED_OPENQRM_COMMAND_FILE | cut -d'.' -f3`
