@@ -35,9 +35,53 @@ if [ -f $OPENQRM_SOURCE_DIR/etc/openqrm-server.conf ]; then
 	for VAR in `cat $OPENQRM_SOURCE_DIR/etc/openqrm-server.conf | grep -v ^# | grep OPENQRM | cut -d'=' -f1`; do
 		eval `export $VAR`
 	done
+    PACKAGE_MANAGER_TIME_OUT=3600
+else
+    PACKAGE_MANAGER_TIME_OUT=30
 fi
 # get distribution
 export OPENQRM_PACKAGE_DISTRIBUTION=`openqrm_get_distro`
+
+
+# runs a command with a timeout
+function openqrm_cmd_timeout() {
+    sleep_time=$PACKAGE_MANAGER_TIME_OUT
+    command=$@
+    $command &
+    cmd_pid=$!
+    ( sleep $sleep_time && kill $cmd_pid && echo "Killed $command due to timeout $sleep_time exceeded" ) &
+    killer_pid=$!
+    wait $cmd_pid &> /dev/null
+    wait_status=$?
+    if [ $wait_status == 0 ]; then
+        disown $killer_pid
+        kill $killer_pid &> /dev/null
+    fi
+    return $wait_status
+}
+
+
+
+
+
+#
+# updates the system's package manager
+#
+# returns the return code of the package manager; the only reliable check is
+# to check for a non-zero returncode (which means an error has occurred).
+#
+function openqrm_update_package_manager() {
+	local PACKAGE=$1
+	# check which dependencies to use
+    if [ -f /etc/debian_version ]; then
+    	WHOAMI=`whoami`
+    	if [ "$WHOAMI" != "root" ]; then
+    		export SUDO="sudo"
+    	fi
+        openqrm_cmd_timeout $SUDO apt-get update
+	fi
+}
+
 
 #
 # Install a system dependency using the system's package manager
@@ -54,16 +98,15 @@ function openqrm_install_os_dependency() {
     	if [ "$WHOAMI" != "root" ]; then
     		export SUDO="sudo"
     	fi
-	# if we already have the package installed, don't install it
-	local PACKAGESTATE=`dpkg -s $PACKAGE | grep '^Status' | awk '{print $4}'`
-	if [ "$PACKAGESTATE" != "installed" ]; then
-	        $SUDO apt-get update
-	    	if [ "$FORCE_INSTALL" == "true" ]; then
-		    	$SUDO apt-get -y install $PACKAGE
-		    else
-		    	$SUDO apt-get install $PACKAGE
-		    fi
-	fi
+        # if we already have the package installed, don't install it
+        local PACKAGESTATE=`dpkg -s $PACKAGE | grep '^Status' | awk '{print $4}'`
+        if [ "$PACKAGESTATE" != "installed" ]; then
+            if [ "$FORCE_INSTALL" == "true" ]; then
+                $SUDO apt-get -y install $PACKAGE
+            else
+                $SUDO apt-get install $PACKAGE
+            fi
+        fi
     elif [ -f /etc/redhat-release ]; then
     	if [ "$FORCE_INSTALL" == "true" ]; then
 			su - root -c "yum -y install $PACKAGE"
