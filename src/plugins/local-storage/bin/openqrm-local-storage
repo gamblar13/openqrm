@@ -38,6 +38,10 @@ fi
 export LANG=C
 LINEBR='
 '
+# how long to wait for the volume authentication, each loop is 5 secs
+MAX_VOLUME_AUTHENTICATION_LOOP=30
+export MAX_VOLUME_AUTHENTICATION_LOOP
+
 # define wget to use with https
 if [ "$openqrm_web_protocol" == "https" ]; then
     WGET_NO_CERT_CHECK="--no-check-certificate"
@@ -240,9 +244,31 @@ case "$LOCAL_COMMAND" in
 
 	auth)
 		echo "Authenticating $LOCAL_IMAGE_TYPE image $LOCAL_IMAGE_ROOTDEVICE to $LOCAL_IMAGE_AUTH"
+        # this is just for starting auth, make sure the device is there, otherwise wait
+		if [ "$LOCAL_OPENQRM_USERNAME" != "" ] && [ "$LOCAL_OPENQRM_PASSWORD" != "" ] && [ "$LOCAL_IMAGE_NAME" != "" ]; then
+            MAX_AUTH_LOOP=0
+            while (true); do
+                if [ -e "/dev$LOCAL_IMAGE_ROOTDEVICE" ]; then
+                    break
+                fi
+                sleep 5
+                if [ "$MAX_AUTH_LOOP" == "$MAX_VOLUME_AUTHENTICATION_LOOP" ]; then
+                    local_storage_log auth "ERROR: Volume $LOCAL_IMAGE_TYPE image $LOCAL_IMAGE_ROOTDEVICE does not exists, Cannot auth to $LOCAL_IMAGE_AUTH"
+                    exit 1
+                fi
+                MAX_AUTH_LOOP=$(( MAX_AUTH_LOOP + 1 ))
+            done
+        fi
         local_storage_lock aquire
         manage_nfs auth $LOCAL_IMAGE_AUTH
         local_storage_lock release
+        # if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+		if [ "$LOCAL_OPENQRM_USERNAME" != "" ] && [ "$LOCAL_OPENQRM_PASSWORD" != "" ] && [ "$LOCAL_IMAGE_NAME" != "" ]; then
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LOCAL_OPENQRM_USERNAME --http-password=$LOCAL_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/local-storage/local-storage-action.php?local_storage_command=auth_finished&local_image_name=$LOCAL_IMAGE_NAME"; then
+                local_storage_log auth "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP!"
+            fi
+        fi
+
 		;;
 
 	list)

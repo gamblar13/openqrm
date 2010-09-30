@@ -133,8 +133,8 @@ function manage_nfs() {
 				echo "ERROR: Could not umount /$LOCAL_STORAGE_SERVER_VOLUME_GROUP/$LOCAL_IMAGE_NAME, trying again ..."
 				local_storage_log local-storage-functions "ERROR: Could not umount /$LOCAL_STORAGE_SERVER_VOLUME_GROUP/$LOCAL_IMAGE_NAME, trying again ..."
 				if [ "$UMOUNT_LOOP" = "$MAX_UMOUNT_LOOP" ]; then
-					echo "ERROR: Could not umount /$LOCAL_STORAGE_SERVER_VOLUME_GROUP/$LOCAL_IMAGE_NAME. Giving up !!!" 2>1
-					local_storage_log local-storage-functions "ERROR: Could not umount /$LOCAL_STORAGE_SERVER_VOLUME_GROUP/$LOCAL_IMAGE_NAME. Giving up !!!"
+					echo "ERROR: Could not umount /$LOCAL_STORAGE_SERVER_VOLUME_GROUP/$LOCAL_IMAGE_NAME. Giving up!" 2>1
+					local_storage_log local-storage-functions "ERROR: Could not umount /$LOCAL_STORAGE_SERVER_VOLUME_GROUP/$LOCAL_IMAGE_NAME. Giving up!"
 					manage_fstab remove
 					local_storage_lock release
 					return 20
