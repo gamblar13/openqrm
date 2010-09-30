@@ -27,6 +27,7 @@ export IMAGE_FSTAB_STATIC=/mnt/etc/fstab-static
 export NETWORK_SERVICES_TO_ADJUST="/etc/init.d/portmap /etc/init.d/netfs /etc/rc.d/init.d/portmap /etc/rc.d/init.d/netfs /etc/init.d/network /etc/rc.d/init.d/network /etc/init.d/networking /etc/rc.d/init.d/networking"
 export NOT_START_SERVICE="dbus avahi-daemon kudzu"
 
+
 # functions
 
 function prepare_udev() {
@@ -39,6 +40,8 @@ function prepare_udev() {
 		cp -a /dev/* /mnt/dev/
 		mkdir -p /mnt/dev/.udevdb/
 	fi
+    # clean udev rulez
+    rm -f /mnt/etc/udev/rules.d/*
 }
 
 
@@ -80,16 +83,22 @@ function import_kernel() {
 	mount -t tmpfs none /tmp_download
 	mount -t tmpfs none /lib/modules
 	cd /tmp_download
-	tftp $OPENQRM_SERVER_IP_ADDRESS -g -r boot/modules-$kernel_name.tgz -l modules-$kernel_name.tgz
+    if ! wget -q -O modules-$kernel_name.tgz http://$OPENQRM_SERVER_IP_ADDRESS/openqrm/boot-service/boot/modules-$kernel_name.tgz; then
+        tftp $OPENQRM_SERVER_IP_ADDRESS -g -r boot/modules-$kernel_name.tgz -l modules-$kernel_name.tgz
+    fi
 	tar -C / -xzf /tmp_download/modules-$kernel_name.tgz
 	rm -f modules-$kernel_name.tgz
 	sync
 	mkdir -p /boot
 	mount -t tmpfs none /boot
 	cd /boot
-	tftp $OPENQRM_SERVER_IP_ADDRESS -g -r boot/vmlinuz-$kernel_name -l vmlinuz-$kernel_name
+    if ! wget -q -O vmlinuz-$kernel_name http://$OPENQRM_SERVER_IP_ADDRESS/openqrm/boot-service/boot/vmlinuz-$kernel_name; then
+    	tftp $OPENQRM_SERVER_IP_ADDRESS -g -r boot/vmlinuz-$kernel_name -l vmlinuz-$kernel_name
+    fi
 	mv vmlinuz-$kernel_name vmlinuz-$kernel_version
-	tftp $OPENQRM_SERVER_IP_ADDRESS -g -r boot/System.map-$kernel_name -l System.map-$kernel_name
+    if ! wget -q -O System.map-$kernel_name http://$OPENQRM_SERVER_IP_ADDRESS/openqrm/boot-service/boot/System.map-$kernel_name; then
+    	tftp $OPENQRM_SERVER_IP_ADDRESS -g -r boot/System.map-$kernel_name -l System.map-$kernel_name
+    fi
 	mv System.map-$kernel_name System.map-$kernel_version
 	cd /
 	mknod /dev/ptmx c 5 2
@@ -117,6 +126,22 @@ function import_kernel() {
 	udevd --daemon
 	# give time to settle, especially needed for some scsi devices
 	sleep 3
+    #lvm
+    if [ -x /bin/lvm ]; then
+        echo "- Scanning for physical lvm drives"
+        /bin/lvm pvscan
+        echo "- Scanning for logical volume groups"
+        /bin/lvm vgscan
+        echo "- Activating logical volume groups"
+        /bin/lvm vgchange -ay
+        echo "- Scanning for logical volumes"
+        /bin/lvm lvscan
+        echo "- Activating logical volumes"
+        for LVOL in `/bin/lvm lvdisplay | grep -i "LV Name" | awk {' print $3 '}`; do
+            echo "- Activating $LVOL"
+            /bin/lvm lvchange -ay $LVOL
+        done
+    fi
 }
 
 
@@ -389,6 +414,10 @@ else
         fi
     elif [ -f /mnt/etc/redhat-release ]; then
         OPENQRM_SHORT_DISTRI_NAME="centos"
+    elif [ -f /mnt/etc/SuSE-release ]; then
+        OPENQRM_SHORT_DISTRI_NAME="suse"
+    else
+        OPENQRM_SHORT_DISTRI_NAME="custom"
     fi
     # get the openQRM client package fitting to distri + arch
     rm -rf /mnt/$resource_basedir/openqrm
