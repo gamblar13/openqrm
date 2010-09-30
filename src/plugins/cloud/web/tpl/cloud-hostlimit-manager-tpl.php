@@ -23,25 +23,8 @@
 }
 </style>
 
-<h1><img border=0 src="/openqrm/base/plugins/cloud/img/clouduser.png"> Create Cloud User on portal <small><a href={external_portal_name} target="_BLANK">{external_portal_name}</a></small></h1>
-<br>
-<form action={thisfile} method=post>
+<h1><img border=0 src="/openqrm/base/plugins/cloud/img/cloudprivateimage.png"> Cloud Host Limits for portal <small><a href="{external_portal_name}" target="_BLANK">{external_portal_name}</a></small></h1>
 
-{cu_name}
-{generate_pass}
-<br>
-{cu_cg}
-{cu_forename}
-{cu_lastname}
-{cu_email}
-{cu_street}
-{cu_city}
-{cu_country}
-{cu_phone}
+{cloud_max_vms_table}
 
-<input type=hidden name='cloud_command' value='create_user'>
-<br>
-<input type=submit value='Create'>
-<br>
-</form>
 

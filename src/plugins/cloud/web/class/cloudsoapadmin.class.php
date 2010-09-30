@@ -40,8 +40,6 @@ require_once "$RootDir/plugins/cloud/class/clouduserslimits.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudrequest.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudconfig.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudmailer.class.php";
-require_once "$RootDir/plugins/cloud/class/cloudipgroup.class.php";
-require_once "$RootDir/plugins/cloud/class/cloudiptables.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudvm.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudimage.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudappliance.class.php";
@@ -203,6 +201,8 @@ class cloudsoapadmin extends cloudsoap {
         $user_fields['cu_city'] = "na";
         $user_fields['cu_country'] = "na";
         $user_fields['cu_phone'] = "0";
+        // default user group
+        $user_fields['cu_cg_id'] = 0;
         // enabled by default
         $user_fields['cu_status'] = 1;
         // check how many ccunits to give for a new user

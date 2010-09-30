@@ -44,8 +44,6 @@ require_once "$RootDir/plugins/cloud/class/clouduser.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudrequest.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudconfig.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudmailer.class.php";
-require_once "$RootDir/plugins/cloud/class/cloudipgroup.class.php";
-require_once "$RootDir/plugins/cloud/class/cloudiptables.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudvm.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudimage.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudappliance.class.php";
@@ -77,7 +75,7 @@ function openqrm_custom_cloud_billing($cr_id, $cu_id, $cu_ccunits) {
     if ($new_cu_ccunits < 0) {
         $new_cu_ccunits = 0;
     }
-    $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "openqrm-cloud-billing-hook", "Applying basic charge $new_cu_ccunits = $cu_ccunits-$basic_costs for request ID $cr_id", "", "", 0, 0, 0);
+    // $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "openqrm-cloud-billing-hook", "Applying basic charge $new_cu_ccunits = $cu_ccunits-$basic_costs for request ID $cr_id", "", "", 0, 0, 0);
     // transaction logging
     $ct = new cloudtransaction();
     $ct->push($cr_id, $cu_id, $custom_costs, $new_cu_ccunits, "Custom Cloud billing", "Custom CCU charge for a Cloud appliance");

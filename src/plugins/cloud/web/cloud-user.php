@@ -76,6 +76,7 @@ require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
 // special clouduser class
 require_once "$RootDir/plugins/cloud/class/clouduser.class.php";
+require_once "$RootDir/plugins/cloud/class/cloudusergroup.class.php";
 require_once "$RootDir/plugins/cloud/class/clouduserslimits.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudconfig.class.php";
 
@@ -179,6 +180,9 @@ function cloud_user_manager() {
 	$arHead['cu_lastname'] = array();
 	$arHead['cu_lastname']['title'] ='Last name';
 
+	$arHead['cu_cg_id'] = array();
+	$arHead['cu_cg_id']['title'] ='Group';
+
 	$arHead['cu_email'] = array();
 	$arHead['cu_email']['title'] ='Email';
 
@@ -215,13 +219,17 @@ function cloud_user_manager() {
         $user_auth_str = "://".$tclu->name.":".$tclu->password."@";
         $external_portal_user_auth = str_replace("://", $user_auth_str, $external_portal_name);
         $user_login_link = "<a href=\"".$external_portal_user_auth."/user/mycloud.php\" title=\"Login\" target=\"_BLANK\" onmouseover=\"return statusMsg('')\">".$tclu->name."</a>";
-
+        // group
+        $cloudusergroup = new cloudusergroup();
+        $cloudusergroup->get_instance_by_id($cu["cu_cg_id"]);
+        $cg_name = $cloudusergroup->name;
 
 		$arBody[] = array(
 			'cu_id' => $cu["cu_id"],
 			'cu_name' => $user_login_link,
 			'cu_forename' => $cu["cu_forename"],
 			'cu_lastname' => $cu["cu_lastname"],
+			'cu_cg_id' => $cg_name,
 			'cu_email' => $cu["cu_email"],
 			'cu_ccunits' => $ccunits_input,
 			'cu_status' => $status_icon,
@@ -274,7 +282,14 @@ function cloud_create_user() {
     // root password input plus generate password button
     $generate_pass = "Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input name=\"cu_password\" type=\"text\" id=\"cu_password\" value=\"\" size=\"10\" maxlength=\"10\">";
     $generate_pass .= "<input type=\"button\" name=\"gen\" value=\"generate\" onclick=\"this.form.cu_password.value=getPassword(10, false, true, true, true, false, true, true, true, false);\"><br>";
-    // without generate pass button : $disp = $disp.htmlobject_input('cu_password', array("value" => '', "label" => 'Password'), 'text', 20);
+    // the user group select
+    $cloudusergroup = new cloudusergroup();
+    $cloudusergroup_list = array();
+    $cloudusergroup_list_select = array();
+    $cloudusergroup_list = $cloudusergroup->get_list();
+    foreach ($cloudusergroup_list as $id => $cg) {
+        $cloudusergroup_list_select[] = array("value" => $cg[value], "label" => $cg[label]);
+    }
 	$cu_forename = htmlobject_input('cu_forename', array("value" => '', "label" => 'Fore name'), 'text', 50);
 	$cu_lastname = htmlobject_input('cu_lastname', array("value" => '', "label" => 'Last name'), 'text', 50);
 	$cu_email = htmlobject_input('cu_email', array("value" => '', "label" => 'Email'), 'text', 50);
@@ -289,6 +304,7 @@ function cloud_create_user() {
 	$t->setVar(array(
         'cu_name' => $cu_name,
         'generate_pass' => $generate_pass,
+        'cu_cg' => htmlobject_select('cu_cg_id', $cloudusergroup_list_select, 'Group'),
         'cu_forename' => $cu_forename,
         'cu_lastname' => $cu_lastname,
         'cu_email' => $cu_email,

@@ -65,6 +65,7 @@ var $deployment_type_req = '';
 var $ha_req = '';
 var $shared_req = '';
 var $puppet_groups = '';
+var $ip_mgmt = '';
 var $appliance_id = '';
 var $lastbill = '';
 
@@ -104,6 +105,7 @@ function get_instance($id) {
 		$this->ha_req = $cloudrequest["cr_ha_req"];
 		$this->shared_req = $cloudrequest["cr_shared_req"];
 		$this->puppet_groups = $cloudrequest["cr_puppet_groups"];
+		$this->ip_mgmt = $cloudrequest["cr_ip_mgmt"];
 		$this->appliance_id = $cloudrequest["cr_appliance_id"];
 		$this->lastbill = $cloudrequest["cr_lastbill"];
 	}
@@ -238,12 +240,95 @@ function get_all_ids() {
 }
 
 
+
+// returns a list of all cloudrequest ids which are new or approvded
+function get_all_new_and_approved_ids() {
+	global $CLOUD_REQUEST_TABLE;
+	global $event;
+	$cloudrequest_list = array();
+	$query = "select cr_id from $CLOUD_REQUEST_TABLE where cr_status=1 or cr_status=2";
+	$db=openqrm_get_db_connection();
+	$rs = $db->Execute($query);
+	if (!$rs)
+		$event->log("get_all_new_and_approved_ids", $_SERVER['REQUEST_TIME'], 2, "cloudrequest.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
+	else
+	while (!$rs->EOF) {
+		$cloudrequest_list[] = $rs->fields;
+		$rs->MoveNext();
+	}
+	return $cloudrequest_list;
+
+}
+
+
+// returns a list of all cloudrequest ids which are active
+function get_all_active_ids() {
+	global $CLOUD_REQUEST_TABLE;
+	global $event;
+	$cloudrequest_list = array();
+	$query = "select cr_id from $CLOUD_REQUEST_TABLE where cr_status=3";
+	$db=openqrm_get_db_connection();
+	$rs = $db->Execute($query);
+	if (!$rs)
+		$event->log("get_all_active_ids", $_SERVER['REQUEST_TIME'], 2, "cloudrequest.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
+	else
+	while (!$rs->EOF) {
+		$cloudrequest_list[] = $rs->fields;
+		$rs->MoveNext();
+	}
+	return $cloudrequest_list;
+
+}
+
+
+// returns a list of all cloudrequest ids which are deprovisioned
+function get_all_deprovisioned_ids() {
+	global $CLOUD_REQUEST_TABLE;
+	global $event;
+	$cloudrequest_list = array();
+	$query = "select cr_id from $CLOUD_REQUEST_TABLE where cr_status=5";
+	$db=openqrm_get_db_connection();
+	$rs = $db->Execute($query);
+	if (!$rs)
+		$event->log("get_all_deprovisioned_ids", $_SERVER['REQUEST_TIME'], 2, "cloudrequest.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
+	else
+	while (!$rs->EOF) {
+		$cloudrequest_list[] = $rs->fields;
+		$rs->MoveNext();
+	}
+	return $cloudrequest_list;
+
+}
+
+
+
 // returns a list of all cloudrequest ids per clouduser
 function get_all_ids_per_user($cu_id) {
 	global $CLOUD_REQUEST_TABLE;
 	global $event;
 	$cloudrequest_list = array();
 	$query = "select cr_id from $CLOUD_REQUEST_TABLE where cr_cu_id=$cu_id";
+	$db=openqrm_get_db_connection();
+	$rs = $db->Execute($query);
+	if (!$rs)
+		$event->log("get_all_ids_per_user", $_SERVER['REQUEST_TIME'], 2, "cloudrequest.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
+	else
+	while (!$rs->EOF) {
+		$cloudrequest_list[] = $rs->fields;
+		$rs->MoveNext();
+	}
+	return $cloudrequest_list;
+
+}
+
+
+
+// returns a list of all active cloudrequest ids per clouduser
+function get_all_active_ids_per_user($cu_id) {
+	global $CLOUD_REQUEST_TABLE;
+	global $event;
+	$cloudrequest_list = array();
+	$query = "select cr_id from $CLOUD_REQUEST_TABLE where cr_cu_id=$cu_id and cr_status>0 and cr_status<4";
 	$db=openqrm_get_db_connection();
 	$rs = $db->Execute($query);
 	if (!$rs)

@@ -22,6 +22,7 @@
 #	Target
 ..|About|plugins/cloud/cloud-about.php|How to use|cloud/plugin.png
 ..|User|plugins/cloud/cloud-user.php|The User on the Cloud|cloud/clouduser.png
+..|Groups|plugins/cloud/cloud-usergroup.php|User Groups on the Cloud|cloud/clouduser.png
 ..|Requests|plugins/cloud/cloud-manager.php|The Requests from the Users|cloud/cloudrequests.png
 ..|Mail|plugins/cloud/cloud-mailer.php|Send a mail to the Cloud Users|cloud/cloudmail.png
 ..|Configuration
@@ -37,7 +38,10 @@
 ....|Quantity|plugins/cloud/cloud-selector.php?product_type=quantity|Quantity Products|cloud/cloudproduct_quantity.png
 ....|Virtual|plugins/cloud/cloud-selector.php?product_type=resource|Virtualization Products|cloud/cloudproduct_resource.png
 ...|Private Images|plugins/cloud/cloud-image-selector.php|Private Cloud Images|cloud/cloudprivateimage.png
-...|IpGroups|plugins/cloud/cloud-ipgroup-manager.php|Setup IP-Adressing for the Cloud|cloud/cloudipgroups.png
+...|Resource Pools|plugins/cloud/cloud-resource-pools.php|Resource Pooling Manager|cloud/cloudprivateimage.png
+...|Host-Limits|plugins/cloud/cloud-hostlimit.php|Host-Limit Manager|cloud/cloudprivateimage.png
+...|Power-Saver|plugins/cloud/cloud-power-saver.php|Power Saver Manager|cloud/cloudprivateimage.png
+...|Ip-Mgmt|plugins/cloud/cloud-ip-manager.php|Setup IP-Adressing for the Cloud|cloud/cloudipgroups.png
 ...|Cloud NAT|plugins/cloud/cloud-nat-manager.php|Configure NAT for the Cloud|cloud/cloudnat.png
 ..|WebService
 ...|Main|plugins/cloud/soap/index.php|Documenation for the Cloud SOAP WebService|cloud/cloudsoap.png

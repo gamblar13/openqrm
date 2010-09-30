@@ -119,6 +119,8 @@ function cloud_config_manager() {
 			case '20':
 			case '21':
 			case '22':
+			case '25':
+			case '26':
 				$ar = array();
 				$ar[] = array('value'=> 'true', 'label'=> 'true');
 				$ar[] = array('value'=> 'false', 'label'=> 'false'); 
@@ -161,6 +163,38 @@ function cloud_config_manager() {
 				$ar[] = array('value'=> 'Euro', 'label'=> 'Euro');
 				$input_value = htmlobject_select($cc["cc_key"], $ar , '', array($cc["cc_value"]));
 			break;
+            
+			case '27':
+			case '28':
+			case '29':
+			case '30':
+			case '31':
+			case '32':
+			case '33':
+				$ar = array();
+				$ar[] = array('value'=> '0', 'label'=> '0');
+				$ar[] = array('value'=> '1', 'label'=> '1');
+				$ar[] = array('value'=> '2', 'label'=> '2');
+				$ar[] = array('value'=> '3', 'label'=> '3');
+				$ar[] = array('value'=> '4', 'label'=> '4');
+				$ar[] = array('value'=> '5', 'label'=> '5');
+				$ar[] = array('value'=> '6', 'label'=> '6');
+				$ar[] = array('value'=> '7', 'label'=> '7');
+				$ar[] = array('value'=> '8', 'label'=> '8');
+				$ar[] = array('value'=> '9', 'label'=> '9');
+				$ar[] = array('value'=> '10', 'label'=> '10');
+				$ar[] = array('value'=> '20', 'label'=> '20');
+				$ar[] = array('value'=> '30', 'label'=> '30');
+				$ar[] = array('value'=> '40', 'label'=> '40');
+				$ar[] = array('value'=> '50', 'label'=> '50');
+				$ar[] = array('value'=> '60', 'label'=> '60');
+				$ar[] = array('value'=> '70', 'label'=> '70');
+				$ar[] = array('value'=> '80', 'label'=> '80');
+				$ar[] = array('value'=> '90', 'label'=> '90');
+				$ar[] = array('value'=> '100', 'label'=> '100');
+				$input_value = htmlobject_select($cc["cc_key"], $ar , '', array($cc["cc_value"]));
+			break;
+
 			
 		}
 		$input_value .= htmlobject_input('identifier[]', array('value' => $cc["cc_id"]), 'hidden');

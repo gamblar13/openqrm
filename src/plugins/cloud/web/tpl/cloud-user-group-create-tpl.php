@@ -23,23 +23,14 @@
 }
 </style>
 
-<h1><img border=0 src="/openqrm/base/plugins/cloud/img/clouduser.png"> Create Cloud User on portal <small><a href={external_portal_name} target="_BLANK">{external_portal_name}</a></small></h1>
+<h1><img border=0 src="/openqrm/base/plugins/cloud/img/clouduser.png"> Create Cloud User Group on portal <small><a href={external_portal_name} target="_BLANK">{external_portal_name}</a></small></h1>
 <br>
 <form action={thisfile} method=post>
 
-{cu_name}
-{generate_pass}
-<br>
-{cu_cg}
-{cu_forename}
-{cu_lastname}
-{cu_email}
-{cu_street}
-{cu_city}
-{cu_country}
-{cu_phone}
+{cg_name}
+{cg_description}
 
-<input type=hidden name='cloud_command' value='create_user'>
+<input type=hidden name='cloud_command' value='create_user_group'>
 <br>
 <input type=submit value='Create'>
 <br>

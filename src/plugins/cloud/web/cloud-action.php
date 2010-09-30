@@ -36,12 +36,14 @@ require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
 // special cloud classes
 require_once "$RootDir/plugins/cloud/class/clouduser.class.php";
+require_once "$RootDir/plugins/cloud/class/cloudusergroup.class.php";
 require_once "$RootDir/plugins/cloud/class/clouduserslimits.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudrequest.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudconfig.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudmailer.class.php";
 global $CLOUD_USER_TABLE;
 global $CLOUD_REQUEST_TABLE;
+global $CLOUD_USER_GROUPS_TABLE;
 
 global $OPENQRM_SERVER_BASE_DIR;
 $refresh_delay=5;
@@ -64,6 +66,13 @@ foreach ($_REQUEST as $key => $value) {
 		$user_fields[$key] = $value;
 	}
 }
+// gather user group parameter in array
+foreach ($_REQUEST as $key => $value) {
+	if (strncmp($key, "cg_", 3) == 0) {
+		$user_group_fields[$key] = $value;
+	}
+}
+
 // gather request parameter in array
 foreach ($_REQUEST as $key => $value) {
 	if (strncmp($key, "cr_", 3) == 0) {
@@ -177,11 +186,13 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			// cr_ha_req VARCHAR(5)
 			// cr_shared_req VARCHAR(5)
 			// cr_puppet_groups VARCHAR(255)
+			// cr_ip_mgmt VARCHAR(255)
 			// cr_appliance_id VARCHAR(255)
 			// cr_lastbill VARCHAR(20)
 			// 
 			// -> cloudusers
 			// cu_id INT(5)
+			// cu_cg_id INT(5)
 			// cu_name VARCHAR(20)
 			// cu_password VARCHAR(50)
 			// cu_forename VARCHAR(50)
@@ -195,6 +206,12 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			// cu_token VARCHAR(100)
 			// cu_ccunits BIGINT(10)
 			// 
+			// -> cloudusergroup
+            // cg_id INT(5)
+			// cg_name VARCHAR(20)
+			// cg_role_id  INT(5)
+			// cg_description VARCHAR(255)
+            //
 			// -> clouduserslimits
 			// cl_id INT(5)
 			// cl_cu_id INT(5)
@@ -208,30 +225,6 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			// cc_id INT(5)
 			// cc_key VARCHAR(50)
 			// cc_value VARCHAR(50)
-
-			// -> ipgroups
-			// ig_id INT(5)
-			// ig_name VARCHAR(50)
-			// ig_network VARCHAR(50)
-			// ig_subnet VARCHAR(50)
-			// ig_gateway VARCHAR(50)
-			// ig_dns1 VARCHAR(50)
-			// ig_dns2 VARCHAR(50)
-			// ig_domain VARCHAR(50)
-			// ig_activeips INT(5)
-
-			// -> iptable
-			// ip_id INT(5)
-			// ip_ig_id INT(5)
-			// ip_appliance_id INT(5)
-			// ip_cr_id INT(5)
-			// ip_active INT(5)
-			// ip_address VARCHAR(50)
-			// ip_subnet VARCHAR(50)
-			// ip_gateway VARCHAR(50)
-			// ip_dns1 VARCHAR(50)
-			// ip_dns2 VARCHAR(50)
-			// ip_domain VARCHAR(50)
 
             // -> cloudimage
             // ci_id INT(5)
@@ -295,12 +288,96 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
             // description VARCHAR(255)
             // state INT(5)
 
-            $create_cloud_requests = "create table cloud_requests(cr_id INT(5), cr_cu_id INT(5), cr_status INT(5), cr_request_time VARCHAR(20), cr_start VARCHAR(20), cr_stop VARCHAR(20), cr_kernel_id INT(5), cr_image_id INT(5), cr_ram_req VARCHAR(20), cr_cpu_req VARCHAR(20), cr_disk_req VARCHAR(20), cr_network_req VARCHAR(255), cr_resource_quantity INT(5), cr_resource_type_req VARCHAR(20), cr_deployment_type_req VARCHAR(50), cr_ha_req VARCHAR(5), cr_shared_req VARCHAR(5), cr_appliance_id VARCHAR(255), cr_puppet_groups VARCHAR(255), cr_lastbill VARCHAR(20))";
-			$create_cloud_users = "create table cloud_users(cu_id INT(5), cu_name VARCHAR(50), cu_password VARCHAR(50), cu_forename VARCHAR(50), cu_lastname VARCHAR(50), cu_email VARCHAR(50), cu_street VARCHAR(100), cu_city VARCHAR(100), cu_country VARCHAR(100), cu_phone VARCHAR(100), cu_status INT(5), cu_token VARCHAR(100), cu_ccunits BIGINT(10))";
+            // -> cloudrespool
+            // rp_id INT(5)
+            // rp_resource_id INT(5)
+            // rp_cg_id INT(5)
+
+            // -> cloudhostlimit
+            // hl_id INT(5)
+            // hl_resource_id INT(5)
+            // hl_current_vms INT(5)
+            // hl_max_vms INT(5)
+
+            // -> cloudpowersaver
+            // ps_id INT(5)
+            // ps_frequence VARCHAR(50)
+            // ps_last_check VARCHAR(50)
+
+			// -> cloud_profiles
+			// pr_id INT(5)
+			// pr_name VARCHAR(20)
+			// pr_cu_id INT(5)
+			// pr_status INT(5)
+			// pr_request_time VARCHAR(20)
+			// pr_start VARCHAR(20)
+			// pr_stop VARCHAR(20)
+			// pr_kernel_id INT(5)
+			// pr_image_id INT(5)
+			// pr_ram_req VARCHAR(20)
+			// pr_cpu_req VARCHAR(20)
+			// pr_disk_req VARCHAR(20)
+			// pr_network_req VARCHAR(255)
+			// pr_resource_quantity INT(5)
+			// pr_resource_type_req VARCHAR(20)
+			// pr_deployment_type_req VARCHAR(50)
+			// pr_ha_req VARCHAR(5)
+			// pr_shared_req VARCHAR(5)
+			// pr_puppet_groups VARCHAR(255)
+			// pr_ip_mgmt VARCHAR(255)
+			// pr_appliance_id VARCHAR(255)
+			// pr_lastbill VARCHAR(20)
+			// pr_description VARCHAR(255)
+
+			// -> cloud_icons
+			// ic_id INT(5)
+			// ic_cu_id INT(5)
+			// ic_type INT(5)
+			// ic_object_id INT(5)
+			// ic_filename VARCHAR(255)
+
+			// -> cloud_matrix
+			// cm_id INT(5)
+			// cm_cu_id INT(5)
+			// cm_description VARCHAR(255)
+			// cm_row01 VARCHAR(255)
+			// cm_row02 VARCHAR(255)
+			// cm_row03 VARCHAR(255)
+			// cm_row04 VARCHAR(255)
+			// cm_row05 VARCHAR(255)
+			// cm_row06 VARCHAR(255)
+			// cm_row07 VARCHAR(255)
+			// cm_row08 VARCHAR(255)
+			// cm_row09 VARCHAR(255)
+			// cm_row10 VARCHAR(255)
+			// cm_row11 VARCHAR(255)
+			// cm_row12 VARCHAR(255)
+
+			// -> cloud_matrix_object
+			// mo_id INT(5)
+			// mo_pr_id INT(5)
+			// mo_cr_id INT(5)
+			// mo_ca_id INT(5)
+			// mo_ne_id INT(5)
+			// mo_table INT(5)
+			// mo_x INT(5)
+			// mo_y INT(5)
+			// mo_state INT(5)
+
+			// -> cloud_create_vm_lc
+			// vc_id INT(5)
+			// vc_resource_id INT(5)
+			// vc_cr_id INT(5)
+            // vc_cr_resource_number INT(5)
+			// vc_request_time VARCHAR(20)
+			// vc_vm_create_timeout INT(5)
+			// vc_state INT(5)
+
+            $create_cloud_requests = "create table cloud_requests(cr_id INT(5), cr_cu_id INT(5), cr_status INT(5), cr_request_time VARCHAR(20), cr_start VARCHAR(20), cr_stop VARCHAR(20), cr_kernel_id INT(5), cr_image_id INT(5), cr_ram_req VARCHAR(20), cr_cpu_req VARCHAR(20), cr_disk_req VARCHAR(20), cr_network_req VARCHAR(255), cr_resource_quantity INT(5), cr_resource_type_req VARCHAR(20), cr_deployment_type_req VARCHAR(50), cr_ha_req VARCHAR(5), cr_shared_req VARCHAR(5), cr_appliance_id VARCHAR(255), cr_puppet_groups VARCHAR(255), cr_ip_mgmt VARCHAR(255), cr_lastbill VARCHAR(20))";
+			$create_cloud_users = "create table cloud_users(cu_id INT(5), cu_cg_id INT(5), cu_name VARCHAR(50), cu_password VARCHAR(50), cu_forename VARCHAR(50), cu_lastname VARCHAR(50), cu_email VARCHAR(50), cu_street VARCHAR(100), cu_city VARCHAR(100), cu_country VARCHAR(100), cu_phone VARCHAR(100), cu_status INT(5), cu_token VARCHAR(100), cu_ccunits BIGINT(10))";
+			$create_cloud_usergroups = "create table cloud_usergroups(cg_id INT(5), cg_name VARCHAR(50), cg_role_id INT(5), cg_description VARCHAR(255))";
 			$create_cloud_users_limit = "create table cloud_users_limits(cl_id INT(5), cl_cu_id INT(5), cl_resource_limit INT(5), cl_memory_limit BIGINT(10), cl_disk_limit BIGINT(10), cl_cpu_limit INT(5), cl_network_limit INT(5))";
 			$create_cloud_config = "create table cloud_config(cc_id INT(5), cc_key VARCHAR(50), cc_value VARCHAR(50))";
-			$create_cloud_ipgroups = "create table cloud_ipgroups(ig_id INT(5), ig_name VARCHAR(50), ig_network VARCHAR(50), ig_subnet VARCHAR(50), ig_gateway VARCHAR(50), ig_dns1 VARCHAR(50), ig_dns2 VARCHAR(50), ig_domain VARCHAR(50), ig_activeips INT(5))";
-			$create_cloud_iptables = "create table cloud_iptables(ip_id INT(5), ip_ig_id INT(5), ip_appliance_id INT(5), ip_cr_id INT(5), ip_active INT(5), ip_address VARCHAR(50), ip_subnet VARCHAR(50), ip_gateway VARCHAR(50), ip_dns1 VARCHAR(50), ip_dns2 VARCHAR(50), ip_domain VARCHAR(50))";
 			$create_cloud_image = "create table cloud_image(ci_id INT(5), ci_cr_id INT(5), ci_image_id INT(5), ci_appliance_id INT(5), ci_resource_id INT(5), ci_disk_size VARCHAR(20), ci_disk_rsize VARCHAR(20), ci_clone_name VARCHAR(50), ci_state INT(5))";
 			$create_cloud_appliance = "create table cloud_appliance(ca_id INT(5), ca_appliance_id INT(5), ca_cr_id INT(5), ca_cmd INT(5), ca_state INT(5))";
 			$create_cloud_nat = "create table cloud_nat(cn_id INT(5), cn_internal_net VARCHAR(50), cn_external_net VARCHAR(50))";
@@ -309,13 +386,20 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			$create_cloud_image_private_life_cycle = "create table cloud_iplc(cp_id INT(5), cp_appliance_id INT(5), cp_cu_id INT(5), cp_state INT(5), cp_start_private VARCHAR(20))";
 			$create_cloud_image_private = "create table cloud_private_image(co_id INT(5), co_image_id INT(5), co_cu_id INT(5), co_comment VARCHAR(255), co_state INT(5))";
 			$create_cloud_selector = "create table cloud_selector(id INT(5), type VARCHAR(255), sort_id INT(5), quantity VARCHAR(255), price INT(5), name VARCHAR(20), description VARCHAR(255), state INT(5))";
+			$create_cloud_resource_pool = "create table cloud_respool(rp_id INT(5), rp_resource_id INT(5), rp_cg_id INT(5))";
+			$create_cloud_host_limit = "create table cloud_hostlimit(hl_id INT(5), hl_resource_id INT(5), hl_current_vms INT(5), hl_max_vms INT(5))";
+			$create_cloud_power_saver = "create table cloud_power_saver(ps_id INT(5), ps_frequence VARCHAR(50), ps_last_check VARCHAR(50))";
+            $create_cloud_profiles = "create table cloud_profiles(pr_id INT(5), pr_name VARCHAR(20), pr_cu_id INT(5), pr_status INT(5), pr_request_time VARCHAR(20), pr_start VARCHAR(20), pr_stop VARCHAR(20), pr_kernel_id INT(5), pr_image_id INT(5), pr_ram_req VARCHAR(20), pr_cpu_req VARCHAR(20), pr_disk_req VARCHAR(20), pr_network_req VARCHAR(255), pr_resource_quantity INT(5), pr_resource_type_req VARCHAR(20), pr_deployment_type_req VARCHAR(50), pr_ha_req VARCHAR(5), pr_shared_req VARCHAR(5), pr_appliance_id VARCHAR(255), pr_puppet_groups VARCHAR(255), pr_ip_mgmt VARCHAR(255), pr_lastbill VARCHAR(20), pr_description VARCHAR(255))";
+            $create_cloud_icons = "create table cloud_icons(ic_id INT(5), ic_cu_id INT(5), ic_type INT(5), ic_object_id INT(5), ic_filename VARCHAR(255))";
+            $create_cloud_matrix = "create table cloud_matrix(cm_id INT(5), cm_cu_id INT(5), cm_description VARCHAR(255), cm_row01 VARCHAR(255), cm_row02 VARCHAR(255), cm_row03 VARCHAR(255), cm_row04 VARCHAR(255), cm_row05 VARCHAR(255), cm_row06 VARCHAR(255), cm_row07 VARCHAR(255), cm_row08 VARCHAR(255), cm_row09 VARCHAR(255), cm_row10 VARCHAR(255), cm_row11 VARCHAR(255), cm_row12 VARCHAR(255))";
+            $create_cloud_matrix_object = "create table cloud_matrix_object(mo_id INT(5), mo_pr_id INT(5), mo_cr_id INT(5), mo_ca_id INT(5), mo_ne_id INT(5), mo_table INT(5), mo_x INT(5), mo_y INT(5), mo_state INT(5))";
+            $create_cloud_create_vm_lc = "create table cloud_create_vm_lc(vc_id INT(5), vc_resource_id INT(5), vc_cr_id INT(5), vc_cr_resource_number INT(5), vc_request_time VARCHAR(20), vc_vm_create_timeout INT(5), vc_state INT(5))";
             $db=openqrm_get_db_connection();
 			$recordSet = &$db->Execute($create_cloud_requests);
 			$recordSet = &$db->Execute($create_cloud_users);
+			$recordSet = &$db->Execute($create_cloud_usergroups);
 			$recordSet = &$db->Execute($create_cloud_users_limit);
 			$recordSet = &$db->Execute($create_cloud_config);
-			$recordSet = &$db->Execute($create_cloud_ipgroups);
-			$recordSet = &$db->Execute($create_cloud_iptables);
 			$recordSet = &$db->Execute($create_cloud_image);
 			$recordSet = &$db->Execute($create_cloud_appliance);
 			$recordSet = &$db->Execute($create_cloud_nat);
@@ -324,6 +408,14 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			$recordSet = &$db->Execute($create_cloud_image_private_life_cycle);
 			$recordSet = &$db->Execute($create_cloud_image_private);
 			$recordSet = &$db->Execute($create_cloud_selector);
+			$recordSet = &$db->Execute($create_cloud_resource_pool);
+			$recordSet = &$db->Execute($create_cloud_host_limit);
+			$recordSet = &$db->Execute($create_cloud_power_saver);
+			$recordSet = &$db->Execute($create_cloud_profiles);
+			$recordSet = &$db->Execute($create_cloud_icons);
+			$recordSet = &$db->Execute($create_cloud_matrix);
+			$recordSet = &$db->Execute($create_cloud_matrix_object);
+			$recordSet = &$db->Execute($create_cloud_create_vm_lc);
 
 			// create the default configuration
 			$create_default_cloud_config1 = "insert into cloud_config(cc_id, cc_key, cc_value) values (1, 'cloud_admin_email', 'root@localhost')";
@@ -374,10 +466,35 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			$recordSet = &$db->Execute($create_default_cloud_config23);
 			$create_default_cloud_config24 = "insert into cloud_config(cc_id, cc_key, cc_value) values (24, 'cloud_1000_ccus', '1')";
 			$recordSet = &$db->Execute($create_default_cloud_config24);
+			$create_default_cloud_config25 = "insert into cloud_config(cc_id, cc_key, cc_value) values (25, 'resource_pooling', 'true')";
+			$recordSet = &$db->Execute($create_default_cloud_config25);
+			$create_default_cloud_config26 = "insert into cloud_config(cc_id, cc_key, cc_value) values (26, 'ip-management', 'true')";
+			$recordSet = &$db->Execute($create_default_cloud_config26);
+			$create_default_cloud_config27 = "insert into cloud_config(cc_id, cc_key, cc_value) values (27, 'max-parallel-phase-one-actions', '0')";
+			$recordSet = &$db->Execute($create_default_cloud_config27);
+			$create_default_cloud_config28 = "insert into cloud_config(cc_id, cc_key, cc_value) values (28, 'max-parallel-phase-two-actions', '3')";
+			$recordSet = &$db->Execute($create_default_cloud_config28);
+			$create_default_cloud_config29 = "insert into cloud_config(cc_id, cc_key, cc_value) values (29, 'max-parallel-phase-three-actions', '0')";
+			$recordSet = &$db->Execute($create_default_cloud_config29);
+			$create_default_cloud_config30 = "insert into cloud_config(cc_id, cc_key, cc_value) values (30, 'max-parallel-phase-four-actions', '0')";
+			$recordSet = &$db->Execute($create_default_cloud_config30);
+			$create_default_cloud_config31 = "insert into cloud_config(cc_id, cc_key, cc_value) values (31, 'max-parallel-phase-five-actions', '0')";
+			$recordSet = &$db->Execute($create_default_cloud_config31);
+			$create_default_cloud_config32 = "insert into cloud_config(cc_id, cc_key, cc_value) values (32, 'max-parallel-phase-six-actions', '0')";
+			$recordSet = &$db->Execute($create_default_cloud_config32);
+			$create_default_cloud_config33 = "insert into cloud_config(cc_id, cc_key, cc_value) values (33, 'max-parallel-phase-seven-actions', '0')";
+			$recordSet = &$db->Execute($create_default_cloud_config33);
 
             // fill in default cloud products for the cloudselector
             $create_default_cloudselector_config = "insert into `cloud_selector` VALUES (1,'cpu',0,'1',1,'1 CPU','1 CPU',1),(2,'cpu',1,'2',2,'2 CPUs','2 CPUs',1),(3,'cpu',2,'4',4,'4 CPUs','4 CPUs',1),(4,'disk',0,'2000',2,'2 GB','2 GB Disk Space',1),(5,'disk',1,'5000',5,'5 GB','5 GB Disk Space',1),(6,'disk',2,'10000',10,'10 GB','10 GB Disk Space',1),(7,'disk',3,'20000',20,'20 GB','20 GB Disk Space',1),(8,'disk',4,'50000',50,'50 GB','50 GB Disk Space',1),(9,'disk',5,'100000',100,'100 GB','100 GB Disk Space',1),(11,'memory',1,'512',2,'512 MB','512 MB Memory',1),(10,'memory',0,'256',1,'256 MB','256 MB Memory',1),(12,'memory',2,'1024',4,'1 GB','1 GB Memory',1),(13,'memory',3,'2048',8,'2 GB','2 GB Memory',1),(16,'network',2,'3',3,'3 NICs','3 Network Cards',1),(15,'network',1,'2',2,'2 NICs','2 Network Cards',1),(14,'network',0,'1',1,'1 NIC','1 Network Card',1),(17,'network',3,'4',4,'4 NICs','4 Network Cards',1),(18,'quantity',0,'1',1,'1','1 CloudAppliance',1),(19,'quantity',1,'2',2,'2','2 CloudAppliances',1),(20,'quantity',2,'3',3,'3','3 CloudAppliances',1),(21,'quantity',3,'4',4,'4','4 CloudAppliances',1),(22,'quantity',4,'5',5,'5','5 CloudAppliances',1);";
 			$recordSet = &$db->Execute($create_default_cloudselector_config);
+            // create default user group
+            $create_default_usergroup = "insert into `cloud_usergroups` VALUES (0,'Default',0,'The default CloudUser Group');";
+			$recordSet = &$db->Execute($create_default_usergroup);
+            // default power-saver config
+            $create_default_power_saver_config = "insert into `cloud_power_saver` VALUES (0,'1800','');";
+			$recordSet = &$db->Execute($create_default_power_saver_config);
+
 
 		    $db->Close();
 			break;
@@ -385,10 +502,9 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 		case 'uninstall':
 			$drop_cloud_requests = "drop table cloud_requests";
 			$drop_cloud_users = "drop table cloud_users";
+			$drop_cloud_usergroups = "drop table cloud_usergroups";
 			$drop_cloud_users_limit = "drop table cloud_users_limits";
 			$drop_cloud_config = "drop table cloud_config";
-			$drop_cloud_ipgroups = "drop table cloud_ipgroups";
-			$drop_cloud_iptables = "drop table cloud_iptables";
 			$drop_cloud_image = "drop table cloud_image";
 			$drop_cloud_appliance = "drop table cloud_appliance";
 			$drop_cloud_nat = "drop table cloud_nat";
@@ -397,13 +513,20 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			$drop_cloud_image_private_life_cycle = "drop table cloud_iplc";
 			$drop_cloud_image_private = "drop table cloud_private_image";
 			$drop_cloud_selector = "drop table cloud_selector";
+			$drop_cloud_resource_pool = "drop table cloud_respool";
+			$drop_cloud_hostlimit = "drop table cloud_hostlimit";
+			$drop_cloud_power_saver = "drop table cloud_power_saver";
+			$drop_cloud_profiles = "drop table cloud_profiles";
+			$drop_cloud_icons = "drop table cloud_icons";
+			$drop_cloud_matrix = "drop table cloud_matrix";
+			$drop_cloud_matrix_object = "drop table cloud_matrix_object";
+			$drop_cloud_create_vm_lc = "drop table cloud_create_vm_lc";
 			$db=openqrm_get_db_connection();
 			$recordSet = &$db->Execute($drop_cloud_requests);
 			$recordSet = &$db->Execute($drop_cloud_users);
+			$recordSet = &$db->Execute($drop_cloud_usergroups);
 			$recordSet = &$db->Execute($drop_cloud_users_limit);
 			$recordSet = &$db->Execute($drop_cloud_config);
-			$recordSet = &$db->Execute($drop_cloud_ipgroups);
-			$recordSet = &$db->Execute($drop_cloud_iptables);
 			$recordSet = &$db->Execute($drop_cloud_image);
 			$recordSet = &$db->Execute($drop_cloud_appliance);
 			$recordSet = &$db->Execute($drop_cloud_nat);
@@ -412,6 +535,14 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			$recordSet = &$db->Execute($drop_cloud_image_private_life_cycle);
 			$recordSet = &$db->Execute($drop_cloud_image_private);
 			$recordSet = &$db->Execute($drop_cloud_selector);
+			$recordSet = &$db->Execute($drop_cloud_resource_pool);
+			$recordSet = &$db->Execute($drop_cloud_hostlimit);
+			$recordSet = &$db->Execute($drop_cloud_power_saver);
+			$recordSet = &$db->Execute($drop_cloud_profiles);
+			$recordSet = &$db->Execute($drop_cloud_icons);
+			$recordSet = &$db->Execute($drop_cloud_matrix);
+			$recordSet = &$db->Execute($drop_cloud_matrix_object);
+			$recordSet = &$db->Execute($drop_cloud_create_vm_lc);
 		    $db->Close();
 			break;
 
@@ -434,12 +565,14 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 
 			// email valid ?
 			$cloud_email = new clouduser();
-			if (!$cloud_email->checkEmail($user_fields['cu_email'])) {
-				$strMsg = "Email address is invalid. <br>";
-				$c_error = 1;
-				redirect($strMsg, 'tab0', "cloud-user.php");
-				exit(0);
-			}
+            if (strcmp($user_fields['cu_email'], "@localhost")) {
+                if (!$cloud_email->checkEmail($user_fields['cu_email'])) {
+                    $strMsg = "Email address is invalid. <br>";
+                    $c_error = 1;
+                    redirect($strMsg, 'tab0', "cloud-user.php");
+                    exit(0);
+                }
+            }
 
 			// password min 6 characters
 			if (strlen($user_fields['cu_password'])<6) {
@@ -518,7 +651,22 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			break;
 
 
-		case 'create_request':
+		case 'create_user_group':
+			$user_group_fields['cg_id'] = openqrm_db_get_free_id('cg_id', $CLOUD_USER_GROUPS_TABLE);
+			// enabled by default
+			$user_group_fields['cg_role_id'] = 1;
+			// checks
+			check_param("Groupname", $user_group_fields['cg_name']);
+			check_param("Description", $user_group_fields['cg_description']);
+
+            $cl_user_group = new cloudusergroup();
+            $cl_user_group->add($user_group_fields);
+            $strMsg = "Added user group $cg_name";
+            redirect($strMsg, 'tab0', "cloud-usergroup.php");
+			break;
+
+
+        case 'create_request':
 		
 			// check if the user has ccunits
 			$cr_cu_id = $request_fields['cr_cu_id'];

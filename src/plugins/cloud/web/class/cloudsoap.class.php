@@ -40,8 +40,6 @@ require_once "$RootDir/plugins/cloud/class/clouduserslimits.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudrequest.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudconfig.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudmailer.class.php";
-require_once "$RootDir/plugins/cloud/class/cloudipgroup.class.php";
-require_once "$RootDir/plugins/cloud/class/cloudiptables.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudvm.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudimage.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudappliance.class.php";
@@ -1241,7 +1239,11 @@ class cloudsoap {
 		if ($appliance_resources >=0) {
 			// an appliance with a pre-selected resource
 			// get its ips from the iptables table
-			$cloud_iptable = new cloudiptables();
+
+// ########### TODO ###################################################################################
+
+/*
+            $cloud_iptable = new cloudiptables();
 			$app_ips = $cloud_iptable->get_ip_list_by_appliance($appliance->id);
             $app_ips_len = count($app_ips);
             if ((is_array($app_ips)) && ($app_ips_len > 0)) {
@@ -1253,10 +1255,13 @@ class cloudsoap {
                     }
 				}
 			} else {
+ *
+ */
                 // in case no external ip was given to the appliance we show the internal ip
                 $resource->get_instance_by_id($appliance->resources);
 				$appliance_ip = $resource->ip;
-			}
+//			}
+// ########### TODO ###################################################################################
 
 		} else {
 			// an appliance with resource auto-select enabled

@@ -37,6 +37,7 @@ global $event;
 class clouduser {
 
 var $id = '';
+var $cg_id = '';
 var $name = '';
 var $password = '';
 var $lastname = '';
@@ -95,6 +96,7 @@ function get_instance($id, $name) {
 
 	foreach ($clouduser_array as $index => $clouduser) {
 		$this->id = $clouduser["cu_id"];
+		$this->cg_id = $clouduser["cu_cg_id"];
 		$this->name = $clouduser["cu_name"];
 		$this->password = $clouduser["cu_password"];
 		$this->forename = $clouduser["cu_forename"];
