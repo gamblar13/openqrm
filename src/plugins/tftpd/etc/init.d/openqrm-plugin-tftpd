@@ -60,6 +60,10 @@ function openqrm_plugin_tftpd_init() {
                 /etc/init.d/tftpd-hpa stop || exit $?
             fi
         fi
+        # empty config to avoid start at init
+        if [ -f /etc/default/tftpd-hpa ]; then
+            mv -f /etc/default/tftpd-hpa /etc/default/tftpd-hpa.disabled
+        fi
 		update-rc.d -f tftpd-hpa remove
 		# inetd ?
 		if [ -f /etc/inetd.conf ]; then
