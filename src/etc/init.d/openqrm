@@ -255,6 +255,10 @@ function openqrm_server_init() {
 	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/web/action/image-auth
 	chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/web/action/image-auth
 
+    # link the tftpboot/boot dir to the boot-services
+    rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/boot
+    ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/ $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/boot
+
     # create the openqrm-client link in the right arch
     KERNEL_ARCH=`uname -m`
     if echo $KERNEL_ARCH | grep i.*86 1>/dev/null; then
