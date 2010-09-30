@@ -108,12 +108,16 @@ global $event;
 
 		switch($cmd) {
 			case "start":
-					// generate a password for the image
+				// authenticate the rootfs / needs openqrm user + pass
+                $openqrm_admin_user = new user("openqrm");
+                $openqrm_admin_user->set_user();
+
+                // generate a password for the image
 				$image_password = $image->generatePassword(12);
 				$image_deployment_parameter = $image->deployment_parameter;
 				$image->set_deployment_parameters("IMAGE_ISCSI_AUTH", $image_password);
 				$event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-netapp-deployment-auth-hook.php", "Authenticating $image_name / $image_rootdevice to resource $resource_mac with password $image_password", "", "", 0, 0, $appliance_id);
-				$auth_start_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -n $image_name -r $image_rootdevice -i $image_password -p $na_password -e $na_storage_ip";
+				$auth_start_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -n $image_name -r $image_rootdevice -i $image_password -p $na_password -e $na_storage_ip -ou $openqrm_admin_user->name -op $openqrm_admin_user->password";
                 $output = shell_exec($auth_start_cmd);
 
 				$event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-netapp-deployment-auth-hook.php", "!! START hook Running : $auth_start_cmd", "", "", 0, 0, $appliance_id);

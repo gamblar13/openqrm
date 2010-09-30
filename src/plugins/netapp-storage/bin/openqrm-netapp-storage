@@ -22,15 +22,22 @@ OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PW
 . $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/netapp-storage/include/openqrm-plugin-netapp-storage-functions
 OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
 . $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
-OPENQRM_SERVER_IP=localhost
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
 resource_id=0
 resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
 export LANG=C
 
 NETAPP_DEFAULT_VOL="/vol"
 NETAPP_BASE_IQN="iqn.1993-08.org.debian:01"
 DEFAULT_IMAGE_SIZE="1000"
 
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+    WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
 
 function netapp_storage_usage() {
 	echo "Usage : $0 add/remove/snap/list <-n image-name> <-i image-password> <-a aggregate> <-p na-password> <-e na-server-ip>"
@@ -84,6 +91,19 @@ while [ $# -ne 0 ]; do
 			NETAPP_SERVER_IP=$2
 			shift
 			;;
+		-t)
+			NETAPP_IMAGE_TYPE=$2
+			shift
+			;;
+		-ou)
+			OPENQRM_USERNAME=$2
+			shift
+			;;
+		-op)
+			OPENQRM_PASSWORD=$2
+			shift
+			;;
+
 		*)
 			echo "ERROR: Free commandline arguments are not allowed"
 			netapp_storage_usage
@@ -214,6 +234,12 @@ case "$NETAPP_COMMAND" in
         # iscsi security add -i <iSCSI node name> -s CHAP -p <password> -n <username>
         $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/netapp-storage/bin/openqrm-netapp-cmd  $NETAPP_SERVER_IP "iscsi security add -i $NETAPP_BASE_IQN:$NETAPP_LUN_NAME -s CHAP -p $NETAPP_IMAGE_PASSWORD -n $NETAPP_LUN_NAME" $NETAPP_PASSWORD
 		netapp_storage_lock release
+        # if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+		if [ "$OPENQRM_USERNAME" != "" ] && [ "$OPENQRM_PASSWORD" != "" ] && [ "$NETAPP_IMAGE_NAME" != "" ]; then
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$OPENQRM_USERNAME --http-password=$OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP_ADDRESS/openqrm/base/plugins/netapp-storage/netapp-storage-action.php?netapp_storage_command=auth_finished&netapp_image_name=$NETAPP_IMAGE_NAME"; then
+                netapp_storage_log auth "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP_ADDRESS!"
+            fi
+        fi
 		;;
 
 	list)

@@ -187,7 +187,7 @@ class netapp_storage {
 		$db=openqrm_get_db_connection();
 		unset($na_fields["na_id"]);
 		$result = $db->AutoExecute($this->_db_table, $na_fields, 'UPDATE', "na_id = $na_id");
-    	$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "netapp_storage.class.php", "!!! updating $this->_db_table", "", "", 0, 0, 0);
+    	$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "netapp_storage.class.php", "Updating $this->_db_table", "", "", 0, 0, 0);
 	if (! $result) {
 			$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "netapp_storage.class.php", "Failed updating EqualLogic Storage server $na_id", "", "", 0, 0, 0);
 		}
