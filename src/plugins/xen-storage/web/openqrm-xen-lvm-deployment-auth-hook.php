@@ -93,7 +93,32 @@ global $event;
 		$resource->get_instance_by_id($appliance->resources);
 		$resource_mac=$resource->mac;
 		$resource_ip=$resource->ip;
-	
+
+        // For xen-storage vms we assume that the image is located on the vm-host
+        // so we send the auth command to the vm-host instead of the image storage.
+        // This enables using a SAN backend with dedicated volumes per vm-host which all
+        // contain all "golden-images" which are used for snapshotting.
+        // We do this to overcome the current lvm limitation of not supporting cluster-wide snapshots
+        $vm_host_resource = new resource();
+        $vm_host_resource->get_instance_by_id($resource->vhostid);
+        if ($vm_host_resource->id != $storage_resource->id) {
+            $event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-xen-lvm-deployment-auth-hook.php", "Appliance $appliance_id image IS NOT available on this xen-storage host, $storage_resource->id not equal $vm_host_resource->id !! Assuming SAN Backend", "", "", 0, 0, $appliance_id);
+        } else {
+            $event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-xen-lvm-deployment-auth-hook.php", "Appliance $appliance_id image IS available on this xen-storage host, $storage_resource->id equal $vm_host_resource->id .. $appliance_name/$appliance_ip", "", "", 0, 0, $appliance_id);
+        }
+
+		switch($cmd) {
+			case "start":
+				// authenticate the rootfs / needs openqrm user + pass
+                $openqrm_admin_user = new user("openqrm");
+                $openqrm_admin_user->set_user();
+				// generate a password for the image
+				$event->log("storage_auth_function", $_SERVER['REQUEST_TIME'], 5, "openqrm-kvm-xen-deployment-auth-hook.php", "Authenticating $image_name / $image_location_name to resource $resource_mac", "", "", 0, 0, $appliance_id);
+				$auth_start_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$deployment_plugin_name/bin/openqrm-$deployment_plugin_name auth -n $image_name -r $image_rootdevice -i $image_name -u $openqrm_admin_user->name -p $openqrm_admin_user->password";
+				$resource->send_command($vm_host_resource->ip, $auth_start_cmd);
+                break;
+        }
+
 	}
 
 

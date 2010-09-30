@@ -70,8 +70,7 @@ function openqrm_xen_storage_appliance($cmd, $appliance_fields) {
     $xen_storage_resource = new resource();
     $xen_storage_resource->get_instance_by_id($storage->resource_id);
     if ($xen_storage_host_resource->id != $xen_storage_resource->id) {
-        $event->log("openqrm_xen_storage_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-xen-storage-appliance-hook.php", "Appliance $appliance_id image is not available on this xen-storage host, $xen_storage_host_resource->id != $xen_storage_resource->idskipping .. $appliance_name/$appliance_ip", "", "", 0, 0, $appliance_id);
-        return;
+        $event->log("openqrm_xen_storage_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-xen-storage-appliance-hook.php", "Appliance $appliance_id image is not available on this xen-storage host. Assuming SAN-Backend", "", "", 0, 0, $appliance_id);
     }
 
 	switch($cmd) {

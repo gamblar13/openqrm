@@ -141,7 +141,6 @@ function validate_input($var, $type) {
         case 'string':
             // remove allowed chars
             $var = str_replace(".", "", $var);
-            $var = str_replace("-", "", $var);
             $var = str_replace("_", "", $var);
             for ($i = 0; $i<strlen($var); $i++) {
                 if (!ctype_alpha($var[$i])) {

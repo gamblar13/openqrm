@@ -88,6 +88,7 @@ function xen_storage_usage() {
 	echo "        $0 remove_vm_nic <-x nic-number> <-n vm-name>"
 	echo "        $0 add_vm_disk <-x disk-number> <-d disk-size> <-n vm-name>"
 	echo "        $0 remove_vm_disk <-x disk-number> <-n vm-name>"
+	echo "        $0 fence <-m mac-address>"
 	exit 1
 }
 
@@ -322,7 +323,7 @@ if [ "$XEN_STORAGE_COMMAND" == "post_vm_list" ]; then
 		fi
 else
 
-	if [ "$XEN_STORAGE_COMMAND" != "list" ] && [ "$XEN_STORAGE_COMMAND" != "setboot" ] && [ "$XEN_STORAGE_COMMAND" != "start_by_mac" ] && [ "$XEN_STORAGE_COMMAND" != "restart_by_mac" ] && [ "$XEN_STORAGE_COMMAND" != "post_bridge_config" ]; then
+	if [ "$XEN_STORAGE_COMMAND" != "list" ] && [ "$XEN_STORAGE_COMMAND" != "setboot" ] && [ "$XEN_STORAGE_COMMAND" != "start_by_mac" ] && [ "$XEN_STORAGE_COMMAND" != "restart_by_mac" ] && [ "$XEN_STORAGE_COMMAND" != "post_bridge_config" ]  && [ "$XEN_STORAGE_COMMAND" != "fence" ]; then
 		if [ "$XEN_STORAGE_VM_NAME" == "" ]; then
 			xen_storage_usage
 		fi
@@ -510,6 +511,10 @@ case "$XEN_STORAGE_COMMAND" in
             exit 1
         fi
 		echo "Starting Xen vm $XEN_STORAGE_VM_MAC -> $XEN_STORAGE_VM_NAME on LVM volume $XEN_STORAGE_VM_DISK" | logger
+        # rescan all lvols
+        lvscan
+        # activate the lvol
+        lvchange -ay $XEN_STORAGE_VM_DISK
         # add disk disk parameter
         # start only if we have a root-disk
         if [ "$XEN_STORAGE_VM_DISK" != "" ]; then
@@ -606,7 +611,10 @@ case "$XEN_STORAGE_COMMAND" in
         if ! xm shutdown $XEN_STORAGE_VM_NAME; then
             xm destroy $XEN_STORAGE_VM_NAME
         fi
-
+        # rescan all lvols
+        lvscan
+        # activate the lvol
+        lvchange -ay $XEN_STORAGE_VM_DISK
         # add disk disk parameter if disk param is not set to noop
         if [ "$XEN_STORAGE_VM_DISK" == "" ]; then
             echo "" > $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME/disk1
@@ -1063,6 +1071,31 @@ case "$XEN_STORAGE_COMMAND" in
 		xen_storage_lock release
 		;;
 
+	fence)
+        unset XEN_STORAGE_VM_NAME
+		if [ "$XEN_STORAGE_VM_MAC" == "" ]; then
+            echo "openQRM Xen-Storage-plugin: ERROR during fence. No mac-address given" | logger
+			xen_storage_usage
+		fi
+		xen_storage_lock aquire
+		echo "Fencing vm with mac $XEN_STORAGE_VM_MAC to boot from $XEN_STORAGE_VM_BOOT"
+        XEN_STORAGE_VM_NAME=`grep -rHi $XEN_STORAGE_VM_MAC $OPENQRM_VM_DIR/*/mac1 2>/dev/null | cut -d':' -f1 | head -n1 2>/dev/null` 2>/dev/null
+        XEN_STORAGE_VM_NAME=`dirname $XEN_STORAGE_VM_NAME` 2>/dev/null
+        XEN_STORAGE_VM_NAME=`basename $XEN_STORAGE_VM_NAME` 2>/dev/null
+        if [ "$XEN_STORAGE_VM_NAME" == "" ]; then
+			echo "NOTICE: Cloud not find XEN-storage vm $XEN_STORAGE_VM_MAC on this host" | logger
+    		xen_storage_lock release
+            exit 1
+        fi
+		# stop hard
+        if xm destroy $XEN_STORAGE_VM_NAME; then
+            openqrm_post_event 0 "fence" 5 "openqrm-xen-storage" "Forced stop for fencing Xen-Storage vm $XEN_STORAGE_VM_NAME"
+        else
+            openqrm_post_event 0 "fence" 3 "openqrm-xen-storage" "Cloud not force stop Xen-Storage vm $XEN_STORAGE_VM_NAME. Trying to continue .."
+        fi
+		xen_storage_lock release
+        exit 0
+		;;
 
 
 	*)

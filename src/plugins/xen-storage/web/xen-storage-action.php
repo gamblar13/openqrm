@@ -28,6 +28,7 @@ require_once "$RootDir/class/image.class.php";
 require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/class/deployment.class.php";
 require_once "$RootDir/class/event.class.php";
+require_once "$RootDir/class/authblocker.class.php";
 require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
 
@@ -46,6 +47,7 @@ $xen_server_id = htmlobject_request('xen_server_id');
 if (!strlen($xen_storage_command)) {
     $xen_storage_command = $xen_server_command;
 }
+$xen_storage_image_name = htmlobject_request('xen_storage_image_name');
 
 
 // global event for logging
@@ -97,6 +99,15 @@ switch ($xen_storage_command) {
         fclose($fout);
         break;
 
+    case 'auth_finished':
+        // remove storage-auth-blocker if existing
+        $authblocker = new authblocker();
+        $authblocker->get_instance_by_image_name($xen_storage_image_name);
+        if (strlen($authblocker->id)) {
+            $event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "xen-storage-action", "Removing authblocker for image $xen_storage_image_name", "", "", 0, 0, 0);
+            $authblocker->remove($authblocker->id);
+        }
+        break;
 
     // vm commands
     // get the incoming vm list

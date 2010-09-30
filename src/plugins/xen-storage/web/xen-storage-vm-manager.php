@@ -282,6 +282,30 @@ if(htmlobject_request('action_table1') != '') {
 			if (isset($_REQUEST['identifier_table1'])) {
                 show_progressbar();
 				foreach($_REQUEST['identifier_table1'] as $xen_name) {
+                    // check if the resource still belongs to an appliance, if yes we do not remove it
+                    $xen_vm_mac = $xen_vm_mac_ar[$xen_name];
+                    $xen_resource = new resource();
+                    $xen_resource->get_instance_by_mac($xen_vm_mac);
+                    $xen_vm_id=$xen_resource->id;
+                    $resource_is_used_by_appliance = "";
+                    $remove_error = 0;
+                    $appliance = new appliance();
+                    $appliance_id_list = $appliance->get_all_ids();
+                    foreach($appliance_id_list as $appliance_list) {
+                        $appliance_id = $appliance_list['appliance_id'];
+                        $app_resource_remove_check = new appliance();
+                        $app_resource_remove_check->get_instance_by_id($appliance_id);
+                        if ($app_resource_remove_check->resources == $xen_vm_id) {
+                            $resource_is_used_by_appliance .= $appliance_id." ";
+                            $remove_error = 1;
+                        }
+                    }
+                    if ($remove_error == 1) {
+                        $strMsg .= "VM Resource id ".$xen_vm_id." is used by appliance(s): ".$resource_is_used_by_appliance." <br>";
+                        $strMsg .= "Not removing VM resource id ".$xen_vm_id." !<br>";
+        				continue;
+                    }
+                    // remove vm
                     $xen_appliance = new appliance();
                     $xen_appliance->get_instance_by_id($xen_id);
                     $xen = new resource();
@@ -295,10 +319,6 @@ if(htmlobject_request('action_table1') != '') {
                     $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage-vm remove -n $xen_name -u $OPENQRM_USER->name -p $OPENQRM_USER->password";
                     $xen->send_command($xen->ip, $resource_command);
                     // we should remove the resource of the vm !
-                    $xen_vm_mac = $xen_vm_mac_ar[$xen_name];
-                    $xen_resource = new resource();
-                    $xen_resource->get_instance_by_mac($xen_vm_mac);
-                    $xen_vm_id=$xen_resource->id;
                     $xen_resource->remove($xen_vm_id, $xen_vm_mac);
                     // wait for statfile to appear again
                     if (!wait_for_statfile($statfile)) {
