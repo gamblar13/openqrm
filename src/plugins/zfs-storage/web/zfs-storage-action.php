@@ -40,6 +40,7 @@ require_once "$RootDir/class/storage.class.php";
 require_once "$RootDir/class/image.class.php";
 require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/class/event.class.php";
+require_once "$RootDir/class/authblocker.class.php";
 require_once "$RootDir/class/openqrm_server.class.php";
 global $IMAGE_INFO_TABLE;
 global $DEPLOYMENT_INFO_TABLE;
@@ -108,6 +109,15 @@ unset($zfs_storage_fields["zfs_storage_command"]);
 			fclose($fout);
 			break;
 
+        case 'auth_finished':
+            // remove storage-auth-blocker if existing
+            $authblocker = new authblocker();
+            $authblocker->get_instance_by_image_name($zfs_storage_image_name);
+            if (strlen($authblocker->id)) {
+                $event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "zfs-storage-action", "Removing authblocker for image $zfs_storage_image_name", "", "", 0, 0, 0);
+                $authblocker->remove($authblocker->id);
+            }
+            break;
 
         default:
 			$event->log("$zfs_storage_command", $_SERVER['REQUEST_TIME'], 3, "zfs-storage-action", "No such zfs-storage command ($zfs_storage_command)", "", "", 0, 0, 0);

@@ -352,11 +352,18 @@ case "$ZFS_COMMAND" in
 
 	auth)
 		zfs_log "Authenticating ISCSI Lun for image rootdevice $ZFS_IMAGE_ROOTDEVICE"
+        ZFS_IMAGE_LOCATION_NAME=`basename $ZFS_IMAGE_ROOTDEVICE`
 		zfs_storage_lock aquire
-        ZFS_IMAGE_NAME=`basename $ZFS_IMAGE_ROOTDEVICE`
-        zfs_log "NOTICE: openQRM zfs-storage plugin setting the CHAP password $ZFS_IMAGE_PASSWORD for chap user $ZFS_IMAGE_NAME"
-        $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/zfs-storage/bin/openqrm-set-chap-password.exp $ZFS_IMAGE_NAME $ZFS_IMAGE_PASSWORD
+        zfs_log "NOTICE: openQRM zfs-storage plugin setting the CHAP password $ZFS_IMAGE_PASSWORD for chap user $ZFS_IMAGE_LOCATION_NAME"
+        $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/zfs-storage/bin/openqrm-set-chap-password.exp $ZFS_IMAGE_LOCATION_NAME $ZFS_IMAGE_PASSWORD
 		zfs_storage_lock release
+        # if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+		if [ "$ZFS_OPENQRM_USERNAME" != "" ] && [ "$ZFS_OPENQRM_PASSWORD" != "" ] && [ "$ZFS_IMAGE_NAME" != "" ]; then
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$ZFS_OPENQRM_USERNAME --http-password=$ZFS_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/zfs-storage/zfs-storage-action.php?zfs_storage_command=auth_finished&zfs_storage_image_name=$ZFS_IMAGE_NAME"; then
+                zfs_log "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP!"
+            fi
+        fi
+
 		;;
 
 	post_zpools)
