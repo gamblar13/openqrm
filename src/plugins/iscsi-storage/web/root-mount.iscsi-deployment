@@ -240,6 +240,18 @@ EOF
 
 function remount_rootfs() {
 
+    # fix for ubuntu lucid + maverick
+    if [ -f /mnt/etc/apt/sources.list ]; then
+        if grep lucid /mnt/etc/apt/sources.list >/remountlog; then
+        	echo "iscsi-storage: Skipping Re-mount $ISCSI_BLOCK_DEVICE ro"
+            return
+        fi
+        if grep maverick /mnt/etc/apt/sources.list >/remountlog; then
+        	echo "iscsi-storage: Skipping Re-mount $ISCSI_BLOCK_DEVICE ro"
+            return
+        fi
+        rm -f /remountlog
+    fi
 	REMOUNT_LOOP=0
 	# remont /mnt ro
 	while ! mount -t $image_rootfstype -o ro,remount $ISCSI_BLOCK_DEVICE /mnt; do

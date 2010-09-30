@@ -20,6 +20,7 @@
 # this script automatically manages iscsi
 OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
 . $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/iscsi-storage/include/openqrm-plugin-iscsi-storage-functions
 OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
 if [ -f /var/openqrm/openqrm-resource.conf ]; then
@@ -27,12 +28,18 @@ if [ -f /var/openqrm/openqrm-resource.conf ]; then
 	OPENQRM_SERVER_IP=$resource_openqrmserver
 elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
 	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
-	OPENQRM_SERVER_IP=localhost
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+	openqrm_server_get_config
+	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
 	resource_id=0
 	resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
     openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
 fi
 export LANG=C
+# how long to wait for the volume authentication, each loop is 5 secs
+MAX_VOLUME_AUTHENTICATION_LOOP=30
+export MAX_VOLUME_AUTHENTICATION_LOOP
+
 # define wget to use with https
 if [ "$openqrm_web_protocol" == "https" ]; then
     WGET_NO_CERT_CHECK="--no-check-certificate"
@@ -190,12 +197,29 @@ case "$ISCSI_COMMAND" in
 
 	auth)
 		echo -n "Authenticating ISCSI Lun for image rootdevice $ISCSI_IMAGE_ROOTDEVICE"
+        # this is just for starting auth, make sure the device is there, otherwise wait
+		if [ "$ISCSI_OPENQRM_USERNAME" != "" ] && [ "$ISCSI_OPENQRM_PASSWORD" != "" ] && [ "$ISCSI_IMAGE_NAME" != "" ]; then
+            MAX_AUTH_LOOP=0
+            while (true); do
+                if [ -e "$ISCSI_STORAGE_SERVER_IMAGE_DIRECTORY/$ISCSI_IMAGE_NAME" ]; then
+                    break
+                fi
+                sleep 5
+                if [ "$MAX_AUTH_LOOP" == "$MAX_VOLUME_AUTHENTICATION_LOOP" ]; then
+                    iscsi_storage_log auth "ERROR: Image $ISCSI_IMAGE_NAME with root-device $ISCSI_IMAGE_ROOTDEVICE does not exists, Cannot auth to $ISCSI_IMAGE_PASSWORD"
+                    exit 1
+                fi
+                MAX_AUTH_LOOP=$(( MAX_AUTH_LOOP + 1 ))
+            done
+        fi
 		iscsi_storage_lock aquire
 		manage_iscsi auth $ISCSI_IMAGE_PASSWORD
 		iscsi_storage_lock release
 		# in case we have a username + password post the updated list to the openQRM-server
-		if [ "$ISCSI_OPENQRM_USERNAME" != "" ] && [ "$ISCSI_OPENQRM_PASSWORD" != "" ]; then
-			$0 post_luns -u $ISCSI_OPENQRM_USERNAME -p $ISCSI_OPENQRM_PASSWORD
+		if [ "$ISCSI_OPENQRM_USERNAME" != "" ] && [ "$ISCSI_OPENQRM_PASSWORD" != "" ] && [ "$ISCSI_IMAGE_NAME" != "" ]; then
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$ISCSI_OPENQRM_USERNAME --http-password=$ISCSI_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/iscsi-storage/iscsi-storage-action.php?iscsi_storage_command=auth_finished&iscsi_image_name=$ISCSI_IMAGE_NAME"; then
+                iscsi_storage_log auth "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP!"
+            fi
 		fi
 		;;
 

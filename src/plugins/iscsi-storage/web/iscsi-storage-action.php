@@ -26,6 +26,7 @@ require_once "$RootDir/class/storage.class.php";
 require_once "$RootDir/class/image.class.php";
 require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/class/event.class.php";
+require_once "$RootDir/class/authblocker.class.php";
 require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
 global $IMAGE_INFO_TABLE;
@@ -33,6 +34,7 @@ global $DEPLOYMENT_INFO_TABLE;
 global $OPENQRM_SERVER_BASE_DIR;
 
 $iscsi_storage_command = htmlobject_request('iscsi_storage_command');
+$iscsi_image_name = htmlobject_request('iscsi_image_name');
 
 // place for the storage stat files
 $StorageDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/plugins/iscsi-storage/storage';
@@ -70,6 +72,16 @@ switch ($iscsi_storage_command) {
         $fout = fopen($filename,"wb");
         fwrite($fout, $filedata);
         fclose($fout);
+        break;
+
+    case 'auth_finished':
+        // remove storage-auth-blocker if existing
+        $authblocker = new authblocker();
+        $authblocker->get_instance_by_image_name($iscsi_image_name);
+        if (strlen($authblocker->id)) {
+            $event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "iscsi-storage-action", "Removing authblocker for image $iscsi_image_name", "", "", 0, 0, 0);
+            $authblocker->remove($authblocker->id);
+        }
         break;
 
     default:

@@ -20,7 +20,7 @@
 
 
 # iscsi-target config file
-IETDCONF=/etc/ietd.conf
+IETDCONF=`find /etc/ -name ietd.conf -type f | head -n1`
 # some definitions
 DEFAULT_IMAGE_SIZE=5000
 ISCSI_MGMT_LOCK_FILE=/var/run/iscsi-storage/iscsi-storage-plugin.lock
@@ -79,7 +79,7 @@ function iscsi_storage_lock() {
 
 function check_iscsi_target() {
 	# iscsi-target installed ?
-	if ! ls $IETDCONF 1>/dev/null; then
+	if [ "$IETDCONF" == "" ]; then
 		echo "ERROR: Iscsi Enterprise Target not installed !"
 		echo "ERROR: For managing Iscsi filesystem-images please download and install from"
 		echo "       $ISCSI_TARGET_URL"
@@ -108,6 +108,8 @@ function manage_iscsi() {
 			echo "Target $ISCSI_IMAGE_NAME" >> $IETDCONF
 			echo "	IncomingUser $ISCSI_IMAGE_NAME $IMAGE_PASS" >> $IETDCONF
 			echo "	Lun $IMAGE_LUN Path=$ISCSI_STORAGE_SERVER_IMAGE_DIRECTORY/$ISCSI_IMAGE_NAME,Type=fileio" >> $IETDCONF
+			echo "	MaxConnections 1   # $ISCSI_IMAGE_NAME" >> $IETDCONF
+			echo "	MaxSessions 1    # $ISCSI_IMAGE_NAME" >> $IETDCONF
             # create config for keeping the size
             echo "LUN_SIZE=$ISCSI_IMAGE_SIZE" > $ISCSI_STORAGE_SERVER_IMAGE_DIRECTORY/$ISCSI_IMAGE_NAME.conf
 			LAST_TID=`grep tid: /proc/net/iet/volume | cut -d':' -f2 | awk {' print $1 '} | sort -g | tail -n1`
