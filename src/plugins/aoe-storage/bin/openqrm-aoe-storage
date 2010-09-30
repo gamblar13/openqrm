@@ -28,7 +28,9 @@ if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
 	OPENQRM_SERVER_IP=$resource_openqrmserver
 elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
 	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
-	OPENQRM_SERVER_IP=localhost
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+	openqrm_server_get_config
+	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
 	resource_id=0
 	resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
     openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
@@ -42,6 +44,9 @@ fi
 # using the resource_id as the shelf-id
 AOE_SHELF=$resource_id
 export AOE_SHELF
+# how long to wait for the volume authentication, each loop is 5 secs
+MAX_VOLUME_AUTHENTICATION_LOOP=30
+export MAX_VOLUME_AUTHENTICATION_LOOP
 
 # let only root run this script
 WHOAMI=`whoami`
@@ -195,13 +200,30 @@ case "$AOE_COMMAND" in
 
 	auth)
 		echo "Authenticating AOE Shelf for image $AOE_IMAGE_ROOTDEVICE to $AOE_IMAGE_AUTH_MAC"
+        # this is just for starting auth, make sure the device is there, otherwise wait
+		if [ "$AOE_OPENQRM_USERNAME" != "" ] && [ "$AOE_OPENQRM_PASSWORD" != "" ] && [ "$AOE_IMAGE_NAME" != "" ]; then
+            MAX_AUTH_LOOP=0
+            while (true); do
+                if [ -e "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME" ]; then
+                    break
+                fi
+                sleep 5
+                if [ "$MAX_AUTH_LOOP" == "$MAX_VOLUME_AUTHENTICATION_LOOP" ]; then
+                    aoe_storage_log auth "ERROR: Volume $LVM_IMAGE_ROOTDEVICE does not exists, Cannot auth to $AOE_IMAGE_AUTH_MAC"
+                    exit 1
+                fi
+                MAX_AUTH_LOOP=$(( MAX_AUTH_LOOP + 1 ))
+            done
+        fi
 		aoe_storage_lock aquire
 		manage_aoe auth $AOE_IMAGE_AUTH_MAC
 		aoe_storage_lock release
-		# in case we have a username + password post the updated list to the openQRM-server
-		if [ "$AOE_OPENQRM_USERNAME" != "" ] && [ "$AOE_OPENQRM_PASSWORD" != "" ]; then
-			$0 post_luns -u $AOE_OPENQRM_USERNAME -p $AOE_OPENQRM_PASSWORD
-		fi
+        # if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+		if [ "$AOE_OPENQRM_USERNAME" != "" ] && [ "$AOE_OPENQRM_PASSWORD" != "" ] && [ "$AOE_IMAGE_NAME" != "" ]; then
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$AOE_OPENQRM_USERNAME --http-password=$AOE_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/aoe-storage/aoe-storage-action.php?aoe_storage_command=auth_finished&aoe_image_name=$AOE_IMAGE_NAME"; then
+                aoe_storage_log auth "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP!"
+            fi
+        fi
 		;;
 
 	list)
@@ -213,8 +235,7 @@ case "$AOE_COMMAND" in
 		cat $VBLADECONF | grep -v '^#' | sed -e 's/#//g' | grep $AOE_STORAGE_SERVER_IMAGE_DIRECTORY > $STORAGE_STATUS_TMP
         sed -i -e "s/ \{1,\}/@/g" $STORAGE_STATUS_TMP
 		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$AOE_OPENQRM_USERNAME --http-password=$AOE_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/aoe-storage/aoe-storage-action.php?aoe_storage_command=get_storage; then
-			echo "ERROR: Could not post the aoe-export status to the openQRM-server at $resource_openqrmserver!"
-			echo "ERROR: Could not post the aoe-export status to the openQRM-server at $resource_openqrmserver!" | logger
+			aoe_storage_log post_luns "ERROR: Could not post the aoe-export status to the openQRM-server at $OPENQRM_SERVER_IP!"
 		fi
 		rm -f $STORAGE_STATUS_TMP
 		rm -f $STORAGE_STATUS_TMP.post
@@ -226,7 +247,7 @@ case "$AOE_COMMAND" in
 		OLD_IFS=$IFS
 IFS='
 '
-		for SHELF_STR in `cat $VBLADECONF | grep -v '#' | grep $AOE_STORAGE_SERVER_IMAGE_DIRECTORY | sed '/^$/d'`; do
+		for SHELF_STR in `cat $VBLADECONF | grep -v '^#' | grep $AOE_STORAGE_SERVER_IMAGE_DIRECTORY | sed '/^$/d'`; do
 			INTERFACE=`echo $SHELF_STR | awk {'print $1	'}`
 			V_SHELF=`echo $SHELF_STR | awk {' print $2 '}`
 			V_SLOT=`echo $SHELF_STR | awk {' print $3 '}`
@@ -239,8 +260,7 @@ IFS='
 		done
 		IFS=$OLD_IFS
 		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$AOE_OPENQRM_USERNAME --http-password=$AOE_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/aoe-storage/aoe-storage-action.php?aoe_storage_command=get_ident; then
-			echo "ERROR: Could not post the aoe-export status to the openQRM-server at $resource_openqrmserver!"
-			echo "ERROR: Could not post the aoe-export status to the openQRM-server at $resource_openqrmserver!" | logger
+			aoe_storage_log post_identifier "ERROR: Could not post the aoe-export status to the openQRM-server at $OPENQRM_SERVER_IP!"
 		fi
 		rm -f $STORAGE_STATUS_TMP
 		rm -f $STORAGE_STATUS_TMP.post
