@@ -21,14 +21,29 @@ OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
 . $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
 . $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/include/openqrm-plugin-dhcpd-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+resource_id=0
+resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+
 DHCPD_CONF="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/dhcpd.conf"
 DHCPD_HOST_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/templates/openqrm-plugin-dhcpd-host.template"
 DHCPD_CMD=$1
 RESOURCE_ID=$2
 RESOURCE_MAC=$3
 RESOURCE_IP=$4
+OPENQRM_USERNAME=$5
+OPENQRM_PASSWORD=$6
 HOSTNAME="resource$RESOURCE_ID"
 export LANG=C
+
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+    WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
 
 
 # TODO: make this function support class b + class a
@@ -47,19 +62,14 @@ function guess_next_ip() {
             return
         fi
         GUESSED_NEW_IP="$RANGE_START_FIRST_BYTES"".""$GUESS_START"
-        dhcpd_log openqrm-dhcpd-manager ".. trying $GUESSED_NEW_IP"
+        #dhcpd_log openqrm-dhcpd-manager ".. trying $GUESSED_NEW_IP"
         if ! grep $GUESSED_NEW_IP $DHCPD_CONF | grep fixed-address 1>/dev/null; then
-            dhcpd_log openqrm-dhcpd-manager "NOTICE: Found $GUESSED_NEW_IP free"
+            #dhcpd_log openqrm-dhcpd-manager "NOTICE: Found $GUESSED_NEW_IP free"
             if ! ping -c 1 -i 1 -w 1 $GUESSED_NEW_IP 1>/dev/null; then
                 dhcpd_log openqrm-dhcpd-manager "NOTICE: Found $GUESSED_NEW_IP free and not pingable"
                 break
-            else
-                dhcpd_log openqrm-dhcpd-manager "NOTICE: Skipping $GUESSED_NEW_IP because it is pingable!"
             fi
-        else
-            dhcpd_log openqrm-dhcpd-manager "NOTICE: Skipping $GUESSED_NEW_IP because it is not free any more"
         fi
-
         GUESS_START=$(( GUESS_START - 1 ))
     done
     echo "$GUESSED_NEW_IP"
@@ -105,6 +115,12 @@ case "$DHCPD_CMD" in
 			cp -f $DHCPD_CONF.openqrm-dhcpd-manager $DHCPD_CONF
 			$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start
 		fi
+        # if we have a username + pass we send back the eventual new generated ip to update the resource_ip in the db
+		if [ "$OPENQRM_USERNAME" != "" ] && [ "$OPENQRM_PASSWORD" != "" ]; then
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$OPENQRM_USERNAME --http-password=$OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/dhcpd/dhcpd-action.php?dhcpd_command=post_ip&resource_id=$RESOURCE_ID&resource_ip=$RESOURCE_IP"; then
+                dhcpd_log openqrm-dhcpd-manager "ERROR: Could not post the logic volume status to the openQRM-server at $resource_openqrmserver!"
+            fi
+        fi
 		dhcpd_lock release
 		;;
 	remove)
