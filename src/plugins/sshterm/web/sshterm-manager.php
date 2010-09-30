@@ -17,7 +17,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
 */
 
 
@@ -57,10 +57,10 @@ if(htmlobject_request('action') != '') {
 
 function sshterm_login($id, $ip) {
     global $OPENQRM_SERVER_IP_ADDRESS;
-    global $OPENQRM_PLUGIN_AJAXTERM_REVERSE_PROXY_PORT;
-	$redirect_url="https://$ip:$OPENQRM_PLUGIN_AJAXTERM_REVERSE_PROXY_PORT";
+    global $OPENQRM_PLUGIN_WEBSHELL_PORT;
+	$redirect_url="https://$ip:$OPENQRM_PLUGIN_WEBSHELL_PORT";
 	if ("$id" == 0) {
-		$redirect_url="https://$OPENQRM_SERVER_IP_ADDRESS:$OPENQRM_PLUGIN_AJAXTERM_REVERSE_PROXY_PORT";
+		$redirect_url="https://$OPENQRM_SERVER_IP_ADDRESS:$OPENQRM_PLUGIN_WEBSHELL_PORT";
 	}
 	$left=50+($id*50);
 	$top=100+($id*50);
@@ -68,7 +68,7 @@ function sshterm_login($id, $ip) {
 ?>
 <script type="text/javascript">
 function open_sshterm (url) {
-    sshterm_window = window.open(url, "<?php echo $ip; ?>", "width=580,height=420,left=<?php echo $left; ?>,top=<?php echo $top; ?>");
+    sshterm_window = window.open(url, "<?php echo $ip; ?>", "width=580,height=420,scrollbars=1,left=<?php echo $left; ?>,top=<?php echo $top; ?>");
     open_sshterm.focus();
 }
 open_sshterm("<?php echo $redirect_url; ?>");
