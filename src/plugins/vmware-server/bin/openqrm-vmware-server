@@ -55,7 +55,8 @@ function vmware-server_usage() {
 	echo "Usage : $0 start/stop/reboot/add/delete/remove/list <-n vm-name>"
 	echo "      : $0 create <-n vm-name> <-m mac-address> <-r memory> [-d disk-size ] [-c cpus ] [-s swap-size ] [-va vnc-password ] [-vp vnc-port ]"
 	echo "      : $0 setboot <-m mac-address> <-b local/net>"
-	echo "      :  $0 post_vm_list <-u username> <-p password>"
+	echo "      : $0 post_vm_list <-u username> <-p password>"
+	echo "      : $0 fence <-m mac-address>"
 	exit 1
 }
 
@@ -151,7 +152,7 @@ if [ "$VMWARE_SERVER_COMMAND" == "post_vm_list" ]; then
 		fi
 else
 
-	if [ "$VMWARE_SERVER_COMMAND" != "list" ] && [ "$VMWARE_SERVER_COMMAND" != "setboot" ]; then
+	if [ "$VMWARE_SERVER_COMMAND" != "list" ] && [ "$VMWARE_SERVER_COMMAND" != "setboot" ]  && [ "$VMWARE_SERVER_COMMAND" != "fence" ]; then
 		if [ "$VMWARE_SERVER_VM_NAME" == "" ]; then
 			vmware-server_usage
 		fi
@@ -605,6 +606,42 @@ EOF
 		fi
 		vmware_server_lock release
 		;;
+
+	fence)
+        unset VMWARE_SERVER_VM_NAME
+		if [ "$VMWARE_SERVER_VM_MAC" == "" ]; then
+			vmware-server_usage
+		fi
+		vmware_server_lock aquire
+		vmware_server_log "Fencing vm with mac $VMWARE_SERVER_VM_MAC"
+        # this command is is running from the openQRM engine which does
+        # not know about the vm-name
+        for VMWARE_SERVER_VM_NET_CONF in `find $OPENQRM_VM_DIR -name *.vmx`; do
+            if grep -i $VMWARE_SERVER_VM_MAC $VMWARE_SERVER_VM_NET_CONF; then
+                VMWARE_SERVER_VM_NAME=`dirname $VMWARE_SERVER_VM_NET_CONF`
+                VMWARE_SERVER_VM_NAME=`basename $VMWARE_SERVER_VM_NAME`
+                vmware_server_log "found $VMWARE_SERVER_VM_MAC"
+                break
+            fi
+        done
+        if [ "$VMWARE_SERVER_VM_NAME" == "" ]; then
+    		vmware_server_log "Cloud not find VMWARE_SERVER vm with mac $VMWARE_SERVER_VM_MAC on this host"
+            vmware_server_lock release
+            exit 1
+        fi
+		# stop hard
+		vmware_server_log "Fencing VMware vm $VMWARE_SERVER_VM_NAME"
+		if ! vmware-cmd $VMWARE_SERVER_VM_NAME stop hard; then
+            vmware_server_log openqrm-vmware-server "Failed to fence VMware vm $VMWARE_SERVER_VM_NAME"
+            openqrm_post_event 0 "openqrm-vmware-server" 3 "openqrm-vmware-server" "Failed to fence VMware vm $VMWARE_SERVER_VM_NAME"
+        else
+            vmware_server_log openqrm-vmware-server "Fenced VMware vm $VMWARE_SERVER_VM_NAME"
+            openqrm_post_event 0 "openqrm-vmware-server" 5 "openqrm-vmware-server" "Fenced VMware vm $VMWARE_SERVER_VM_NAME"
+        fi
+		vmware_server_lock release
+		;;
+
+
 
 	*)
 		vmware-server_usage
