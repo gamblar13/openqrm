@@ -22,6 +22,7 @@ $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
 $BaseDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/';
 require_once "$RootDir/include/user.inc.php";
 require_once "$RootDir/class/image.class.php";
+require_once "$RootDir/class/appliance.class.php";
 require_once "$RootDir/class/storage.class.php";
 require_once "$RootDir/class/deployment.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
@@ -35,25 +36,6 @@ function redirect($strMsg, $currenttab = 'tab0', $url = '') {
 	header("Location: $url");
 	exit;
 }
-
-/*
-if(htmlobject_request('action') != '') {
-$strMsg = '';
-
-	switch (htmlobject_request('action')) {
-		case 'remove':
-			if(strtolower(OPENQRM_USER_ROLE_NAME) == 'administrator') {
-				$image = new image();
-				foreach($_REQUEST['identifier'] as $id) {
-					$strMsg .= $image->remove($id);
-				}
-				redirect($strMsg);
-			}
-		break;
-	}
-
-}
-*/
 
 
 
@@ -118,7 +100,28 @@ $strMsg = '';
 					$image = new image();
 					if(isset($_REQUEST['delident'])) {
 						foreach($_REQUEST['delident'] as $id) {
-							$strMsg .= $image->remove($id);
+                            // check that image is not still used by an appliance
+                            $image_is_used_by_appliance = "";
+                            $remove_error = 0;
+                            $appliance = new appliance();
+                            $appliance_id_list = $appliance->get_all_ids();
+                            foreach($appliance_id_list as $appliance_list) {
+                                $appliance_id = $appliance_list['appliance_id'];
+                                $app_image_remove_check = new appliance();
+                                $app_image_remove_check->get_instance_by_id($appliance_id);
+                                if ($app_image_remove_check->imageid == $id) {
+                                    $image_is_used_by_appliance .= $appliance_id." ";
+                                    $remove_error = 1;
+                                }
+                            }
+                            if ($remove_error == 1) {
+                                $strMsg .= "Image id ".$id." is used by appliance(s): ".$image_is_used_by_appliance." <br>";
+                                $strMsg .= "Not removing image id ".$id." !<br>";
+                                continue;
+                            }
+                            // here we remove the image
+                            $image->remove($id);
+							$strMsg .= "Removed image id ".$id."<br>";
 						}
 						redirect($strMsg);
 					}

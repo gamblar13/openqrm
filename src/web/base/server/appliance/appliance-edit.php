@@ -60,12 +60,10 @@ if($appliance_id != '') {
 	if(isset($_REQUEST['identifier'][0]) == false) {
 		$ar_request['appliance_cluster'] = $appliance->cluster;
 		$ar_request['appliance_ssi'] = $appliance->ssi;
-		$ar_request['appliance_highavailable'] = $appliance->highavailable;
 		$ar_request['appliance_virtual'] = $appliance->virtual;
 	} else {
 		$ar_request['appliance_cluster'] = (htmlobject_request('appliance_cluster') != '') ? 1 : 0;
 		$ar_request['appliance_ssi'] = (htmlobject_request('appliance_ssi') != '') ? 1 : 0;
-		$ar_request['appliance_highavailable'] = (htmlobject_request('appliance_highavailable') != '') ? 1 : 0;
 		$ar_request['appliance_virtual'] = (htmlobject_request('appliance_virtual') != '') ? 1 : 0;
 	}
 
@@ -92,17 +90,48 @@ $openqrm_server = new openqrm_server();
 				if (ereg("^[A-Za-z0-9_-]*$", $ar_request['appliance_name']) === false) {
 					$strMsg .= 'appliance name must be [A-Za-z0-9_-]<br/>';
 					$error = 1;
-				} 
+				}
 			} else {
 				$strMsg .= "appliance name can not be empty<br/>";
 				$error = 1;
 			}
+                        // checks
+                        $appliance = new appliance();
+                        $appliance->get_instance_by_id($appliance_id);
+
+                        $save_resource_id = $ar_request['appliance_resources'];
+                        $save_image_id = $ar_request['appliance_imageid'];
+                        $save_kernel_id = $ar_request['appliance_kernelid'];
+
+                        // resource changed ?
+                        if ($appliance->resources != $save_resource_id) {
+                        // if resource changed and check that appliance is stopped (do not care about the origin resource)
+                            if (strcmp($appliance->state, "stopped")) {
+                                $strMsg .= "Please stop the appliance $appliance_id before changing its resource!<br>Not saving appliance $appliance_id.<br>";
+                                redirect($strMsg);
+                                $error = 1;
+                            }
+                        }
+                        // image changed ?
+                        if ($appliance->imageid != $save_image_id) {
+                            // if image changed and check that appliance is stopped
+                            if (strcmp($appliance->state, "stopped")) {
+                                $strMsg .= "Image of appliance $appliance_id changed.<br>Please restart appliance $appliance_id to apply the change!<br>";
+                            }
+                        }
+                        // kernel changed ?
+                        if ($appliance->kernelid != $save_kernel_id) {
+                            // if kernel changed and check that appliance is stopped
+                            if (strcmp($appliance->state, "stopped")) {
+                                $strMsg .= "Kernel of appliance $appliance_id changed.<br>Please restart appliance $appliance_id to apply the change!<br>";
+                            }
+                        }
+
 
 			if($error == 0) {
 				#$ar_request['appliance_id'] = openqrm_db_get_free_id('appliance_id', $APPLIANCE_INFO_TABLE);
-				$appliance = new appliance();
 				echo $appliance->update($appliance_id, $ar_request);
-				$strMsg .= 'updated appliance';
+				$strMsg .= "Updated appliance ".$appliance_id."<br>";
 				redirect($strMsg);
 			} 
 			else { $_REQUEST['strMsg'] = $strMsg; }
@@ -305,7 +334,7 @@ function appliance_form() {
 				'lang_requirements' => '<h3>Requirements</h3>',
 				'appliance_kernelid' => $kernelid,
 				'appliance_imageid' => $image,
-				'appliance_virtualization' => htmlobject_select('appliance_virtualization', $virtualization_list, 'Resource', array($ar_request['appliance_virtualization'])),
+				'appliance_virtualization' => htmlobject_select('appliance_virtualization', $virtualization_list, 'Resource type', array($ar_request['appliance_virtualization'])),
 				'appliance_name' => htmlobject_input('appliance_name', array("value" => $ar_request['appliance_name'], "label" => 'Name'), 'text', 20),
 				'appliance_cpunumber' => htmlobject_select('appliance_cpunumber', $available_cpunumber, 'CPUs', array($p_appliance->cpunumber)),
 				'appliance_cpuspeed' => htmlobject_select('appliance_cpuspeed', $available_cpuspeed, 'CPU-speed', array($p_appliance->cpuspeed)),
@@ -317,7 +346,6 @@ function appliance_form() {
 				'appliance_comment' => htmlobject_textarea('appliance_comment', array("value" => $ar_request['appliance_comment'], "label" => 'Comment')),
 				'appliance_cluster' => htmlobject_input('appliance_cluster', array("value" => 1, "label" => 'Cluster'), 'checkbox', ($ar_request['appliance_cluster'] == 0) ? false : true),
 				'appliance_ssi' => htmlobject_input('appliance_ssi', array("value" => 1, "label" => 'SSI'), 'checkbox', ($ar_request['appliance_ssi'] == 0) ? false : true),
-				'appliance_highavailable' => htmlobject_input('appliance_highavailable', array("value" => 1, "label" => 'Highavailable'), 'checkbox', ($ar_request['appliance_highavailable'] == 0) ? false : true),
 				'appliance_virtual' => htmlobject_input('appliance_virtual', array("value" => 1, "label" => 'Virtual'), 'checkbox', ($ar_request['appliance_virtual'] == 0) ? false : true),
 				'submit_save' => htmlobject_input('action', array("value" => 'save', "label" => 'save'), 'submit'),
 				'lang_table' => '',

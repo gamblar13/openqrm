@@ -38,6 +38,10 @@ function documentation_introduction() {
 	$disp = $disp."</li><li>";
 	$disp = $disp."<a href='architecture.php'>Architecture of the server</a>";
 	$disp = $disp."</li><li>";
+
+	$disp = $disp."<a href='http://www.openqrm-enterprise.com/news/details/article/in-depth-documentation-of-openqrm-available.html' target='_BLANK'>In-depth documentation of openQRM</a>";
+	$disp = $disp."</li><li>";
+
 	$disp = $disp."<a href='requirements.php'>System requirements</a>,";
 	$disp = $disp."</li><li>";
 	$disp = $disp."<a href='installation.php'>Installing openQRM</a>,";

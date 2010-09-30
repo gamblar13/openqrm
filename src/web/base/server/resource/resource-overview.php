@@ -49,6 +49,7 @@ $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
 require_once "$RootDir/include/user.inc.php";
 require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/class/image.class.php";
+require_once "$RootDir/class/appliance.class.php";
 require_once "$RootDir/class/kernel.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
 require_once "$RootDir/class/virtualization.class.php";
@@ -130,6 +131,27 @@ if(htmlobject_request('action') != '' && $OPENQRM_USER->role == "administrator")
                 show_progressbar();
 				foreach($_REQUEST['identifier'] as $id) {
 					if($id != 0) {
+                        // check that resource is not still used by an appliance
+                        $resource_is_used_by_appliance = "";
+                        $remove_error = 0;
+                        $appliance = new appliance();
+                        $appliance_id_list = $appliance->get_all_ids();
+                        foreach($appliance_id_list as $appliance_list) {
+                            $appliance_id = $appliance_list['appliance_id'];
+                            $app_resource_remove_check = new appliance();
+                            $app_resource_remove_check->get_instance_by_id($appliance_id);
+                            if ($app_resource_remove_check->resources == $id) {
+                                $resource_is_used_by_appliance .= $appliance_id." ";
+                                $remove_error = 1;
+                            }
+                        }
+                        if ($remove_error == 1) {
+                            $strMsg .= "Resource id ".$id." is used by appliance(s): ".$resource_is_used_by_appliance." <br>";
+                            $strMsg .= "Not removing resource id ".$id." !<br>";
+                            continue;
+                        }
+
+                        // here we remove the resource
 						$resource = new resource();
 						$resource->get_instance_by_id($id);
 						$mac = $resource->mac;

@@ -387,8 +387,10 @@ function image_form() {
 		$local_rootdevice_identifier_array[] = array("value" => "/dev/sdd3", "label" => "/dev/sdd3");
 		$local_rootdevice_identifier_array[] = array("value" => "/dev/sdd4", "label" => "/dev/sdd4");
 
-		$install_from_local_input = htmlobject_select('install_from_local', $local_rootdevice_identifier_array, 'Install-from-local');
-		$transfer_to_local_input = htmlobject_select('transfer_to_local', $local_rootdevice_identifier_array, 'Transfer-to-local');
+		// $install_from_local_input = htmlobject_select('install_from_local', $local_rootdevice_identifier_array, 'Install-from-local');
+		// $transfer_to_local_input = htmlobject_select('transfer_to_local', $local_rootdevice_identifier_array, 'Transfer-to-local');
+		$install_from_local_input = htmlobject_input('install_from_local', array("value" => '', "label" => 'Install-from-local'), 'text', 100);
+		$transfer_to_local_input = htmlobject_input('transfer_to_local', array("value" => '', "label" => 'Transfer-to-local'), 'text', 100);
 
 		//------------------------------------------------------------ set template
 		$t = new Template_PHPLIB();

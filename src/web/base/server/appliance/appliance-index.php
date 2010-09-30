@@ -56,23 +56,46 @@ if(htmlobject_request('action') != '') {
                             $appliance_virtualization=$appliance->virtualization;
                             $appliance->find_resource($appliance_virtualization);
                             $appliance->get_instance_by_id($id);
+                            if ($appliance->resources <0) {
+                                $strMsg .= "Could not find any available resource for appliance $id!<br>";
+                                continue;
+                            }
                         }
                         $resource->get_instance_by_id($appliance->resources);
                         if ($appliance->resources == 0) {
                             $strMsg .= "An appliance with the openQRM-server as resource is always active!<br>";
-                        } else {
-                            if (!strcmp($appliance->state, "active"))  {
-                                $strMsg .= "Not starting already started appliance $id <br>";
-                            } else {
-                                $kernel = new kernel();
-                                $kernel->get_instance_by_id($appliance->kernelid);
-                                // send command to the openQRM-server
-                                $openqrm_server->send_command("openqrm_assign_kernel $resource->id $resource->mac $kernel->name");
-                                // start appliance
-                                $return_msg .= $appliance->start();
-                                $strMsg .= "Started appliance $id <br>";
-                            }
+                            continue;
                         }
+                        if (!strcmp($appliance->state, "active"))  {
+                            $strMsg .= "Not starting already started appliance $id <br>";
+                            continue;
+                        }
+                        // check that resource is idle 
+                        $app_resource = new resource();
+                        $app_resource->get_instance_by_id($appliance->resources);
+                        // resource has ip ?
+                        if (!strcmp($app_resource->ip, "0.0.0.0")) {
+                            $strMsg .= "Resource $app_resource->id is not in idle state. Not starting appliance $id <br>";
+                            continue;
+                        }
+                        // resource assinged to imageid 1 ?
+                        if ($app_resource->imageid != 1) {
+                            $strMsg .= "Resource $app_resource->id is not in idle state. Not starting appliance $id <br>";
+                            continue;
+                        }
+                        // resource active
+                        if (strcmp($app_resource->state, "active")) {
+                            $strMsg .= "Resource $app_resource->id is not in idle state. Not starting appliance $id <br>";
+                            continue;
+                        }
+                        // if no errors then we start the appliance
+                        $kernel = new kernel();
+                        $kernel->get_instance_by_id($appliance->kernelid);
+                        // send command to the openQRM-server
+                        $openqrm_server->send_command("openqrm_assign_kernel $resource->id $resource->mac $kernel->name");
+                        // start appliance
+                        $return_msg .= $appliance->start();
+                        $strMsg .= "Started appliance $id <br>";
                     }
                 }
 				redirect($strMsg);
@@ -87,20 +110,21 @@ if(htmlobject_request('action') != '') {
                         $resource->get_instance_by_id($appliance->resources);
                         if ($appliance->resources == 0) {
                             $strMsg .= "An appliance with the openQRM-server as resource is always active!<br>";
-                        } else {
-                            if (strcmp($appliance->state, "stopped"))  {
-                                $kernel = new kernel();
-                                $kernel->get_instance_by_id($appliance->kernelid);
-                                // send command to the openQRM-server
-                                $openqrm_server->send_command("openqrm_assign_kernel $resource->id $resource->mac default");
-                                // stop appliance
-                                $return_msg .= $appliance->stop();
-                                $strMsg .= "Stopped appliance $id <br>";
-                            } else {
-                                $strMsg .= "Not stopping already stopped appliance $id <br>";
-                            }
+                            continue;
                         }
-                    }
+                        if (!strcmp($appliance->state, "stopped"))  {
+                            $strMsg .= "Not stopping already stopped appliance $id <br>";
+                            continue;
+                        }
+                        // here we stop
+                        $kernel = new kernel();
+                        $kernel->get_instance_by_id($appliance->kernelid);
+                        // send command to the openQRM-server
+                        $openqrm_server->send_command("openqrm_assign_kernel $resource->id $resource->mac default");
+                        // stop appliance
+                        $return_msg .= $appliance->stop();
+                        $strMsg .= "Stopped appliance $id <br>";
+                     }
                 }
 				redirect($strMsg);
 				break;
@@ -114,15 +138,15 @@ if(htmlobject_request('action') != '') {
                         if ($appliance->resources == 0) {
                             $return_msg .= $appliance->remove($id);
                             $strMsg .= "Removed appliance $id <br>";
-                        } else {
-                            if (strcmp($appliance->state, "active"))  {
-                                $return_msg .= $appliance->remove($id);
-                                $strMsg .= "Removed appliance $id <br>";
-                            } else {
-                                $strMsg .= "Not removing active appliance $id <br>";
-                            }
+                            continue;
                         }
-                    }
+                        if (!strcmp($appliance->state, "active"))  {
+                            $strMsg .= "Not removing active appliance $id <br>";
+                            continue;
+                        }
+                        $appliance->remove($id);
+                        $strMsg .= "Removed appliance $id <br>";
+                     }
                 }
 				redirect($strMsg);
 				break;
@@ -204,6 +228,10 @@ function appliance_display() {
 	$arBody = array();
 	$appliance_array = $appliance_tmp->display_overview($table->offset, $table->limit, $table->sort, $table->order);
 
+    $resource_icon_default="/openqrm/base/img/resource.png";
+    $active_state_icon="/openqrm/base/img/active.png";
+    $inactive_state_icon="/openqrm/base/img/idle.png";
+
 	foreach ($appliance_array as $index => $appliance_db) {
 		$appliance = new appliance();
 		$appliance->get_instance_by_id($appliance_db["appliance_id"]);
@@ -212,7 +240,15 @@ function appliance_display() {
 		if ($appliance_resources >=0) {
 			// an appliance with a pre-selected resource
 			$resource->get_instance_by_id($appliance_resources);
-			$appliance_resources_str = "$resource->id / $resource->ip";
+            $state_icon="/openqrm/base/img/$resource->state.png";
+            if (!file_exists($_SERVER["DOCUMENT_ROOT"]."/".$state_icon)) {
+                $state_icon="/openqrm/base/img/unknown.png";
+            }
+            // idle ?
+            if (("$resource->imageid" == "1") && ("$resource->state" == "active")) {
+                $state_icon="/openqrm/base/img/idle.png";
+            }
+			$appliance_resources_str = " <img width=12 height=12 src=$state_icon>  $resource->id / $resource->ip";
 		} else {
 			// an appliance with resource auto-select enabled
 			$appliance_resources_str = "auto-select";
@@ -236,12 +272,8 @@ function appliance_display() {
 		$virtualization->get_instance_by_id($appliance_db["appliance_virtualization"]);
 		$appliance_virtualization_type=$virtualization->name;
 
-		$strEdit = '';
-		#if($image_db["image_id"] != 1) {
-			$strEdit = '<a href="appliance-edit.php?appliance_id='.$appliance_db["appliance_id"].'&currenttab=tab2"><img src="../../img/edit.png" width="24" height="24" alt="edit"/> Edit</a>';
-		#}
-
-
+        $strEdit = '<a href="appliance-edit.php?appliance_id='.$appliance_db["appliance_id"].'&currenttab=tab2"><img src="../../img/edit.png" width="24" height="24" alt="edit"/> Edit</a>';
+                
 		$str = '<b>Kernel:</b> '.$kernel->name.'<br>
 				<b>Image:</b> '.$image->name.'<br>
 				<b>Resource:</b> '.$appliance_resources_str.'<br>

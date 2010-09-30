@@ -21,6 +21,7 @@ $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
 $BaseDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/';
 require_once "$RootDir/include/user.inc.php";
 require_once "$RootDir/class/storage.class.php";
+require_once "$RootDir/class/image.class.php";
 require_once "$RootDir/class/deployment.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
 
@@ -116,7 +117,25 @@ $strMsg = '';
 					$storage = new storage();
 					if(isset($_REQUEST['delident'])) {
 						foreach($_REQUEST['delident'] as $id) {
-							$strMsg .= $storage->remove($id);
+                            // check that there are no images which are still using this storage server
+                            $image_is_used_by_storage = "";
+                            $remove_error = 0;
+                            $image_remove_check = new image();
+                            $image_remove_id_list = $image_remove_check->get_ids_by_storage($id);
+                            foreach($image_remove_id_list as $image_list) {
+                                $image_id = $image_list['image_id'];
+                                $image_is_used_by_storage .= $image_id." ";
+                                $remove_error = 1;
+                            }
+                            if ($remove_error == 1) {
+                                $strMsg .= "Storage id ".$id." still contains Image id(s): ".$image_is_used_by_storage." <br>";
+                                $strMsg .= "Not removing storage id ".$id." !<br>";
+                                continue;
+                            }
+
+                            // here we remove the storage
+                            $storage->remove($id);
+							$strMsg .= "Removed storage id ".$id."<br>";
 						}
 						redirect($strMsg);
 					}
