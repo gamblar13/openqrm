@@ -70,8 +70,7 @@ function openqrm_kvm_storage_appliance($cmd, $appliance_fields) {
     $kvm_storage_resource = new resource();
     $kvm_storage_resource->get_instance_by_id($storage->resource_id);
     if ($kvm_storage_host_resource->id != $kvm_storage_resource->id) {
-        $event->log("openqrm_kvm_storage_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-kvm-storage-appliance-hook.php", "Appliance $appliance_id image is not available on this kvm-storage host, $kvm_storage_host_resource->id != $kvm_storage_resource->idskipping .. $appliance_name/$appliance_ip", "", "", 0, 0, $appliance_id);
-        return;
+        $event->log("openqrm_kvm_storage_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-kvm-storage-appliance-hook.php", "Appliance $appliance_id image is not available on this kvm-storage host. Assuming SAN-Backend", "", "", 0, 0, $appliance_id);
     }
 
 	switch($cmd) {

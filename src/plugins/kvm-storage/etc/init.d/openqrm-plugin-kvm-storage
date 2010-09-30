@@ -37,7 +37,7 @@ function openqrm_plugin_kvm_storage_start() {
 	touch $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/kvm-storage/.running
     # start the vm status autostart
     if [ -d "$OPENQRM_VM_DIR" ]; then
-        for VM_CONFIG in `find $OPENQRM_VM_DIR/* -name autostart`; do
+        for VM_CONFIG in `find $OPENQRM_VM_DIR/* -name autostart 2>/dev/null`; do
             VM_NAME=`dirname $VM_CONFIG`
             VM_NAME=`basename $VM_NAME`
             echo "- auto-starting VM $VM_NAME"

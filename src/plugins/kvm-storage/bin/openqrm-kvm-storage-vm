@@ -67,6 +67,7 @@ function kvm_usage() {
 	echo "        $0 update_vm_ram <-r memory> <-n vm-name>"
 	echo "        $0 add_vm_nic <-s nic-number> <-m mac-address> <-n vm-name>"
 	echo "        $0 remove_vm_nic <-s nic-number> <-n vm-name>"
+	echo "        $0 fence <-m mac-address>"
 	exit 1
 }
 
@@ -207,7 +208,7 @@ if [ "$KVM_COMMAND" == "post_vm_list" ] || [ "$KVM_COMMAND" == "post_vm_config" 
 		fi
 else
 
-	if [ "$KVM_COMMAND" != "list" ] && [ "$KVM_COMMAND" != "setboot" ] && [ "$KVM_COMMAND" != "start_by_mac" ] && [ "$KVM_COMMAND" != "restart_by_mac" ]  && [ "$KVM_COMMAND" != "post_bridge_config" ]  && [ "$KVM_COMMAND" != "stop_by_mac" ]; then
+	if [ "$KVM_COMMAND" != "list" ] && [ "$KVM_COMMAND" != "setboot" ] && [ "$KVM_COMMAND" != "start_by_mac" ] && [ "$KVM_COMMAND" != "restart_by_mac" ]  && [ "$KVM_COMMAND" != "post_bridge_config" ]  && [ "$KVM_COMMAND" != "stop_by_mac" ]   && [ "$KVM_COMMAND" != "fence" ]; then
 		if [ "$KVM_VM_NAME" == "" ]; then
 			kvm_usage
 		fi
@@ -399,6 +400,10 @@ case "$KVM_COMMAND" in
             exit 1
         fi
 		echo "Starting Kvm vm $KVM_VM_MAC -> $KVM_VM_NAME on LVM volume $KVM_VM_DISK" | logger
+        # rescan all lvols
+        lvscan
+        # activate the lvol
+        lvchange -ay $KVM_VM_DISK
         # add disk disk parameter
         echo "KVM_VM_DISK_1=\"$KVM_VM_DISK\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/disk1
         # start only if we have a root-disk
@@ -486,7 +491,10 @@ case "$KVM_COMMAND" in
 			kill $VM_PID
 			kill -9 $VM_PID 1>/dev/null 2>&1
 		fi
-
+        # rescan all lvols
+        lvscan
+        # activate the lvol
+        lvchange -ay $KVM_VM_DISK
         # add disk disk parameter if disk param is not set to noop
         if [ "$KVM_VM_DISK" != "noop" ]; then
             echo "KVM_VM_DISK_1=\"$KVM_VM_DISK\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/disk1
@@ -864,6 +872,35 @@ case "$KVM_COMMAND" in
 		fi
 		kvm_storage_lock release
 		;;
+
+
+	fence)
+        unset KVM_VM_NAME
+		if [ "$KVM_VM_MAC" == "" ]; then
+			kvm_usage
+		fi
+		kvm_storage_lock aquire
+		echo "Fencing vm with mac $KVM_VM_MAC"
+        # this command is is running from the openQRM engine which does
+        # not know about the kvm-name
+        KVM_VM_NAME=`grep -rHi $KVM_VM_MAC $OPENQRM_VM_DIR/*/net1 2>/dev/null | grep KVM_VM_MAC | cut -d':' -f1 2>/dev/null` 2>/dev/null
+        KVM_VM_NAME=`dirname $KVM_VM_NAME` 2>/dev/null
+        KVM_VM_NAME=`basename $KVM_VM_NAME` 2>/dev/null
+        if [ "$KVM_VM_NAME" == "" ]; then
+			echo "NOTICE: Cloud not find KVM-storage vm $KVM_VM_MAC on this host" | logger
+    		kvm_storage_lock release
+            exit 1
+        fi
+		# stop it hard
+		. $OPENQRM_VM_DIR/$KVM_VM_NAME/net1
+		VM_PID=`ps ax | grep -i $KVM_VM_MAC_1 | grep kvm | grep -i screen | grep -v grep | awk {' print $1 '}`
+		if [ "$VM_PID" != "" ]; then
+			kill $VM_PID
+			kill -9 $VM_PID 1>/dev/null 2>&1
+		fi
+		kvm_storage_lock release
+		;;
+
 
 
 	*)

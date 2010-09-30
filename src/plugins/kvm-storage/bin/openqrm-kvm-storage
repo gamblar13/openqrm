@@ -38,6 +38,10 @@ fi
 export LANG=C
 LINEBR='
 '
+# how long to wait for the volume authentication, each loop is 5 secs
+MAX_VOLUME_AUTHENTICATION_LOOP=30
+export MAX_VOLUME_AUTHENTICATION_LOOP
+
 # define wget to use with https
 if [ "$openqrm_web_protocol" == "https" ]; then
     WGET_NO_CERT_CHECK="--no-check-certificate"
@@ -215,6 +219,7 @@ case "$LVM_COMMAND" in
 		fi
 		echo -n "Creating snapshot size $LVM_IMAGE_SIZE from logical volume $LVM_IMAGE_NAME -> $LVM_IMAGE_SNAPSHOT_NAME"
         kvm_storage_lock aquire
+        lvchange -ay /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
 		lvcreate --size $LVM_IMAGE_SIZE""m --snapshot --name $LVM_IMAGE_SNAPSHOT_NAME /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
         kvm_storage_lock release
 		# in case we have a username + password post the updated list to the openQRM-server
@@ -225,6 +230,26 @@ case "$LVM_COMMAND" in
 
 	auth)
 		echo "Authenticating $LVM_IMAGE_TYPE image $LVM_IMAGE_ROOTDEVICE to $LVM_IMAGE_AUTH"
+        # this is just for starting auth, make sure the device is there, otherwise wait
+		if [ "$LVM_OPENQRM_USERNAME" != "" ] && [ "$LVM_OPENQRM_PASSWORD" != "" ] && [ "$LVM_IMAGE_NAME" != "" ]; then
+            MAX_AUTH_LOOP=0
+            while (true); do
+                lvchange -ay $LVM_IMAGE_ROOTDEVICE
+                if [ -e "$LVM_IMAGE_ROOTDEVICE" ]; then
+                    break
+                fi
+                sleep 5
+                if [ "$MAX_AUTH_LOOP" == "$MAX_VOLUME_AUTHENTICATION_LOOP" ]; then
+                    kvm_storage_log auth "ERROR: Volume $LVM_IMAGE_TYPE image $LVM_IMAGE_ROOTDEVICE does not exists, Cannot auth to $LVM_IMAGE_AUTH"
+                    exit 1
+                fi
+                MAX_AUTH_LOOP=$(( MAX_AUTH_LOOP + 1 ))
+            done
+            # if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LVM_OPENQRM_USERNAME --http-password=$LVM_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/kvm-storage/kvm-storage-action.php?lvm_storage_command=auth_finished&kvm_storage_image_name=$LVM_IMAGE_NAME"; then
+                kvm_storage_log auth "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP!"
+            fi
+        fi
 		;;
 
 	list)
@@ -288,6 +313,7 @@ case "$LVM_COMMAND" in
 		export LVM_IMAGE_SIZE
 		echo "Resizing logical volume $LVM_IMAGE_NAME + size $LVM_IMAGE_SIZE MB using volume group $LVM_STORAGE_SERVER_VOLUME_GROUP"
         kvm_storage_lock aquire
+        lvchange -ay /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
         lvresize -L +$LVM_IMAGE_SIZE /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME 2>&1 | logger
         kvm_storage_lock release
 		# in case we have a username + password post the updated list to the openQRM-server
@@ -336,6 +362,7 @@ case "$LVM_COMMAND" in
         # copy content
         echo "Running : dd if=/dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME of=/dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_SNAPSHOT_NAME bs=1M" | logger
         kvm_storage_lock release
+        lvchange -ay /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
         dd if=/dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME of=/dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_SNAPSHOT_NAME bs=1M
 
         # here we notify openQRM that cloning has finished

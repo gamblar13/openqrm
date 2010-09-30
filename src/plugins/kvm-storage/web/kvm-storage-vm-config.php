@@ -650,7 +650,7 @@ function kvm_vm_config_net() {
         $bridge_identifier_array = array();
         $bridge_identifier_array[] = array("value" => "$kvm_internal_bridge", "label" => "$kvm_internal_bridge (internal bridge)");
         $bridge_identifier_array[] = array("value" => "$kvm_external_bridge", "label" => "$kvm_external_bridge (external bridge)");
-        $bridge_select = htmlobject_select('kvm_vm_bridge', $bridge_identifier_array, 'Network-Bridge', array($store[OPENQRM_KVM_VM_CPUS]));
+        $bridge_select = htmlobject_select('kvm_vm_bridge', $bridge_identifier_array, 'Network-Bridge', 0);
 
         $vm_config_nic_type_disp = "<input type=\"radio\" name=\"kvm_nic_model\" value=\"virtio\" checked=\"checked\" /> virtio - Best performance, Linux only <br>";
         $vm_config_nic_type_disp .= "<input type=\"radio\" name=\"kvm_nic_model\" value=\"e1000\" /> e1000 - Server Operating systems <br>";

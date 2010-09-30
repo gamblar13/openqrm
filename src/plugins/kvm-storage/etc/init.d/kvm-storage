@@ -45,7 +45,21 @@ fi
 
 function kvm_start() {
 	echo "Starting the openQRM kvm-storage-plugin"
-   	export FORCE_INSTALL=true
+     # first check if this is a kvm host
+	if ! which kvm 1>/dev/null; then
+        if ! which qemu-kvm 1>/dev/null; then
+            # maybe it is centos and not in the path
+            if [ ! -x /usr/libexec/qemu-kvm ]; then
+                exit 0
+            fi
+        fi
+    fi
+	# check that bridging is enabled, if not this may is not a kvm host
+	if ! which brctl 1>/dev/null; then
+		exit 0
+	fi
+    # otherwise we want to prepare the host a bit
+  	export FORCE_INSTALL=true
    	openqrm_install_os_dependency screen
 
 	# preparing the nic-bios in case the openQRM server itself is the kvm-host
@@ -67,23 +81,11 @@ function kvm_start() {
     fi
 
 	# be sure to have the tun device
-	if [ ! -f /dev/tun ]; then
+	if [ ! -e /dev/tun ]; then
 		mknod /dev/tun c 10 200
 	fi
 	depmod -a
 	modprobe tun
-
-	# check that bridging is enabled
-	if ! which brctl 1>/dev/null; then
-		kvm_storage_log kvm_start "ERROR: brctl is not installed! Please install bridge-utils."
-		exit 1
-	fi
-	if ! which kvm 1>/dev/null; then
-        if ! which qemu-kvm 1>/dev/null; then
-            kvm_storage_log kvm_start "ERROR: kvm is not installed! Please install kvm."
-            exit 1
-        fi
-    fi
     # setting the kvm-ifup +kvm-ifdown script to the internal and external bridge
     # internal
     cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-kvm-storage-ifup | sed -e "s/@@OPENQRM_PLUGIN_KVM_STORAGE_BRIDGE@@/$OPENQRM_PLUGIN_KVM_INTERNAL_BRIDGE/g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-kvm-ifup
@@ -100,7 +102,7 @@ function kvm_start() {
 
     # start the vm status autostart
     if [ -d "$OPENQRM_VM_DIR" ]; then
-        for VM_CONFIG in `find $OPENQRM_VM_DIR/* -name autostart`; do
+        for VM_CONFIG in `find $OPENQRM_VM_DIR/* -name autostart 2>/dev/null`; do
             VM_NAME=`dirname $VM_CONFIG`
             VM_NAME=`basename $VM_NAME`
             echo "- auto-starting VM $VM_NAME"

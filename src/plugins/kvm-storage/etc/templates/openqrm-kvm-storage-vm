@@ -21,8 +21,13 @@ KVM=`which kvm`
 if [ "$KVM" == "" ]; then
     KVM=`which qemu-kvm`
     if [ "$KVM" == "" ]; then
-        echo "ERROR: kvm ist not installed on this system !" | logger
-        exit 1
+        # maybe it is centos and not in the path
+        if [ -x /usr/libexec/qemu-kvm ]; then
+            KVM=/usr/libexec/qemu-kvm
+        else
+            echo "ERROR: kvm ist not installed on this system !" | logger
+            exit 1
+        fi
     fi
 fi
 # which screen binary to use

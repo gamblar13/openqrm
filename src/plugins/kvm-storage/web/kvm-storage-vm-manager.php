@@ -271,6 +271,30 @@ if(htmlobject_request('action') != '') {
 			if (isset($_REQUEST['identifier'])) {
 				foreach($_REQUEST['identifier'] as $kvm_server_name) {
                     show_progressbar();
+                    // check if the resource still belongs to an appliance, if yes we do not remove it
+                    $kvm_vm_mac = $kvm_vm_mac_ar[$kvm_server_name];
+                    $kvm_resource = new resource();
+                    $kvm_resource->get_instance_by_mac($kvm_vm_mac);
+                    $kvm_vm_id=$kvm_resource->id;
+                    $resource_is_used_by_appliance = "";
+                    $remove_error = 0;
+                    $appliance = new appliance();
+                    $appliance_id_list = $appliance->get_all_ids();
+                    foreach($appliance_id_list as $appliance_list) {
+                        $appliance_id = $appliance_list['appliance_id'];
+                        $app_resource_remove_check = new appliance();
+                        $app_resource_remove_check->get_instance_by_id($appliance_id);
+                        if ($app_resource_remove_check->resources == $kvm_vm_id) {
+                            $resource_is_used_by_appliance .= $appliance_id." ";
+                            $remove_error = 1;
+                        }
+                    }
+                    if ($remove_error == 1) {
+                        $strMsg .= "VM Resource id ".$kvm_vm_id." is used by appliance(s): ".$resource_is_used_by_appliance." <br>";
+                        $strMsg .= "Not removing VM resource id ".$kvm_vm_id." !<br>";
+        				continue;
+                    }
+                    // remove vm
                     $kvm_appliance = new appliance();
                     $kvm_appliance->get_instance_by_id($kvm_server_id);
                     $kvm_server = new resource();
@@ -285,10 +309,6 @@ if(htmlobject_request('action') != '') {
                     // send command
                     $kvm_server->send_command($kvm_server->ip, $resource_command);
                     // we should remove the resource of the vm !
-                    $kvm_vm_mac = $kvm_vm_mac_ar[$kvm_server_name];
-                    $kvm_resource = new resource();
-                    $kvm_resource->get_instance_by_mac($kvm_vm_mac);
-                    $kvm_vm_id=$kvm_resource->id;
                     $kvm_resource->remove($kvm_vm_id, $kvm_vm_mac);
                     // and wait for the resulting statfile
                     if (!wait_for_statfile($statfile)) {
