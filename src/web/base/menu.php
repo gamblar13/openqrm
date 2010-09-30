@@ -129,6 +129,8 @@ global $OPENQRM_SERVER_BASE_DIR;
 			parse_subsection("Storage", "storage");
 			parse_subsection("Virtualization", "virtualization");
 			parse_subsection("Misc", "misc");
+            // and the enterprise plugins
+			parse_subsection("Enterprise", "enterprise");
 		
 			if($strMenuStructure != '') {
 				$mid2->setMenuStructureString($strMenuStructure);
