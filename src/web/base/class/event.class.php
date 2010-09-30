@@ -109,6 +109,10 @@ var $resource_id = '';
 */
 var $_db_table;
 
+/** thanks for the patch by tvs
+* Time of running cron.daily
+*/
+var $crondaily_time = '943939500';
 
 	//--------------------------------------------------
 	/**
@@ -214,9 +218,14 @@ var $_db_table;
 		}
 		$db=openqrm_get_db_connection();
 		$result = $db->AutoExecute($this->_db_table, $event_fields, 'INSERT');
-		if (! $result) {
-			$this->log("add", $_SERVER['REQUEST_TIME'], 2, "event.class.php", "Failed adding new event to database", "", "", 0, 0, 0);
-		}
+        // patch by tvs
+        if (! $result) {
+            if ((strncmp(strftime("%X", $this->crondaily_time), strftime("%X", $event_fields["event_time"]), 5))!=0) {
+                // try again
+                sleep(1);
+                $result = $db->AutoExecute($this->_db_table, $event_fields, 'INSERT');
+            }
+        }
 	}
 
 	//--------------------------------------------------
@@ -273,7 +282,6 @@ var $_db_table;
 	*/
 	//--------------------------------------------------
 	function log($name, $time, $priority, $source, $description, $comment, $capabilities, $status, $image_id, $resource_id) {
-
 		// check if log already exists, if yes, just update the date
 		$db=openqrm_get_db_connection();
 		$rs = &$db->Execute("select event_id from $this->_db_table where event_description='$description' and event_source='$source' and event_name='$name' order by event_id DESC");
@@ -281,7 +289,7 @@ var $_db_table;
 			$this->log("log", $_SERVER['REQUEST_TIME'], 2, "event.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
 		else
 		if ($rs->EOF) {
-			// log does not yet exists, add it
+            // log does not yet exists, add it
 			$new_event_id=openqrm_db_get_free_id('event_id', $this->_db_table);
 			$event_fields=array();
 			$event_fields["event_id"]=$new_event_id;
@@ -298,7 +306,6 @@ var $_db_table;
 			$this->add($event_fields);
 
 		} else {
-	
 			// log already exists, just update the date
 			$event_fields=array();
 			while (!$rs->EOF) {
