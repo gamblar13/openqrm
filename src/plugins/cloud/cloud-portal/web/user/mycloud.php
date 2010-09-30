@@ -1,12 +1,25 @@
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
 <head>
+<title>openQRM Cloud Portal</title>
 
 <style type="text/css">
-  <!--
-   -->
-  </style>
-  <script type="text/javascript" language="javascript" src="../js/datetimepicker.js"></script>
-  <script language="JavaScript">
+
+
+
+</style>
+
+<link type="text/css" href="js/development-bundle/themes/smoothness/ui.all.css" rel="stylesheet" />
+<link type="text/css" href="../css/jquery.css" rel="stylesheet" />
+<link type="text/css" rel="stylesheet" href="../css/calendar.css" />
+<link type="text/css" rel="stylesheet" href="../css/mycloud.css" />
+
+<script type="text/javascript" language="javascript" src="../js/datetimepicker.js"></script>
+<script type="text/javascript" src="js/js/jquery-1.3.2.min.js"></script>
+<script type="text/javascript" src="js/js/jquery-ui-1.7.1.custom.min.js"></script>
+<script language="JavaScript">
 	<!--
 		if (document.images)
 		{
@@ -15,8 +28,7 @@
 		}
 	//-->
 </script>
-<link type="text/css" rel="stylesheet" href="../css/calendar.css">
-<link rel="stylesheet" type="text/css" href="../css/mycloud.css" />
+
 
 </head>
 
@@ -65,12 +77,14 @@ require_once "$RootDir/plugins/cloud/class/cloudirlc.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudiplc.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudprivateimage.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudselector.class.php";
+require_once "$RootDir/plugins/cloud/class/cloudprofile.class.php";
 
-// inclde the mycloud parts
+// include the mycloud parts
 require_once "./mycloudrequests.php";
 require_once "./mycloud_appliances.php";
 require_once "./mycloudaccount.php";
 require_once "./mycloudimages.php";
+require_once "./mycloudprofiles.php";
 
 
 global $OPENQRM_SERVER_BASE_DIR;
@@ -80,6 +94,10 @@ $openqrm_server = new openqrm_server();
 $OPENQRM_SERVER_IP_ADDRESS=$openqrm_server->get_ip_address();
 global $OPENQRM_SERVER_IP_ADDRESS;
 global $CLOUD_REQUEST_TABLE;
+
+// currently we allow up to 11 profiles -> those fits to the vid profile inventory
+$max_profile_count=11;
+global $max_profile_count;
 
 // who are you ?
 $auth_user = $_SERVER['PHP_AUTH_USER'];
@@ -106,6 +124,10 @@ if (!strcmp($request_fields['cr_shared_req'], "on")) {
 if (!strlen($request_fields['cr_disk_req'])) {
 	$request_fields['cr_disk_req']=5000;
 }
+
+// to save the cloud request as profile
+$profile_name = htmlobject_request('profile_name');
+global $profile_name;
 
 
 
@@ -134,7 +156,7 @@ function redirect($strMsg, $currenttab = 'tab0', $url = '') {
 function check_is_number($param, $value) {
 	if(!ctype_digit($value)){
 		$strMsg = "$param is not a number <br>";
-		redirect($strMsg, tab1);
+		redirect($strMsg, "tab0");
 		exit(0);
 	}
 }
@@ -157,15 +179,236 @@ function is_allowed_char($text) {
 function check_param($param, $value) {
 	if (!strlen($value)) {
 		$strMsg = "$param is empty <br>";
-		redirect($strMsg, tab1);
+		redirect($strMsg, "tab0");
 		exit(0);
 	}
 	if(!ctype_alnum($value)){
 		$strMsg = "$param contains special characters <br>";
-		redirect($strMsg, tab1);
+		redirect($strMsg, "tab0");
 		exit(0);
 	}
 }
+
+
+// function to check the user-input for a complete request
+function check_request($request_fields, $request_user) {
+
+    check_param("Quantity", $request_fields['cr_resource_quantity']);
+    check_param("Kernel Id", $request_fields['cr_kernel_id']);
+    check_param("Image Id", $request_fields['cr_image_id']);
+    check_param("Memory", $request_fields['cr_ram_req']);
+    check_param("CPU", $request_fields['cr_cpu_req']);
+    check_param("Network", $request_fields['cr_network_req']);
+
+    // check user limits
+    $cloud_user_limit = new clouduserlimits();
+    $cloud_user_limit->get_instance_by_cu_id($request_user->id);
+    $resource_quantity = $request_fields['cr_resource_quantity'];
+    $ram_req = $request_fields['cr_ram_req'];
+    $disk_req = $request_fields['cr_disk_req'];
+    $cpu_req = $request_fields['cr_cpu_req'];
+    $network_req = $request_fields['cr_network_req'];
+    if (!$cloud_user_limit->check_limits($resource_quantity, $ram_req, $disk_req, $cpu_req, $network_req)) {
+        $strMsg = "User exceeds its Cloud-Limits ! Not adding the request";
+        echo "$strMsg <br>";
+        flush();
+        sleep(4);
+        redirect($strMsg, 'tab0', "cloud-manager.php");
+        exit(0);
+    }
+
+    // parse start date
+    $startt = $request_fields['cr_start'];
+    $tstart = date_to_timestamp($startt);
+    $request_fields['cr_start'] = $tstart;
+
+    // parse stop date
+    $stopp = $request_fields['cr_stop'];
+    $tstop = date_to_timestamp($stopp);
+    $request_fields['cr_stop'] = $tstop;
+    $nowstmp = $_SERVER['REQUEST_TIME'];
+
+    // check that the new stop time is later than the start time
+    if ($tstop < ($tstart + 3600)) {
+        $strMsg .="Request cannot be created with stop date before start.<br>Request duration must be at least 1 hour.<br>";
+        redirect($strMsg, "tab0");
+        exit(0);
+    }
+
+    // check that the new stop time is later than the now + 1 hour
+    if ($tstop < ($nowstmp + 3600)) {
+        $strMsg .="Request duration must be at least 1 hour.<br>Not creating the request.<br>";
+        redirect($strMsg, "tab0");
+        exit(0);
+    }
+
+    // check disk param
+    check_is_number("Disk", $request_fields['cr_disk_req']);
+    if ($request_fields['cr_disk_req'] <= 500) {
+        $strMsg .="Disk parameter must be > 500 <br>";
+        redirect($strMsg, "tab0");
+        exit(0);
+    }
+    // max disk size
+    $cc_disk_conf = new cloudconfig();
+    $max_disk_size = $cc_disk_conf->get_value(8);  // 8 is max_disk_size config
+    if ($request_fields['cr_disk_req'] > $max_disk_size) {
+        $strMsg .="Disk parameter must be <= $max_disk_size <br>";
+        redirect($strMsg, "tab0");
+        exit(0);
+    }
+    // max network interfaces
+    $max_network_interfaces = $cc_disk_conf->get_value(9);  // 9 is max_network_interfaces
+    if ($request_fields['cr_network_req'] > $max_network_interfaces) {
+        $strMsg .="Network parameter must be <= $max_network_interfaces <br>";
+        redirect($strMsg, "tab0");
+        exit(0);
+    }
+    // max resource per cr
+    $max_res_per_cr = $cc_disk_conf->get_value(6);  // 6 is max_resources_per_cr
+    if ($request_fields['cr_resource_quantity'] > $max_res_per_cr) {
+        $strMsg .="Resource quantity parameter must be <= $max_res_per_cr <br>";
+        redirect($strMsg, "tab0");
+        exit(0);
+    }
+
+    // private image ? if yes do not clone it
+    $show_private_image = $cc_disk_conf->get_value(21);	// show_private_image
+    if (!strcmp($show_private_image, "true")) {
+        $piid = $request_fields['cr_image_id'];
+        $private_cu_image = new cloudprivateimage();
+        $private_cu_image->get_instance_by_image_id($piid);
+        if (strlen($private_cu_image->cu_id)) {
+            if ($private_cu_image->cu_id > 0) {
+                if ($private_cu_image->cu_id == $request_user->id) {
+                    // check to make sure we don't start two appliances off of one image!
+                    $cloudimage_state = new cloudimage();
+                    $cloudimage_state->get_instance_by_image_id($private_cu_image->image_id);
+                    if(!$cloudimage_state->id) {
+                            // set to non-shared !
+                            $request_fields['cr_shared_req']=0;
+                    } else {
+                            $strMsg .="Private Cloud image is already in use! Skipping ...<br>";
+                            redirect($strMsg, "tab0");
+                            exit(0);
+
+                    }
+                } else {
+                    $strMsg .="Unauthorized request of private Cloud image! Skipping ...<br>";
+                    redirect($strMsg, "tab0");
+                    exit(0);
+                }
+            }
+        }
+    }
+
+    // set the eventual selected puppet groups
+    if(htmlobject_request('puppet_groups') != '') {
+        $puppet_groups_array = htmlobject_request('puppet_groups');
+        if (is_array($puppet_groups_array)) {
+            foreach($puppet_groups_array as $puppet_group) {
+                $puppet_groups_str .= "$puppet_group,";
+            }
+            // remove last ,
+            $puppet_groups_str = rtrim($puppet_groups_str, ",");
+            $request_fields['cr_puppet_groups'] = $puppet_groups_str;
+        }
+    }
+
+    // check ip-mgmt
+    if(htmlobject_request('cr_ip_mgmt') != '') {
+        $ip_mgmt_array = htmlobject_request('cr_ip_mgmt');
+        // a select for each nic
+        if (is_array($ip_mgmt_array)) {
+            for ($mnic = 1; $mnic <= $max_network_interfaces; $mnic++) {
+                $ip_mgmt_id = $ip_mgmt_array[$mnic];
+                if ($ip_mgmt_id != -1) {
+                    $ip_mgmt_config_str .= $mnic.":".$ip_mgmt_array[$mnic].",";
+                }
+
+            }
+        }
+    }
+    $ip_mgmt_config_str = rtrim($ip_mgmt_config_str, ",");
+    $request_fields['cr_ip_mgmt'] = $ip_mgmt_config_str;
+
+    // ####### start of cloudselector case #######
+    // if cloudselector is enabled check if products exist
+    $cloud_selector_enabled = $cc_disk_conf->get_value(22);	// cloudselector
+    if (!strcmp($cloud_selector_enabled, "true")) {
+        $cloudselector = new cloudselector();
+        // cpu
+        $cs_cpu = htmlobject_request('cr_cpu_req');
+        if (!$cloudselector->product_exists_enabled("cpu", $cs_cpu)) {
+            $strMsg .="Cloud CPU Product ($cs_cpu) is not existing...<br>";
+            redirect($strMsg, "tab0");
+            exit(0);
+        }
+        // disk
+        $cs_disk = htmlobject_request('cr_disk_req');
+        if (!$cloudselector->product_exists_enabled("disk", $cs_disk)) {
+            $strMsg .="Cloud Disk Product ($cs_disk) is not existing...<br>";
+            redirect($strMsg, "tab0");
+            exit(0);
+        }
+        // kernel
+        $cs_kernel = htmlobject_request('cr_kernel_id');
+        if (!$cloudselector->product_exists_enabled("kernel", $cs_kernel)) {
+            $strMsg .="Cloud Kernel Product ($cs_kernel) is not existing...<br>";
+            redirect($strMsg, "tab0");
+            exit(0);
+        }
+        // memory
+        $cs_memory = htmlobject_request('cr_ram_req');
+        if (!$cloudselector->product_exists_enabled("memory", $cs_memory)) {
+            $strMsg .="Cloud Memory Product ($cs_memory) is not existing...<br>";
+            redirect($strMsg, "tab0");
+            exit(0);
+        }
+        // network
+        $cs_network = htmlobject_request('cr_network_req');
+        if (!$cloudselector->product_exists_enabled("network", $cs_network)) {
+            $strMsg .="Cloud Network Product ($cs_network) is not existing...<br>";
+            redirect($strMsg, "tab0");
+            exit(0);
+        }
+        // puppet
+        if(htmlobject_request('puppet_groups') != '') {
+            $puppet_groups_array = htmlobject_request('puppet_groups');
+            if (is_array($puppet_groups_array)) {
+                foreach($puppet_groups_array as $puppet_group) {
+                    if (!$cloudselector->product_exists_enabled("puppet", $puppet_group)) {
+                        $strMsg .="Cloud Puppet Product ($puppet_group) is not existing...<br>";
+                        redirect($strMsg, "tab0");
+                        exit(0);
+                    }
+                }
+            }
+        }
+        // quantity
+        $cs_quantity = htmlobject_request('cr_resource_quantity');
+        if (!$cloudselector->product_exists_enabled("quantity", $cs_quantity)) {
+            $strMsg .="Cloud Quantity Product ($cs_quantity) is not existing...<br>";
+            redirect($strMsg, "tab0");
+            exit(0);
+        }
+        // resource type
+        $cs_resource = htmlobject_request('cr_resource_type_req');
+        if (!$cloudselector->product_exists_enabled("resource", $cs_resource)) {
+            $strMsg .="Cloud Virtualization Product ($cs_resource) is not existing...<br>";
+            redirect($strMsg, "tab0");
+            exit(0);
+        }
+
+
+        // ####### end of cloudselector case #######
+    }
+
+
+}
+
+
+
 
 // get admin email
 $cc_conf = new cloudconfig();
@@ -236,7 +479,7 @@ if (htmlobject_request('action') != '') {
 	
 					$strMsg .="Set Cloud request $id to deprovision <br>";
 				}
-				redirect($strMsg, "tab0");
+				redirect($strMsg, "tab1");
 			}
 			break;
 
@@ -272,16 +515,15 @@ if (htmlobject_request('action') != '') {
 					$cr_request->extend_stop_time($id, $new_stop_timestmp);
 					$strMsg .="Extended Cloud request $id to $cr_stop <br>";
 				}
-				redirect($strMsg, "tab0");
+				redirect($strMsg, "tab1");
 			}
 			break;
 
-		case 'create_request':
+		case 'Create':
 			$request_user = new clouduser();
 			$request_user->get_instance_by_name("$auth_user");
 			// set user id
-			$request_user_id = $request_user->id;
-			$request_fields['cr_cu_id'] = $request_user_id;
+			$request_fields['cr_cu_id'] = $request_user->id;
 			// check if billing is enabled
 			$cb_config = new cloudconfig();
 			$cloud_billing_enabled = $cb_config->get_value(16);	// 16 is cloud_billing_enabled
@@ -292,204 +534,37 @@ if (htmlobject_request('action') != '') {
 					exit(0);
 				}
 			}
+
+            // check ip-mgmt
+            $max_network_interfaces = $cb_config->get_value(9);  // 9 is max_network_interfaces
+            if(htmlobject_request('cr_ip_mgmt') != '') {
+                $ip_mgmt_array = htmlobject_request('cr_ip_mgmt');
+                // a select for each nic
+                if (is_array($ip_mgmt_array)) {
+                    for ($mnic = 1; $mnic <= $max_network_interfaces; $mnic++) {
+                        $ip_mgmt_id = $ip_mgmt_array[$mnic];
+                        if ($ip_mgmt_id != -1) {
+                            $ip_mgmt_config_str .= $mnic.":".$ip_mgmt_array[$mnic].",";
+
+                        }
+
+                    }
+                }
+            }
+            $ip_mgmt_config_str = rtrim($ip_mgmt_config_str, ",");
+            $request_fields['cr_ip_mgmt'] = $ip_mgmt_config_str;
+
             // check user input
-			check_param("Quantity", $request_fields['cr_resource_quantity']);
-			check_param("Kernel Id", $request_fields['cr_kernel_id']);
-			check_param("Image Id", $request_fields['cr_image_id']);
-			check_param("Memory", $request_fields['cr_ram_req']);
-			check_param("CPU", $request_fields['cr_cpu_req']);
-			check_param("Network", $request_fields['cr_network_req']);
+            check_request($request_fields, $request_user);
 
-			// check user limits
-			$cloud_user_limit = new clouduserlimits();
-			$cloud_user_limit->get_instance_by_cu_id($request_user->id);
-			$resource_quantity = $request_fields['cr_resource_quantity'];
-			$ram_req = $request_fields['cr_ram_req'];
-			$disk_req = $request_fields['cr_disk_req'];
-			$cpu_req = $request_fields['cr_cpu_req'];
-			$network_req = $request_fields['cr_network_req'];
-			if (!$cloud_user_limit->check_limits($resource_quantity, $ram_req, $disk_req, $cpu_req, $network_req)) {
-				$strMsg = "User exceeds its Cloud-Limits ! Not adding the request";
-				echo "$strMsg <br>";
-				flush();
-				sleep(4);
-				redirect($strMsg, 'tab0', "cloud-manager.php");
-				exit(0);
-			}
-
-			// parse start date
-			$startt = $request_fields['cr_start'];
-			$tstart = date_to_timestamp($startt);
-			$request_fields['cr_start'] = $tstart;
-
-			// parse stop date
-			$stopp = $request_fields['cr_stop'];
-			$tstop = date_to_timestamp($stopp);
-			$request_fields['cr_stop'] = $tstop;
-			$nowstmp = $_SERVER['REQUEST_TIME'];
-
-			// check that the new stop time is later than the start time
-			if ($tstop < ($tstart + 3600)) {
-				$strMsg .="Request cannot be created with stop date before start.<br>Request duration must be at least 1 hour.<br>";
-				redirect($strMsg, "tab2");
-				exit(0);
-			}
-
-			// check that the new stop time is later than the now + 1 hour
-			if ($tstop < ($nowstmp + 3600)) {
-				$strMsg .="Request duration must be at least 1 hour.<br>Not creating the request.<br>";
-				redirect($strMsg, "tab2");
-				exit(0);
-			}
-
-			// check disk param
-			check_is_number("Disk", $request_fields['cr_disk_req']);
-			if ($request_fields['cr_disk_req'] <= 500) {
-				$strMsg .="Disk parameter must be > 500 <br>";
-				redirect($strMsg, "tab2");
-				exit(0);
-			}
-			// max disk size
-			$cc_disk_conf = new cloudconfig();
-			$max_disk_size = $cc_disk_conf->get_value(8);  // 8 is max_disk_size config
-			if ($request_fields['cr_disk_req'] > $max_disk_size) {
-				$strMsg .="Disk parameter must be <= $max_disk_size <br>";
-				redirect($strMsg, "tab2");
-				exit(0);
-			}
-			// max network interfaces
-			$max_network_infterfaces = $cc_disk_conf->get_value(9);  // 9 is max_network_interfaces
-			if ($request_fields['cr_network_req'] > $max_network_infterfaces) {
-				$strMsg .="Network parameter must be <= $max_network_infterfaces <br>";
-				redirect($strMsg, "tab2");
-				exit(0);
-			}
-            // max resource per cr
-			$max_res_per_cr = $cc_disk_conf->get_value(6);  // 6 is max_resources_per_cr
-			if ($request_fields['cr_resource_quantity'] > $max_res_per_cr) {
-				$strMsg .="Resource quantity parameter must be <= $max_res_per_cr <br>";
-				redirect($strMsg, "tab2");
-				exit(0);
-			}
-
-            // private image ? if yes do not clone it
-            $show_private_image = $cc_disk_conf->get_value(21);	// show_private_image
-            if (!strcmp($show_private_image, "true")) {
-                $piid = $request_fields['cr_image_id'];
-                $private_cu_image = new cloudprivateimage();
-                $private_cu_image->get_instance_by_image_id($piid);
-                if (strlen($private_cu_image->cu_id)) {
-                    if ($private_cu_image->cu_id > 0) {
-                        $cl_user = new clouduser();
-                        $cl_user->get_instance_by_name($auth_user);
-                        if ($private_cu_image->cu_id == $cl_user->id) {
-                            // check to make sure we don't start two appliances off of one image!
-                            $cloudimage_state = new cloudimage();
-                            $cloudimage_state->get_instance_by_image_id($private_cu_image->image_id);
-                            if(!$cloudimage_state->id) {
-                                    // set to non-shared !
-                                    $request_fields['cr_shared_req']=0;
-                            } else {
-                                    $strMsg .="Private Cloud image is already in use! Skipping ...<br>";
-                                    redirect($strMsg, "tab2");
-                                    exit(0);
-
-                            }
-                        } else {
-                            $strMsg .="Unauthorized request of private Cloud image! Skipping ...<br>";
-                            redirect($strMsg, "tab2");
-                            exit(0);
-                        }
-                    }
-                }
-            }
-
-			// set the eventual selected puppet groups
-			if(htmlobject_request('puppet_groups') != '') {
-				$puppet_groups_array = htmlobject_request('puppet_groups');
-				if (is_array($puppet_groups_array)) {
-					foreach($puppet_groups_array as $puppet_group) {
-						$puppet_groups_str .= "$puppet_group,";
-					}
-					// remove last ,
-					$puppet_groups_str = rtrim($puppet_groups_str, ",");
-					$request_fields['cr_puppet_groups'] = $puppet_groups_str;
-				}
-			}
-
-
-            // ####### start of cloudselector case #######
-            // if cloudselector is enabled check if products exist
-            $cloud_selector_enabled = $cc_disk_conf->get_value(22);	// cloudselector
-            if (!strcmp($cloud_selector_enabled, "true")) {
-                $cloudselector = new cloudselector();
-                // cpu
-                $cs_cpu = htmlobject_request('cr_cpu_req');
-                if (!$cloudselector->product_exists_enabled("cpu", $cs_cpu)) {
-                    $strMsg .="Cloud CPU Product ($cs_cpu) is not existing...<br>";
-                    redirect($strMsg, "tab2");
-                    exit(0);
-                }
-                // disk
-                $cs_disk = htmlobject_request('cr_disk_req');
-                if (!$cloudselector->product_exists_enabled("disk", $cs_disk)) {
-                    $strMsg .="Cloud Disk Product ($cs_disk) is not existing...<br>";
-                    redirect($strMsg, "tab2");
-                    exit(0);
-                }
-                // kernel
-                $cs_kernel = htmlobject_request('cr_kernel_id');
-                if (!$cloudselector->product_exists_enabled("kernel", $cs_kernel)) {
-                    $strMsg .="Cloud Kernel Product ($cs_kernel) is not existing...<br>";
-                    redirect($strMsg, "tab2");
-                    exit(0);
-                }
-                // memory
-                $cs_memory = htmlobject_request('cr_ram_req');
-                if (!$cloudselector->product_exists_enabled("memory", $cs_memory)) {
-                    $strMsg .="Cloud Memory Product ($cs_memory) is not existing...<br>";
-                    redirect($strMsg, "tab2");
-                    exit(0);
-                }
-                // network
-                $cs_network = htmlobject_request('cr_network_req');
-                if (!$cloudselector->product_exists_enabled("network", $cs_network)) {
-                    $strMsg .="Cloud Network Product ($cs_network) is not existing...<br>";
-                    redirect($strMsg, "tab2");
-                    exit(0);
-                }
-                // puppet
-                if(htmlobject_request('puppet_groups') != '') {
-                    $puppet_groups_array = htmlobject_request('puppet_groups');
-                    if (is_array($puppet_groups_array)) {
-                        foreach($puppet_groups_array as $puppet_group) {
-                            if (!$cloudselector->product_exists_enabled("puppet", $puppet_group)) {
-                                $strMsg .="Cloud Puppet Product ($puppet_group) is not existing...<br>";
-                                redirect($strMsg, "tab2");
-                                exit(0);
-                            }
-                        }
-                    }
-                }
-                // quantity
-                $cs_quantity = htmlobject_request('cr_resource_quantity');
-                if (!$cloudselector->product_exists_enabled("quantity", $cs_quantity)) {
-                    $strMsg .="Cloud Quantity Product ($cs_quantity) is not existing...<br>";
-                    redirect($strMsg, "tab2");
-                    exit(0);
-                }
-                // resource type
-                $cs_resource = htmlobject_request('cr_resource_type_req');
-                if (!$cloudselector->product_exists_enabled("resource", $cs_resource)) {
-                    $strMsg .="Cloud Virtualization Product ($cs_resource) is not existing...<br>";
-                    redirect($strMsg, "tab2");
-                    exit(0);
-                }
-
-
-                // ####### end of cloudselector case #######
-            }
-
+            // parse start date
+            $astartt = $request_fields['cr_start'];
+            $astart = date_to_timestamp($astartt);
+            $request_fields['cr_start'] = $astart;
+            // parse stop date
+            $astopp = $request_fields['cr_stop'];
+            $astop = date_to_timestamp($astopp);
+            $request_fields['cr_stop'] = $astop;
 			// id
 			$request_fields['cr_id'] = openqrm_db_get_free_id('cr_id', $CLOUD_REQUEST_TABLE);
 			$cr_request = new cloudrequest();
@@ -510,8 +585,76 @@ if (htmlobject_request('action') != '') {
 			$rmail->send();
 
 			$strMsg="Created new Cloud request";
-			redirect($strMsg, "tab0");
+			redirect($strMsg, "tab1");
 			break;
+
+
+
+		case 'Save':
+			$request_user = new clouduser();
+			$request_user->get_instance_by_name("$auth_user");
+            // check user input
+            check_request($request_fields, $request_user);
+            check_param("Profile-name", $profile_name);
+
+            // check if profile name is existing already
+            $cloud_profile = new cloudprofile();
+            $cloud_profile->get_instance_by_name($profile_name);
+            if (strlen($cloud_profile->name)) {
+                $strMsg .="Cloud profile name $profile_name already in use. Please choose another name.";
+                redirect($strMsg, "tab0");
+                exit(0);
+            }
+            // check max profile number
+            $pr_count = $cloud_profile->get_count_per_user($request_user->id);
+            if ($pr_count >=$max_profile_count) {
+                $strMsg .="Max Cloud profile count reached.<br>Please remove one or more profiles before creating new ones.";
+                redirect($strMsg, "tab0");
+                exit(0);
+            }
+
+            // parse start date
+            $astartt = $pr_request_fields['cr_start'];
+            $astart = date_to_timestamp($astartt);
+            $pr_request_fields['cr_start'] = $astart;
+            // parse stop date
+            $astopp = $pr_request_fields['cr_stop'];
+            $astop = date_to_timestamp($astopp);
+            $pr_request_fields['cr_stop'] = $astop;
+
+            // remap fields from cr to pr
+            $pr_request_fields['pr_status'] = $request_fields['cr_status'];
+            $pr_request_fields['pr_request_time'] = $request_fields['cr_request_time'];
+            $pr_request_fields['pr_start'] = $request_fields['cr_start'];
+            $pr_request_fields['pr_stop'] = $request_fields['cr_stop'];
+            $pr_request_fields['pr_kernel_id'] = $request_fields['cr_kernel_id'];
+            $pr_request_fields['pr_image_id'] = $request_fields['cr_image_id'];
+            $pr_request_fields['pr_ram_req'] = $request_fields['cr_ram_req'];
+            $pr_request_fields['pr_cpu_req'] = $request_fields['cr_cpu_req'];
+            $pr_request_fields['pr_disk_req'] = $request_fields['cr_disk_req'];
+            $pr_request_fields['pr_network_req'] = $request_fields['cr_network_req'];
+            $pr_request_fields['pr_resource_quantity'] = $request_fields['cr_resource_quantity'];
+            $pr_request_fields['pr_resource_type_req'] = $request_fields['cr_resource_type_req'];
+            $pr_request_fields['pr_deployment_type_req'] = $request_fields['cr_deployment_type_req'];
+            $pr_request_fields['pr_ha_req'] = $request_fields['cr_ha_req'];
+            $pr_request_fields['pr_shared_req'] = $request_fields['cr_shared_req'];
+            $pr_request_fields['pr_puppet_groups'] = $request_fields['cr_puppet_groups'];
+            $pr_request_fields['pr_ip_mgmt'] = $request_fields['cr_ip_mgmt'];
+            $pr_request_fields['pr_appliance_id'] = $request_fields['cr_appliance_id'];
+            $pr_request_fields['pr_lastbill'] = $request_fields['cr_lastbill'];
+			$pr_request_fields['pr_name'] = $profile_name;
+
+			// set user id
+			$pr_request_fields['pr_cu_id'] = $request_user->id;
+			// id
+			$pr_request_fields['pr_id'] = openqrm_db_get_free_id('pr_id', $cloud_profile->_db_table);
+			$cloud_profile->add($pr_request_fields);
+            $strMsg .="Saving Cloud request as profile $profile_name.";
+            redirect($strMsg, "tab2");
+            exit(0);
+            break;
+
+
 
 
 // ######################## end of cloud-request actions #####################
@@ -668,22 +811,21 @@ if (htmlobject_request('action') != '') {
                             if ($cloud_appliance_login->state == 1) {
                                 $sshterm_login_ip_arr = htmlobject_request('sshterm_login_ip');
                                 $sshterm_login_ip = $sshterm_login_ip_arr["$id"];
-                                $strMsg = "Login into Cloud appliance $id ($sshterm_login_ip)<br>";
+                                $strMsg .= "Login into Cloud appliance $id ($sshterm_login_ip)<br>";
 
-                                $redirect_url="https://$sshterm_login_ip:$OPENQRM_PLUGIN_AJAXTERM_REVERSE_PROXY_PORT";
+                                $redirect_url="https://$sshterm_login_ip:$OPENQRM_PLUGIN_WEBSHELL_PORT";
                                 $left=50+($id*50);
                                 $top=100+($id*50);
                 // add the javascript function to open an sshterm
                 ?>
                             <script type="text/javascript">
                             function open_sshterm (url) {
-                                sshterm_window = window.open(url, "<?php echo $sshterm_login_ip; ?>", "width=580,height=420,left=<?php echo $left; ?>,top=<?php echo $top; ?>");
+                                sshterm_window = window.open(url, "<?php echo $sshterm_login_ip; ?>", "width=580,height=420,scrollbars=1,left=<?php echo $left; ?>,top=<?php echo $top; ?>");
                                 open_sshterm.focus();
                             }
                             open_sshterm("<?php echo $redirect_url; ?>");
                             </script>
                 <?php
-                                $strMsg .= "Login to Cloud appliance $id<br>";
                             } else {
                                 $strMsg .= "Can only login to Cloud appliance $id if it is in active state<br>";
                                 continue;
@@ -910,26 +1052,31 @@ if ($cloud_enabled != 'true') {
 // include header
 include "$DocRoot/cloud-portal/mycloud-head.php";
 
-if ((htmlobject_request('action') != '') && (isset($_REQUEST['identifier']))) {
-	switch (htmlobject_request('action')) {
-		case 'extend':
-			foreach($_REQUEST['identifier'] as $id) {
-				$output[] = array('label' => 'Extend My Cloud Request', 'value' => my_cloud_extend_request($id));
-			}
-	}
-}
-
 
 $cloudu = new clouduser();
 $cloudu->get_instance_by_name($auth_user);
 if ($cloudu->status == 1) {
-	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab0\">Cloud Manager</a>", 'value' => my_cloud_manager());
-	$output[] = array('label' => "<a href=\"#\" onClick=\"javascript:window.open('vcd/','','location=0,status=0,scrollbars=1,width=910,height=740');\">Visual Cloud Designer</a>", 'value' => '');
-	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab2\">Cloud Request</a>", 'value' => my_cloud_create_request());
-	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab3\">Cloud Appliances</a>", 'value' => my_cloud_appliances());
-	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab4\">My Account</a>", 'value' => mycloud_account());
-	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab5\">My Images</a>", 'value' => mycloud_images());
-	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab6\">Help</a>", 'value' => mycloud_documentation());
+	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab0\">Create</a>", 'value' => my_cloud_create_request());
+    // check if in extent cr
+    $cr_in_extend = 0;
+    if ((htmlobject_request('action') != '') && (isset($_REQUEST['identifier']))) {
+        switch (htmlobject_request('action')) {
+            case 'extend':
+                foreach($_REQUEST['identifier'] as $id) {
+                    $output[] = array('label' => 'Extend My Cloud Request', 'value' => my_cloud_extend_request($id));
+                    $cr_in_extend = 1;
+                }
+        }
+    }
+    if ($cr_in_extend == 0) {
+    	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab1\">Requests</a>", 'value' => my_cloud_manager());
+    }
+	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab2\">Profiles</a>", 'value' => mycloud_profiles());
+	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab3\">Appliances</a>", 'value' => my_cloud_appliances());
+	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab4\">Images</a>", 'value' => mycloud_images());
+	$output[] = array('label' => "<a href=\"#\" onClick=\"javascript:window.open('vid/','','location=0,status=0,scrollbars=1,width=920,height=820,left=300,top=50,screenX=300,screenY=50');\">Infrastructure</a>", 'value' => "");
+    $output[] = array('label' => "<a href=\"$thisfile?currenttab=tab6\">Account</a>", 'value' => mycloud_account());
+	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab7\">Help</a>", 'value' => mycloud_documentation());
 	$output[] = array('label' => "<a href=\"/cloud-portal/mycloud-logout.php\">Logout</a>", 'value' => "");
 } else {
 	$output[] = array('label' => 'Your account has been disabled', 'value' => my_cloud_account_disabled());
@@ -942,5 +1089,4 @@ include "$DocRoot/cloud-portal/mycloud-bottom.php";
 
 ?>
 
-</html>
 

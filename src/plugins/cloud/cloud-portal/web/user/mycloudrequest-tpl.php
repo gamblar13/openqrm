@@ -1,6 +1,3 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <!--
 /*
   This file is part of openQRM.
@@ -20,204 +17,16 @@
     Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 -->
-<head>
-	<title>Create Cloud Request</title>
-    <link type="text/css" href="js/development-bundle/themes/smoothness/ui.all.css" rel="stylesheet" />
-    <link type="text/css" href="../css/jquery.css" rel="stylesheet" />
-    <script type="text/javascript" src="js/js/jquery-1.3.2.min.js"></script>
-    <script type="text/javascript" src="js/js/jquery-ui-1.7.1.custom.min.js"></script>
-
-
-
-<style>
-.htmlobject_tab_box {
-	width:850px;
-}
-
-
-.inline {
-    display: inline;
-}
-
-#cr_start_input {
-    position: relative;
-    left: 70px;
-    top: 5px;
-    height: 10px;
-	width:160px;
-    float:left;
-}
-
-#cr_start {
-    position: relative;
-    left: 0px;
-    top: 0px;
-    height: 22px;
-	width:130px;
-    float:right;
-}
-
-#img_start_cal {
-    position: relative;
-    left: 160px;
-    top: 5px;
-    height: 16px;
-	width:16px;
-    float:left;
-}
-
-
-#cr_stop_input {
-    position: relative;
-    left: 65px;
-    top: 5px;
-    height: 10px;
-	width:160px;
-    float:left;
-}
-
-
-#cr_stop {
-    position: relative;
-    left: 5px;
-    top: 0px;
-    height: 22px;
-	width:130px;
-    float:right;
-}
-
-#img_stop_cal {
-    position: relative;
-    left: 165px;
-    top: 5px;
-    height: 16px;
-	width:16px;
-    float:left;
-}
-
-
-#cloud_request {
-    position: relative;
-    left: 0px;
-    top: 0px;
-    height: 340px;
-	width:280px;
-    float:left;
-    border: solid 1px #ccc;
-    padding: 10px 10px 0 10px;
-}
-
-
-hr  {
-    color: #ccc;
-    background-color: #ccc;
-    height: 1px;
-}
-
-
-#cloud_applications {
-    position: relative;
-    left: 5px;
-    top: 0px;
-    height: 350px;
-	width:140px;
-    float:left;
-}
-
-#puppet {
-    border: solid 1px #ccc;
-    padding: 5px 5px 0 5px;
-}
-
-
-
-#submit_request {
-    position: absolute;
-    left: 750px;
-    top: 530px;
-    height: 25px;
-	width:70px;
-    float:left;
-}
-
-
-
-
-#cloud_request_costs {
-    position: relative;
-    left: 10px;
-    top: 0px;
-    height: 350px;
-	width:163px;
-    float:left;
-}
-
-#costs {
-    border: solid 1px #ccc;
-    padding: 5px 5px 0 5px;
-    height: 345px;
-}
-
-
-
-#cloud_limits {
-    position: relative;
-    left: 0px;
-    top: 0px;
-    height: 300px;
-	width:230px;
-    float:right;
-}
-
-
-#cloud_user_limits {
-    border: solid 1px #ccc;
-    padding: 5px 5px 0 5px;
-}
-#cloud_global_limits {
-    border: solid 1px #ccc;
-    padding: 5px 5px 0 5px;
-}
-
-
-
-#cost_resource_type_req,
-#cost_kernel,
-#cost_image,
-#cost_memory,
-#cost_cpu,
-#cost_disk,
-#cost_network,
-#cost_apps,
-#cost_ha {
-    float:right;
-    padding: 0px 15px 0 10px;
-}
-
-
-
-#costs_summary {
-    position: relative;
-    left: 0px;
-    top: 0px;
-    height: 25px;
-	width:140px;
-    float:right;
-}
-
-
-</style>
-
-
-</head>
-<body>
 
 
 <form action="{formaction}">
 {currentab}
-<h1>Create new Cloud Request</h1>
+<h1>Create new Cloud Request &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    <a href="#" onClick="javascript:window.open('vcd/','','location=0,status=0,scrollbars=1,width=910,height=740,left=100,top=50,screenX=100,screenY=50');">Use the Visual Cloud Designer</a></h1>
 
-{subtitle}
+     <div id="subtitle">
+    {subtitle}
+    </div>
 
     <div id="cloud_request">
 
@@ -246,16 +55,23 @@ hr  {
 	{cloud_ha}
 	{cloud_clone_on_deploy}
 
-	{cloud_command}
-
 	</div>
 
 	<div id="cloud_applications">
 		<div id="puppet">
-        <b><u>Applications</u></b>
+        <b><u>{cloud_puppet_title}</u></b>
         <br>
 		{cloud_show_puppet}
 		</div>
+
+		<div id="ip_mgmt">
+        <b><u>{cloud_ip_mgmt}</u></b>
+        <br>
+		{cloud_ip_mgmt_select}
+		</div>
+
+
+
     </div>
 
 
@@ -320,6 +136,11 @@ hr  {
 
 
     <div id="submit_request">{submit_save}</div>
+
+    <div id="profile_name_input"> or save as Cloud Profile:<br>{profile_name_input}</div>
+
+    <div id="save_profile">{cloud_profile}</div>
+
 
 </form>
 
@@ -564,7 +385,4 @@ hr  {
         recalculate_costs();
 
     </script>
-
-</body>
-</html>
 

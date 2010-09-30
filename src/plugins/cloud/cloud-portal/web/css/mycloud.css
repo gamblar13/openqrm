@@ -222,6 +222,7 @@ padding:0;
 	color: #646464;	
 	line-height:15px;
 	padding-left:2px;
+    width:140px;
 }
 .htmlobject_box textarea {	
 	width:396px;
@@ -366,3 +367,212 @@ margin: 0;
 padding: 0 25px 0 0; 
 text-decoration: none;
 }
+
+
+.htmlobject_tab_box {
+	width:850px;
+}
+
+
+.inline {
+    display: inline;
+}
+
+
+
+#cr_start_input {
+    position: relative;
+    left: 70px;
+    top: 5px;
+    height: 10px;
+	width:160px;
+    float:left;
+}
+
+#cr_start {
+    position: relative;
+    left: 3px;
+    top: 0px;
+    height: 15px;
+	width:130px;
+    float:right;
+}
+
+#img_start_cal {
+    position: relative;
+    left: 160px;
+    top: 5px;
+    height: 16px;
+	width:16px;
+    float:left;
+}
+
+
+#cr_stop_input {
+    position: relative;
+    left: 65px;
+    top: 5px;
+    height: 10px;
+	width:160px;
+    float:left;
+}
+
+
+#cr_stop {
+    position: relative;
+    left: 8px;
+    top: 0px;
+    height: 15px;
+	width:130px;
+    float:right;
+}
+
+#img_stop_cal {
+    position: relative;
+    left: 165px;
+    top: 5px;
+    height: 16px;
+	width:16px;
+    float:left;
+}
+
+
+#cloud_request {
+    position: relative;
+    left: 0px;
+    top: 0px;
+    height: 340px;
+	width:280px;
+    float:left;
+    border: solid 1px #ccc;
+    padding: 10px 10px 0 10px;
+}
+
+
+hr  {
+    color: #ccc;
+    background-color: #ccc;
+    height: 1px;
+}
+
+
+#cloud_applications {
+    position: relative;
+    left: 5px;
+    top: 0px;
+    height: 350px;
+	width:140px;
+    float:left;
+}
+
+#puppet {
+    border: solid 1px #ccc;
+    padding: 5px 5px 0 5px;
+}
+
+#ip_mgmt {
+    border: solid 1px #ccc;
+    padding: 5px 5px 0 5px;
+}
+
+
+#submit_request {
+    position: absolute;
+    left: 690px;
+    top: 510px;
+    height: 25px;
+	width:70px;
+    float:left;
+}
+
+
+#save_profile {
+    position: absolute;
+    left: 810px;
+    top: 560px;
+    height: 25px;
+	width:70px;
+    float:left;
+}
+
+
+
+#profile_name_input {
+    position: absolute;
+    left: 690px;
+    top: 547px;
+    height: 25px;
+	width:170px;
+    float:left;
+}
+
+
+
+#cloud_request_costs {
+    position: relative;
+    left: 10px;
+    top: 0px;
+    height: 350px;
+	width:163px;
+    float:left;
+}
+
+#costs {
+    border: solid 1px #ccc;
+    padding: 5px 5px 0 5px;
+    height: 345px;
+}
+
+
+
+#cloud_limits {
+    position: relative;
+    left: 0px;
+    top: 0px;
+    height: 300px;
+	width:230px;
+    float:right;
+}
+
+
+#cloud_user_limits {
+    border: solid 1px #ccc;
+    padding: 5px 5px 0 5px;
+}
+#cloud_global_limits {
+    border: solid 1px #ccc;
+    padding: 5px 5px 0 5px;
+}
+
+
+
+#cost_resource_type_req,
+#cost_kernel,
+#cost_image,
+#cost_memory,
+#cost_cpu,
+#cost_disk,
+#cost_network,
+#cost_apps,
+#cost_ha {
+    float:right;
+    padding: 0px 15px 0 10px;
+}
+
+
+
+#costs_summary {
+    position: relative;
+    left: 0px;
+    top: 0px;
+    height: 25px;
+	width:140px;
+    float:right;
+}
+
+
+
+
+
+
+

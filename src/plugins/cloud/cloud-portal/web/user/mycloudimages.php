@@ -106,12 +106,12 @@ if (htmlobject_request('action') != '') {
                     $cp_user->get_instance_by_name("$auth_user");
                     if ($cp_user->id != $pimage->cu_id) {
                         $strMsg = "Private image $id is not owned by $auth_user  $cp_user->id  ! Skipping ... <br>";
-                        redirect2image($strMsg, tab5, "mycloud.php");
+                        redirect2image($strMsg, tab4, "mycloud.php");
                         exit(0);
                     }
                     if (!$private_image_enabled) {
                         $strMsg = "Private image feature is not enabled in this Cloud ! Skipping ... <br>";
-                        redirect2image($strMsg, tab5, "mycloud.php");
+                        redirect2image($strMsg, tab4, "mycloud.php");
                         exit(0);
                     }
                     // register a new cloudimage for removal
@@ -133,7 +133,7 @@ if (htmlobject_request('action') != '') {
 
                 }
             }
-            redirect2image($strMsg, tab5, "mycloud.php");
+            redirect2image($strMsg, tab4, "mycloud.php");
 			break;
 
 		case 'comment':
@@ -145,12 +145,12 @@ if (htmlobject_request('action') != '') {
                     $cp_user->get_instance_by_name("$auth_user");
                     if ($cp_user->id != $pimage->cu_id) {
                         $strMsg = "Private image $id is not owned by $auth_user  $cp_user->id  ! Skipping ... <br>";
-                        redirect2image($strMsg, tab5, "mycloud.php");
+                        redirect2image($strMsg, tab4, "mycloud.php");
                         exit(0);
                     }
                     if (!$private_image_enabled) {
                         $strMsg = "Private image feature is not enabled in this Cloud ! Skipping ... <br>";
-                        redirect2image($strMsg, tab5, "mycloud.php");
+                        redirect2image($strMsg, tab4, "mycloud.php");
                         exit(0);
                     }
                     $updated_image_comment_arr = htmlobject_request('image_comment');
@@ -167,7 +167,7 @@ if (htmlobject_request('action') != '') {
                     $updated_image_comment_check = str_replace("/", "", $updated_image_comment_check);
                     if(!check_allowed_input($updated_image_comment_check)){
                         $strMsg = "Comment contains special characters, skipping update <br>";
-                        redirect2image($strMsg, tab5, "mycloud.php");
+                        redirect2image($strMsg, tab4, "mycloud.php");
                         exit(0);
                     }
                     $cloud_pimage = new cloudprivateimage();
@@ -179,7 +179,7 @@ if (htmlobject_request('action') != '') {
 
                 }
             }
-            redirect2image($strMsg, tab5, "mycloud.php");
+            redirect2image($strMsg, tab4, "mycloud.php");
 			break;
 
 // ######################## end of cloud-image actions #####################
@@ -241,7 +241,7 @@ function mycloud_images() {
         $pco_id = $private_image_db["co_id"];
         $pcomment = $private_image_db["co_comment"];
         $arBody[] = array(
-            'image_icon' => "<img width=16 height=16 src=$active_state_icon><input type=hidden name=\"currenttab\" value=\"tab5\">",
+            'image_icon' => "<img width=16 height=16 src=$active_state_icon><input type=hidden name=\"currenttab\" value=\"tab4\">",
             'co_id' => $pco_id,
             'image_name' => $pimage->name,
             'co_comment' => "<input type=text name=\"image_comment[$pco_id]\" value=\"$pcomment\">",
@@ -270,7 +270,7 @@ function mycloud_images() {
 	$t->setFile('tplfile', './' . 'mycloudimages-tpl.php');
 	$t->setVar(array(
         'thisfile' => $thisfile,
-        'currentab' => htmlobject_input('currenttab', array("value" => 'tab5', "label" => ''), 'hidden'),
+        'currentab' => htmlobject_input('currenttab', array("value" => 'tab4', "label" => ''), 'hidden'),
         'private_image_table' => $table->get_string(),
 	));
 	$disp =  $t->parse('out', 'tplfile');

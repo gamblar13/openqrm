@@ -38,6 +38,7 @@ require_once "$RootDir/plugins/cloud/class/clouduserslimits.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudrequest.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudconfig.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudmailer.class.php";
+require_once "$RootDir/plugins/cloud/class/cloudappliance.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudprivateimage.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudselector.class.php";
 
@@ -226,6 +227,20 @@ function my_cloud_manager() {
 		$timestamp=$cr["cr_stop"];
 		$cr_stop = date("d-m-Y H-i", $timestamp);
 		$cr_resource_quantity = $cr["cr_resource_quantity"];
+        // show ca_id instead of app_id
+        $cr_apps = $cr["cr_appliance_id"];
+        $cr_apps_str = "";
+        if ((strlen($cr_apps)) && ($cr_apps != 0)) {
+            $cr_cloud_appliance = new cloudappliance();
+            $cr_app_array = explode(",", $cr_apps);
+            if (is_array($cr_app_array)) {
+                foreach($cr_app_array as $cr_app_id) {
+                    $cr_cloud_appliance->get_instance_by_appliance_id($cr_app_id);
+                    $cr_apps_str .= $cr_cloud_appliance->id.", ";
+                }
+            }
+            $cr_apps_str = substr($cr_apps_str, 0, strlen($cr_apps_str)-2);
+        }
 
 		// fill the array for the table
 		$arBody[] = array(
@@ -236,7 +251,7 @@ function my_cloud_manager() {
 			'cr_start' => $cr_start,
 			'cr_stop' => $cr_stop,
 			'cr_resource_quantity' => $cr_resource_quantity,
-			'cr_appliance_id' => $cr["cr_appliance_id"],
+			'cr_appliance_id' => "<a href=\"/cloud-portal/user/mycloud.php?currenttab=tab3\">".$cr_apps_str."</a>",
 		);
 	}
 
@@ -244,6 +259,7 @@ function my_cloud_manager() {
 // echo "<pre>";
 // print_r($table);
 
+    $table->add_headrow("<input type=\"hidden\" name=\"currenttab\" value=\"tab1\">");
 	$table->id = 'Tabelle';
 	$table->css = 'htmlobject_table';
 	$table->border = 1;
@@ -347,6 +363,21 @@ function my_cloud_extend_request($cr_id) {
     $timestamp=$cl_request->stop;
     $cr_stop = date("d-m-Y H-i", $timestamp);
     $cr_resource_quantity = $cl_request->resource_quantity;
+    // show ca_id instead of app_id
+    $cr_apps = $cl_request->appliance_id;
+    $cr_apps_str = "";
+    if ((strlen($cr_apps)) && ($cr_apps != 0)) {
+        $cr_cloud_appliance = new cloudappliance();
+        $cr_app_array = explode(",", $cr_apps);
+        if (is_array($cr_app_array)) {
+            foreach($cr_app_array as $cr_app_id) {
+                $cr_cloud_appliance->get_instance_by_appliance_id($cr_app_id);
+                $cr_apps_str .= $cr_cloud_appliance->id.", ";
+            }
+        }
+        $cr_apps_str = substr($cr_apps_str, 0, strlen($cr_apps_str)-2);
+    }
+
     // preprare a calendar to let the user extend the request
     $cr_stop_input="<input id=\"extend_cr_stop\" type=\"text\" name=\"extend_cr_stop\" value=\"$cr_stop\" size=\"20\" maxlength=\"20\">";
     $cal="$cr_stop_input Extend <a href=\"javascript:NewCal('extend_cr_stop','ddmmyyyy',true,24,'dropdown',true)\">";
@@ -362,11 +393,12 @@ function my_cloud_extend_request($cr_id) {
         'cr_start' => $cr_start,
         'cr_stop' => $cal,
         'cr_resource_quantity' => $cr_resource_quantity,
-        'cr_appliance_id' => $cl_request->appliance_id,
+        'cr_appliance_id' => "<a href=\"/cloud-portal/user/mycloud.php?currenttab=tab3\">".$cr_apps_str."</a>",
     );
 
 	$table->id = 'Tabelle';
 	$table->css = 'htmlobject_table';
+	$table->sort = '';
 	$table->border = 1;
 	$table->cellspacing = 0;
 	$table->cellpadding = 3;
@@ -565,6 +597,7 @@ function my_cloud_create_request() {
                     }
                 }
                 $show_puppet .= "<br/>";
+                $puppet_title = "Applications";
             }
         }
 
@@ -695,7 +728,7 @@ function my_cloud_create_request() {
                     $show_puppet = $show_puppet."<input type='checkbox' name='puppet_groups[]' value=$puppet_g>$puppet_g<br/>";
                 }
                 $show_puppet = $show_puppet."<br/>";
-
+                $puppet_title = "Applications";
             }
         }
 
@@ -738,7 +771,7 @@ function my_cloud_create_request() {
                 // because we don't want users to assign the same image to two appliances
                 $priv_cloud_im = new cloudimage();
                 $priv_cloud_im->get_instance_by_image_id($priv_image->image_id);
-                if(!$priv_cloud_im->id) {
+                if($priv_cloud_im->resource_id == 0) {
                         $image_list[] = array("value" => $priv_im->id, "label" => $priv_im->name);
                 }
             } else if ($priv_image->cu_id == 0) {
@@ -764,6 +797,30 @@ function my_cloud_create_request() {
         $subtitle = "<b>Please create <a href='/openqrm/base/server/image/image-new.php?currenttab=tab1'>Sever-Images</a> first!";
     }
 
+
+    // check ip-mgmt
+    $show_ip_mgmt = $cc_conf->get_value(26);	// ip-mgmt enabled ?
+    if (!strcmp($show_ip_mgmt, "true")) {
+        if (file_exists("$RootDir/plugins/ip-mgmt/.running")) {
+            require_once "$RootDir/plugins/ip-mgmt/class/ip-mgmt.class.php";
+        	$ip_mgmt = new ip_mgmt();
+            $ip_mgmt_list_per_user = $ip_mgmt->get_list_by_user($cloud_user->cg_id);
+            $ip_mgmt_list_per_user_arr[] = array("value" => -1, "label" => "None");
+            foreach($ip_mgmt_list_per_user as $list) {
+                $ip_mgmt_id = $list['ip_mgmt_id'];
+                $ip_mgmt_name = trim($list['ip_mgmt_name']);
+                $ip_mgmt_address = trim($list['ip_mgmt_address']);
+                $ip_mgmt_list_per_user_arr[] = array("value" => $ip_mgmt_id, "label" => $ip_mgmt_name."-".$ip_mgmt_address);
+            }
+            // a select for each nic
+            for ($mnic = 1; $mnic <= $max_network_interfaces; $mnic++) {
+                $ip_mgmt_select .= htmlobject_select("cr_ip_mgmt[$mnic]", $ip_mgmt_list_per_user_arr, "Network-Card $mnic");
+            }
+            $ip_mgmt_title = "IP-Addresses";
+        }
+    }
+
+
     // check for default-clone-on-deploy
     $cc_default_clone_on_deploy = $cc_conf->get_value(5);	// default_clone_on_deploy
     if (!strcmp($cc_default_clone_on_deploy, "true")) {
@@ -784,15 +841,13 @@ function my_cloud_create_request() {
     $stop_request = $stop_request."<img src=\"../img/cal.gif\" id=\"img_stop_cal\" width=\"16\" height=\"16\" border=\"0\" alt=\"Pick a date\">";
     $stop_request = $stop_request."</a>";
 
-
-	//------------------------------------------------------------ set template
+    //------------------------------------------------------------ set template
 	$t = new Template_PHPLIB();
 	$t->debug = false;
 	$t->setFile('tplfile', './' . 'mycloudrequest-tpl.php');
 	$t->setVar(array(
 		'formaction' => $thisfile,
 		'currentab' => htmlobject_input('currenttab', array("value" => 'tab0', "label" => ''), 'hidden'),
-		'cloud_command' => htmlobject_input('action', array("value" => 'create_request', "label" => ''), 'hidden'),
 		'subtitle' => $subtitle,
 		'cloud_user' => "User&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input name=\"cr_cu_id\" type=\"text\" size=\"10\" maxlength=\"20\" value=\"$auth_user\" disabled><br>",
 		'cloud_request_start' => $start_request,
@@ -807,10 +862,15 @@ function my_cloud_create_request() {
 		'cloud_network_req' => htmlobject_select('cr_network_req', $max_network_interfaces_select, 'Network-cards'),
 		'cloud_ha' => $show_ha,
 		'cloud_clone_on_deploy' => $clone_on_deploy,
+		'cloud_puppet_title' => $puppet_title,
 		'cloud_show_puppet' => $show_puppet,
+		'cloud_ip_mgmt_select' => $ip_mgmt_select,
+		'cloud_ip_mgmt' => $ip_mgmt_title,
 		'cloud_global_limits' => $cloud_global_limits,
 		'cloud_user_limits' => $cloud_user_limits,
-		'submit_save' => htmlobject_input('Create', array("value" => 'Create', "label" => 'Create'), 'submit'),
+		'submit_save' => htmlobject_input('action', array("value" => 'Create', "label" => 'Create'), 'submit'),
+		'cloud_profile' => htmlobject_input('action', array("value" => 'Save', "label" => 'Save'), 'submit'),
+		'profile_name_input' => "<input id=\"profile_name \"type=\"text\" name=\"profile_name\" value=\"\" size=\"10\" maxlength=\"15\">",
 	));
 	$disp =  $t->parse('out', 'tplfile');
 	return $disp;

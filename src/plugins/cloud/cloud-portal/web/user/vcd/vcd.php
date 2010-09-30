@@ -40,6 +40,7 @@ require_once "$RootDir/plugins/cloud/class/cloudconfig.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudmailer.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudprivateimage.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudselector.class.php";
+require_once "$RootDir/plugins/cloud/class/cloudprofile.class.php";
 
 global $OPENQRM_SERVER_BASE_DIR;
 $refresh_delay=5;
@@ -53,7 +54,9 @@ global $event;
 // who are you ?
 $auth_user = $_SERVER['PHP_AUTH_USER'];
 global $auth_user;
-
+// max profile limit
+$max_profile_count=11;
+global $max_profile_count;
 
 
 function date_to_timestamp($date) {
@@ -97,7 +100,7 @@ function check_param($param, $value, $empty) {
 if (htmlobject_request('action') != '') {
 	switch (htmlobject_request('action')) {
         case 'newvcd':
-
+            $profile_name = htmlobject_request('profile_name');
             $kernel=$_GET["kernel"];
             $systemtype=$_GET["systemtype"];
             $serverimage=$_GET["serverimage"];
@@ -348,45 +351,99 @@ if (htmlobject_request('action') != '') {
                 // ####### end of cloudselector case #######
             }
 
-            // adding everything to the request_fields array
-            $request_fields['cr_cu_id'] = $request_user_id;
-            $request_fields['cr_resource_quantity'] = $quantity;
-            $request_fields['cr_ram_req'] = $memory;
-            $request_fields['cr_disk_req'] = $disk_size;
-            $request_fields['cr_cpu_req'] = $cpus;
-            $request_fields['cr_network_req'] = $network;
-            $request_fields['cr_puppet_groups'] = $puppet_groups;
-            $request_fields['cr_ha_req']=$highavailable;
-            $request_fields['cr_start'] = $cr_start;
-            $request_fields['cr_stop'] = $cr_stop;
-            $request_fields['cr_resource_type_req'] = $virtualization_id;
-            $request_fields['cr_kernel_id'] = $kernel_id;
-            $request_fields['cr_image_id'] = $image_id;
-            // get a new cr id
-            $request_fields['cr_id'] = openqrm_db_get_free_id('cr_id', $CLOUD_REQUEST_TABLE);
-            $cr_request = new cloudrequest();
-            $cr_request->add($request_fields);
 
-           // get admin email
-            $cc_conf = new cloudconfig();
-            $cc_admin_email = $cc_conf->get_value(1);  // 1 is admin_email
-            // send mail to admin
-            $cr_id = $request_fields['cr_id'];
-            $cu_name = $request_user->name;
-            $cu_email = $request_user->email;
 
-            $rmail = new cloudmailer();
-            $rmail->to = "$cc_admin_email";
-            $rmail->from = "$cc_admin_email";
-            $rmail->subject = "openQRM Cloud: New request from user $cu_name";
-            $rmail->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/new_cloud_request.mail.tmpl";
-            $arr = array('@@USER@@'=>"$cu_name", '@@ID@@'=>"$cr_id", '@@OPENQRM_SERVER_IP_ADDRESS@@'=>"$OPENQRM_SERVER_IP_ADDRESS");
-            $rmail->var_array = $arr;
-            $rmail->send();
+            // save or submit ?
+            if (strlen($profile_name)) {
+                // save as cloud profile, profile name valid ?
+                if (!check_param("profile_name", $profile_name, true)) {
+                    $event->log("openqrm-vcd", $_SERVER['REQUEST_TIME'], 2, "openqrm-vcd.php", "Clouduser $auth_user id $request_user_id tried adding invalid profile-name", "", "", 0, 0, 0);
+                    exit(false);
+                }
+                // check if profile name is existing already
+                $cloud_profile = new cloudprofile();
+                $cloud_profile->get_instance_by_name($profile_name);
+                if (strlen($cloud_profile->name)) {
+                    $event->log("openqrm-vcd", $_SERVER['REQUEST_TIME'], 2, "openqrm-vcd.php", "Clouduser $auth_user id $request_user_id tried profile-name in use", "", "", 0, 0, 0);
+                    exit(false);
+                }
+                // check max profile number
+                $pr_count = $cloud_profile->get_count_per_user($request_user->id);
+                if ($pr_count >=$max_profile_count) {
+                    $event->log("openqrm-vcd", $_SERVER['REQUEST_TIME'], 2, "openqrm-vcd.php", "Clouduser $auth_user id $request_user_id has reached max-profiles", "", "", 0, 0, 0);
+                    exit(false);
+                }
+                // preparing the profile array to add
+                $pr_request_time = $_SERVER['REQUEST_TIME'];
+                $pr_request_fields['pr_status'] = 1;
+                $pr_request_fields['pr_request_time'] = $pr_request_time;
+                $pr_request_fields['pr_start'] = $cr_start;
+                $pr_request_fields['pr_stop'] = $cr_stop;
+                $pr_request_fields['pr_kernel_id'] = $kernel_id;
+                $pr_request_fields['pr_image_id'] = $image_id;
+                $pr_request_fields['pr_ram_req'] = $memory;
+                $pr_request_fields['pr_cpu_req'] = $cpus;
+                $pr_request_fields['pr_disk_req'] = $disk_size;
+                $pr_request_fields['pr_network_req'] = $network;
+                $pr_request_fields['pr_resource_quantity'] = $quantity;
+                $pr_request_fields['pr_resource_type_req'] = $virtualization_id;
+                $pr_request_fields['pr_deployment_type_req'] = 0;
+                $pr_request_fields['pr_ha_req'] = $highavailable;
+                $pr_request_fields['pr_shared_req'] = 1;
+                $pr_request_fields['pr_puppet_groups'] = $puppet_groups;
+                $pr_request_fields['pr_ip_mgmt'] = 0;
+                $pr_request_fields['pr_appliance_id'] = 0;
+                $pr_request_fields['pr_name'] = $profile_name;
+                // set user id
+                $pr_request_fields['pr_cu_id'] = $request_user->id;
+                // id
+                $pr_request_fields['pr_id'] = openqrm_db_get_free_id('pr_id', $cloud_profile->_db_table);
+                $cloud_profile->add($pr_request_fields);
+                $event->log("openqrm-vcd", $_SERVER['REQUEST_TIME'], 5, "openqrm-vcd.php", "Clouduser $auth_user id $request_user_id added new profile $profile_name", "", "", 0, 0, 0);
+                exit(true);
 
-            $event->log("openqrm-vcd", $_SERVER['REQUEST_TIME'], 5, "openqrm-vcd.php", "Clouduser $auth_user id $request_user_id added new cloud request", "", "", 0, 0, 0);
+            } else {
+                // submitting request to the cloud
+                // adding everything to the request_fields array
+                $request_fields['cr_cu_id'] = $request_user_id;
+                $request_fields['cr_resource_quantity'] = $quantity;
+                $request_fields['cr_ram_req'] = $memory;
+                $request_fields['cr_disk_req'] = $disk_size;
+                $request_fields['cr_cpu_req'] = $cpus;
+                $request_fields['cr_network_req'] = $network;
+                $request_fields['cr_puppet_groups'] = $puppet_groups;
+                $request_fields['cr_ha_req']=$highavailable;
+                $request_fields['cr_start'] = $cr_start;
+                $request_fields['cr_stop'] = $cr_stop;
+                $request_fields['cr_resource_type_req'] = $virtualization_id;
+                $request_fields['cr_kernel_id'] = $kernel_id;
+                $request_fields['cr_image_id'] = $image_id;
+                // get a new cr id
+                $request_fields['cr_id'] = openqrm_db_get_free_id('cr_id', $CLOUD_REQUEST_TABLE);
+                $cr_request = new cloudrequest();
+                $cr_request->add($request_fields);
 
-            exit(true);
+               // get admin email
+                $cc_conf = new cloudconfig();
+                $cc_admin_email = $cc_conf->get_value(1);  // 1 is admin_email
+                // send mail to admin
+                $cr_id = $request_fields['cr_id'];
+                $cu_name = $request_user->name;
+                $cu_email = $request_user->email;
+
+                $rmail = new cloudmailer();
+                $rmail->to = "$cc_admin_email";
+                $rmail->from = "$cc_admin_email";
+                $rmail->subject = "openQRM Cloud: New request from user $cu_name";
+                $rmail->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/new_cloud_request.mail.tmpl";
+                $arr = array('@@USER@@'=>"$cu_name", '@@ID@@'=>"$cr_id", '@@OPENQRM_SERVER_IP_ADDRESS@@'=>"$OPENQRM_SERVER_IP_ADDRESS");
+                $rmail->var_array = $arr;
+                $rmail->send();
+
+                $event->log("openqrm-vcd", $_SERVER['REQUEST_TIME'], 5, "openqrm-vcd.php", "Clouduser $auth_user id $request_user_id added new cloud request", "", "", 0, 0, 0);
+                exit(true);
+            }
+
             break;
 
 

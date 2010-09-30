@@ -1,9 +1,7 @@
-<html>
-<head>
+
 <link type="text/css" rel="stylesheet" href="../css/calendar.css">
 <link rel="stylesheet" type="text/css" href="../css/mycloud.css" />
 
-</head>
 
 <?php
 /*

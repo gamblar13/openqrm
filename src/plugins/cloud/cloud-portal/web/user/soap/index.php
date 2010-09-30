@@ -17,12 +17,7 @@
     Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 -->
-<html>
-  <head>
-    <title>openQRM Cloud SOAP-WebService</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  </head>
-  <body>
+
 
 <table border="0" width="700" cellspacing="2" cellpadding="2">
     <thead>
@@ -50,14 +45,4 @@
     </tbody>
 </table>
 
-
-
-
-
-
-
-
-
-  </body>
-</html>
 

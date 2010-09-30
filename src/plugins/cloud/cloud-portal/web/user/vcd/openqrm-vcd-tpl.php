@@ -132,7 +132,7 @@ function check_exists_uniq(s, needle) {
 }
 
 
-function submitrequest(s)
+function submitrequest(s, action)
 {
 
     var str = [];
@@ -232,24 +232,47 @@ function submitrequest(s)
     var tmpstr = str.join(delimiter);
     var final_str = tmpstr.replace(" ", "%20");
 
-    //start the ajax
-    $.ajax({
-         //this is the php file that processes the data and send mail
-         url: "vcd.php?action=newvcd&" + str.join(delimiter),
-         //GET method is used
-         type: "GET",
-         //Do not cache the page
-         cache: false,
-         //success
-         success: function (html) {
-             //if process.php returned 1/true (send mail success)
-             if (html==1) {
-                 alert('Your request was successfully submitted to the Cloud.\nPlease check your mailbox for login-details.')
-             } else {
-                 alert('Sorry, an unexpected error appeared.\nPlease check your Cloud Limits or again later.');
-             }
-         }
-     });
+    // request or save profile
+    switch(action) {
+        case 0:
+            $.ajax({
+                 url: "vcd.php?action=newvcd&" + str.join(delimiter),
+                 type: "GET",
+                 cache: false,
+                 success: function (html) {
+                     if (html==1) {
+                         alert('Your request was successfully submitted to the Cloud.\nPlease check your mailbox for login-details.')
+                     } else {
+                         alert('Sorry, an unexpected error appeared.\nPlease check your Cloud Limits or try again later.');
+                     }
+                 }
+             });
+            break;
+
+        case 1:
+            // saving as cloud profile
+            var profilename = document.getElementById('profile_name').value;
+            if (profilename.length < 1) {
+                alert("Empty Cloud Profile Name. Not saving Profile !");
+            } else {
+                $.ajax({
+                     url: "vcd.php?action=newvcd&profile_name=" + profilename + "&" + str.join(delimiter),
+                     type: "GET",
+                     cache: false,
+                     success: function (html) {
+                         if (html==1) {
+                             alert('Your request was successfully saved as Cloud Profile ' + profilename)
+                         } else {
+                             alert('Sorry, an unexpected error appeared.\nPlease check your Cloud Limits or try again later.');
+                         }
+                     }
+                 });
+            }
+            break;
+
+    }
+
+
 
 
 }
@@ -292,6 +315,26 @@ function checkcosts(s)
              alert(data);
          }
      });
+
+}
+
+
+
+function save_request_as_profile(s) {
+
+    var str = [];
+    var key = 'myKey[]=';
+    var delimiter = '&'
+    $(s + "> *").not('.ui-sortable-helper').each(function() {
+        if (this.getAttribute('id') != null) {
+            str.push(this.getAttribute('key')+"="+this.getAttribute('value'));
+        }
+    });
+
+    var o = str.join(delimiter);
+
+
+    alert("here we go ..." + o);
 
 }
 
@@ -581,17 +624,29 @@ and check to have enough CCU's (Cloud Computing Units) when requesting a System.
     <center><b>Cloud Actions</b></center>
     <hr />
 
-    <div class="serializer">
+    <div id="submitrequest" class="serializer">
         <br />
-        <center><a href="#" onClick="submitrequest('#builder'); return false;" style="text-decoration: none">
+        <center><a href="#" onClick="submitrequest('#builder', 0); return false;" style="text-decoration: none">
         <img src="../../img/submit.png" width="32" height="32" alt="submit" border="0"/>
         <br />
-        <b>Request Appliance</b>
+        <b>Request</b>
         </a></center>
     </div>
    <br />
 
-    <div  class="costs">
+    <div id="saveprofile" class="saveprofile">
+        <br />
+        <center><a href="#" onClick="submitrequest('#builder', 1)" style="text-decoration: none">
+        <img src="../../img/resource.png" width="32" height="32" alt="Reset" border="0"/>
+        <br />
+        <b>Save Profile</b>
+        </a>
+        <br />
+        <input type="text" id="profile_name" name="profile_name" value="" size="5" maxlength="10">
+        </center>
+    </div>
+
+    <div id="checkcosts" class="costs">
         <br />
         <center><a href="#" onClick="checkcosts('#builder'); return false;" style="text-decoration: none">
         <img src="../../img/checkcosts.png" width="32" height="32" alt="Check Costs" border="0"/>
@@ -600,14 +655,18 @@ and check to have enough CCU's (Cloud Computing Units) when requesting a System.
         </a></center>
     </div>
 
-    <div  class="reset">
+    <div id="resetdesigner" class="reset">
         <br />
         <center><a href="#" onClick="window.location.reload()" style="text-decoration: none">
         <img src="../../img/clear.png" width="32" height="32" alt="Reset" border="0"/>
         <br />
-        <b>Reset Designer</b>
+        <b>Reset</b>
         </a></center>
     </div>
+
+
+
+
 
 </div>
 

@@ -1,8 +1,3 @@
-<html>
-<head>
-<link type="text/css" rel="stylesheet" href="../css/cloud.css">
-</head>
-
 <!--
 /*
   This file is part of openQRM.
@@ -22,11 +17,6 @@
     Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 -->
-<style>
-.htmlobject_tab_box {
-	width:850px;
-}
-</style>
 
 <form action="{formaction}" method="GET">
 <h1>My Cloud Account</h1>

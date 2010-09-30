@@ -14,16 +14,22 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
 */
 -->
 
-<h1>My Cloud Appliances</h1>
+<script language="JavaScript">
+
+function doRefresh() {
+    window.location.reload();
+}
+</script>
+
+
+<h1>My Cloud Profiles</h1>
 
 <form action="{thisfile}">
 {currentab}
-{cloud_appliance_table}
+{cloud_profile_table}
 
 </form>
-<br>
-

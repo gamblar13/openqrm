@@ -1,9 +1,19 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+<title>openQRM Cloud Portal</title>
+
 <link rel="stylesheet" type="text/css" href="css/mycloud.css" />
 <style>
 .htmlobject_tab_box {
 	width:600px;
 }
 </style>
+
+</head>
+<body>
 
 <?php
 /*
@@ -182,6 +192,8 @@ if(htmlobject_request('action') != '') {
 				$user_fields['cu_token'] = $user_token;
 				// prepare more defaults
 				$user_fields['cu_status'] = 0;
+                // default user group
+				$user_fields['cu_cg_id'] = 0;
 				$user_fields['cu_id'] = openqrm_db_get_free_id('cu_id', $CLOUD_USER_TABLE);
 				// check how many ccunits to give for a new user
 				$cc_conf = new cloudconfig();
@@ -528,7 +540,6 @@ include "$DocRoot/cloud-portal/mycloud-bottom.php";
 
 ?>
 
-</html>
 
 
 

@@ -90,14 +90,14 @@ function check_update_param($param, $value, $len) {
         if (!strlen($value)) {
             $strMsg = "$param is empty <br>";
             $c_error = 1;
-            redirectit($strMsg, tab4, "mycloud.php");
+            redirectit($strMsg, tab6, "mycloud.php");
             exit(0);
         }
         $value_len = strlen($value);
         if ($value_len <= $len) {
             $strMsg = "$param is too short. Needs min. $len characters<br>";
             $c_error = 1;
-            redirectit($strMsg, tab4, "mycloud.php");
+            redirectit($strMsg, tab6, "mycloud.php");
             exit(0);
         }
     }
@@ -114,7 +114,7 @@ function check_update_param($param, $value, $len) {
 	if(!check_allowed($value)){
 		$strMsg = "$param contains special characters <br>";
 		$c_error = 1;
-		redirectit($strMsg, tab4, "mycloud.php");
+		redirectit($strMsg, tab6, "mycloud.php");
 		exit(0);
 	}
 }
@@ -144,13 +144,13 @@ if (htmlobject_request('account_command') != '') {
             if (strcmp($auth_user, $post_user)) {
 				$strMsg = "Unauthorized access ! <br>";
 				$c_error = 1;
-				redirectit($strMsg, tab4, "mycloud.php");
+				redirectit($strMsg, tab6, "mycloud.php");
 				exit(0);
             }
             if (strcmp($auth_user, $db_user)) {
 				$strMsg = "Unauthorized access ! <br>";
 				$c_error = 1;
-				redirectit($strMsg, tab4, "mycloud.php");
+				redirectit($strMsg, tab6, "mycloud.php");
 				exit(0);
             }
 
@@ -159,7 +159,7 @@ if (htmlobject_request('account_command') != '') {
 			if (!$cloud_email->checkEmail($user_fields['cu_email'])) {
 				$strMsg = "Email address is invalid. <br>";
 				$c_error = 1;
-				redirectit($strMsg, tab4, "mycloud.php");
+				redirectit($strMsg, tab6, "mycloud.php");
 				exit(0);
 			}
 
@@ -172,7 +172,7 @@ if (htmlobject_request('account_command') != '') {
                 if (strcmp($user_fields['cu_password'], $user_fields['cu_password_check'])) {
                     $strMsg = "Passwords are not equal <br>";
                     $c_error = 1;
-                    redirectit($strMsg, tab4, "mycloud.php");
+                    redirectit($strMsg, tab6, "mycloud.php");
                     exit(0);
                 }
                 // update htpasswd
@@ -194,7 +194,7 @@ if (htmlobject_request('account_command') != '') {
                     $openqrm_server_command="htpasswd -b $CloudDir/user/.htpasswd $post_user $u_pass";
                     $output = shell_exec($openqrm_server_command);
                 }
-                redirectit($strMsg, tab4, "mycloud.php");
+                redirectit($strMsg, tab6, "mycloud.php");
 			}
 			break;
 
@@ -309,7 +309,7 @@ function mycloud_account() {
 	$t->setVar(array(
 		'formaction' => "mycloudaccount.php",
 		'submit_save' => htmlobject_input('account_command', array("value" => 'Update', "label" => 'Update'), 'submit'),
-        'currenttab' => "<input type=hidden name=\"currenttab\" value=\"tab4\">",
+        'currenttab' => "<input type=hidden name=\"currenttab\" value=\"tab6\">",
         'cu_id' => "<input type=hidden name=\"cu_id\" value=\"$cu_id\">",
         'cu_name_input' => $cu_name_input,
         'cu_password_input' => $cu_password_input,

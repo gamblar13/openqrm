@@ -39,8 +39,8 @@ require_once "$RootDir/plugins/cloud/class/cloudconfig.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudmailer.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudimage.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudappliance.class.php";
-require_once "$RootDir/plugins/cloud/class/cloudiptables.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudnat.class.php";
+require_once "$RootDir/plugins/cloud/class/cloudicon.class.php";
 
 global $OPENQRM_SERVER_BASE_DIR;
 $refresh_delay=5;
@@ -49,6 +49,8 @@ $openqrm_server = new openqrm_server();
 $OPENQRM_SERVER_IP_ADDRESS=$openqrm_server->get_ip_address();
 global $OPENQRM_SERVER_IP_ADDRESS;
 global $CLOUD_REQUEST_TABLE;
+$cloud_object_icon_size=48;
+global $cloud_object_icon_size;
 
 // who are you ?
 $auth_user = $_SERVER['PHP_AUTH_USER'];
@@ -63,6 +65,8 @@ function my_cloud_appliances() {
 	global $auth_user;
     global $RootDir;
     global $DocRoot;
+    global $cloud_object_icon_size;
+
     $sshterm_enabled = false;
     $collectd_graph_enabled = false;
     $disk_resize_enabled = false;
@@ -162,7 +166,11 @@ function my_cloud_appliances() {
 		if ($appliance_resources >=0) {
 			// an appliance with a pre-selected resource
 			// get its ips from the iptables table
-			$cloud_iptable = new cloudiptables();
+// ########### TODO ###################################################################################
+
+/*
+
+            $cloud_iptable = new cloudiptables();
 			$app_ips = $cloud_iptable->get_ip_list_by_appliance($appliance->id);
             $app_ips_len = count($app_ips);
             if ((is_array($app_ips)) && ($app_ips_len > 0)) {
@@ -177,12 +185,15 @@ function my_cloud_appliances() {
                     }
 				}
 			} else {
+ *
+ */
                 // in case no external ip was given to the appliance we show the internal ip
                 $resource->get_instance_by_id($appliance->resources);
 				$appliance_resources_str = $resource->ip;
                 $sshterm_login_ip =  $resource->ip;
                 $sshterm_login = true;
-			}
+//			}
+// ########### TODO ###################################################################################
 
             // check if we need to NAT the ip address
             $cn_conf = new cloudconfig();
@@ -235,7 +246,13 @@ function my_cloud_appliances() {
             $show_pause_button = false;
             $show_unpause_button = false;
         }
-
+        // check if we have a custom icon for the cloudappliance
+        $cloud_icon = new cloudicon();
+        $cloud_icon->get_instance_by_details($clouduser->id, 2, $cloud_appliance->id);
+        if (strlen($cloud_icon->filename)) {
+    		$resource_icon_default="custom-icons/".$cloud_icon->filename;
+        }
+        
 		$kernel = new kernel();
 		$kernel->get_instance_by_id($appliance->kernelid);
 		$image = new image();
@@ -282,14 +299,15 @@ function my_cloud_appliances() {
             $cloud_appliance_disk_size = "$cloud_image_disk_size";
         }
         // format image column
-        $config_column = "<b>Kernel:</b> ".$kernel->name."</br><b>Image:</b> ".$image->name."<br><b>Type:</b> ".$appliance_virtualization_type."<br><b>IP:</b>".$appliance_resources_str;
+        $config_column = "<b>Kernel:</b> ".$kernel->name."<br><b>Image:</b> ".$image->name."<br><b>Type:</b> ".$appliance_virtualization_type."<br><b>IP:</b>".$appliance_resources_str;
 
         $appliance_comment = $appliance->comment;
 		$arBody[] = array(
-			'appliance_state' => "<img src=$state_icon>",
-			'appliance_icon' => "<img width=24 height=24 src=$resource_icon_default><input type=hidden name=\"currenttab\" value=\"tab3\">",
+			'appliance_state' => "<img width=\"16\" height=\"16\" src=\"".$state_icon."\">",
+			'appliance_icon' => "<img width=\"".$cloud_object_icon_size."\" height=\"".$cloud_object_icon_size."\" src=\"".$resource_icon_default."\"><input type=hidden name=\"currenttab\" value=\"tab3\">
+                <br><br><a href=\"#\" onClick=\"javascript:window.open('mycloudiconupload.php?object_type=2&object_id=$cloud_appliance->id','','location=0,status=0,scrollbars=1,width=390,height=170,left=200,top=150,screenX=200,screenY=150');\"><small>Upload Icon</small></a>",
 			'appliance_id' => $cloud_appliance->id,
-			'appliance_name' => $appliance->name,
+			'appliance_name' => $appliance->name."<br><br><a href=\"/cloud-portal/user/mycloud.php?currenttab=tab1\"><small>(Request: ". $cloud_appliance->cr_id.")<small></a><br><br>",
 			'appliance_config' => $config_column,
 			'appliance_disk_size' => $cloud_appliance_disk_size,
 			'appliance_comment' => "<input type=text name=\"appliance_comment[$cloud_appliance->id]\" value=\"$appliance_comment\">",

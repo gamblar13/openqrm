@@ -1,4 +1,4 @@
-<!--
+<?php
 /*
   This file is part of openQRM.
 
@@ -16,14 +16,8 @@
 
     Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
--->
 
-<h1>My Cloud Appliances</h1>
 
-<form action="{thisfile}">
-{currentab}
-{cloud_appliance_table}
+include "vid.php";
 
-</form>
-<br>
-
+?>
