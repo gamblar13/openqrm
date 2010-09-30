@@ -1,0 +1,537 @@
+#!/bin/bash
+# this script automatically manages nfs and iscsi on lxc
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/include/openqrm-plugin-lxc-storage-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/openqrm-plugin-lxc-storage.conf
+OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	OPENQRM_SERVER_IP=$resource_openqrmserver
+	OPENQRM_EXEC_PORT=$resource_execdport
+elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+	openqrm_server_get_config
+	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+	resource_id=0
+	resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+    openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+fi
+export LANG=C
+LINEBR='
+'
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+    WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+# defines the filesystem to use for the lxc storage volumes
+LXC_STORAGE_DEFAULT_FILESYSTEM=ext4
+export LXC_STORAGE_DEFAULT_FILESYSTEM
+# how long to wait for the volume authentication, each loop is 5 secs
+MAX_VOLUME_AUTHENTICATION_LOOP=30
+export MAX_VOLUME_AUTHENTICATION_LOOP
+
+# the web-reachable template dir on the openQRM Server
+LXC_TEMPLATE_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lxc-templates"
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+
+function lxc_storage_usage() {
+	echo "Usage : $0 add/remove/snap/list/resize/clone <-n image-name> <-v volume-group>"
+	echo "             [-m size in MB]"
+	echo "             [-s image-snapshot-name]"
+	echo "        $0 auth <-r image-rootdevice> <-i authidentifier>"
+	echo "        $0 post_vg <-u username> <-p password>"
+	echo "        $0 post_lv <-u username> <-p password> <-v volume-group>"
+	echo "        $0 post_identifier <-u username> <-p password>"
+	echo "        $0 get_lxc_templates"
+	echo "        $0 remove_lxc_template <-t template-name>"
+	echo "        $0 deploy_lxc_template <-t template-name> <-n image-name> <-v volume-group>"
+	echo "        $0 download_lxc_template <-d template-url>"
+	exit 1
+}
+
+
+FULL_COMMANDLINE="$0 $@"
+LVM_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			LVM_IMAGE_NAME=$2
+			shift
+			;;
+		-m)
+			LVM_IMAGE_SIZE=$2
+			shift
+			;;
+		-s)
+			LVM_IMAGE_SNAPSHOT_NAME=$2
+			shift
+			;;
+		-i)
+			LVM_IMAGE_AUTH=$2
+			shift
+			;;
+		-r)
+			LVM_IMAGE_ROOTDEVICE=$2
+			shift
+			;;
+		-u)
+			LVM_OPENQRM_USERNAME=$2
+			shift
+			;;
+		-p)
+			LVM_OPENQRM_PASSWORD=$2
+			shift
+			;;
+		-v)
+			LVM_STORAGE_SERVER_VOLUME_GROUP=$2
+			shift
+			;;
+		-t)
+			LXC_TEMPLATE_NAME=$2
+			shift
+			;;
+		-d)
+			LXC_TEMPLATE_URL=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			lxc_storage_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+
+
+# main
+if [ "$LVM_COMMAND" == "" ]; then
+	lxc_storage_usage
+fi
+
+if [ "$LVM_COMMAND" == "post_lv" ] || [ "$LVM_COMMAND" == "post_vg" ] || [ "$LVM_COMMAND" == "post_identifier" ]; then
+		if [ "$LVM_OPENQRM_USERNAME" == "" ]; then
+			lxc_storage_usage
+		fi
+		if [ "$LVM_OPENQRM_PASSWORD" == "" ]; then
+			lxc_storage_usage
+		fi
+		if [ "$LVM_COMMAND" == "post_lv" ]; then
+			if [ "$LVM_STORAGE_SERVER_VOLUME_GROUP" == "" ]; then
+				lxc_storage_usage
+			fi
+		fi
+
+else
+
+	if [ "$LVM_COMMAND" != "list" ] && [ "$LVM_COMMAND" != "auth" ] && [ "$LVM_COMMAND" != "get_lxc_templates" ] && [ "$LVM_COMMAND" != "remove_lxc_template" ] && [ "$LVM_COMMAND" != "download_lxc_template" ]; then
+		if [ "$LVM_IMAGE_NAME" == "" ]; then
+			lxc_storage_usage
+		fi
+		if [ "$LVM_STORAGE_SERVER_VOLUME_GROUP" == "" ]; then
+			lxc_storage_usage
+		fi
+	fi
+fi
+# load required lvm modules if needed
+if ! grep dm_mod /proc/modules 1>/dev/null; then
+	modprobe dm-mod 1>/dev/null 2>&1
+	modprobe dm-snapshot 1>/dev/null 2>&1
+	# give time to settle
+	sleep 2
+fi
+
+if [ "$LVM_COMMAND" != "list" ] && [ "$LVM_COMMAND" != "post_vg" ] && [ "$LVM_COMMAND" != "post_identifier" ] && [ "$LVM_COMMAND" != "auth" ] && [ "$LVM_COMMAND" != "get_lxc_templates" ] && [ "$LVM_COMMAND" != "remove_lxc_template" ] && [ "$LVM_COMMAND" != "download_lxc_template" ]; then
+	# check if volume group exists
+	if ! `vgdisplay | grep $LVM_STORAGE_SERVER_VOLUME_GROUP 1>/dev/null`; then
+		echo "ERROR: Could not find volume-group $LVM_STORAGE_SERVER_VOLUME_GROUP on the storage-server"
+		exit 1
+	fi
+fi
+
+case "$LVM_COMMAND" in 
+
+	add)
+		if [ "$LVM_IMAGE_SIZE" == "" ]; then
+			LVM_IMAGE_SIZE=$DEFAULT_IMAGE_SIZE
+			# echo "Using default size of $DEFAULT_IMAGE_SIZE MB!"
+		fi
+		export LVM_IMAGE_SIZE
+        lxc_storage_lock aquire
+		lvcreate -L$LVM_IMAGE_SIZE -n$LVM_IMAGE_NAME $LVM_STORAGE_SERVER_VOLUME_GROUP
+        openqrm_post_event 0 "add" 5 "openqrm-lxc-storage" "Creating logical volume $LVM_IMAGE_NAME size $LVM_IMAGE_SIZE MB on vg $LVM_STORAGE_SERVER_VOLUME_GROUP"
+        #echo "NOTICE: creating $LXC_STORAGE_DEFAULT_FILESYSTEM filesytem on /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME"
+        if ! mkfs.$LXC_STORAGE_DEFAULT_FILESYSTEM -F /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME; then
+            openqrm_post_event 0 "add" 2 "openqrm-lxc-storage" "Could not create $LXC_STORAGE_DEFAULT_FILESYSTEM filesytem on /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME"
+            lxc_storage_lock release
+            exit 1
+        fi
+        # deactivate vol, assignment will activate it on demand
+        #lvchange -an /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+        lxc_storage_lock release
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$LVM_OPENQRM_USERNAME" != "" ] && [ "$LVM_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_lv -u $LVM_OPENQRM_USERNAME -p $LVM_OPENQRM_PASSWORD -v $LVM_STORAGE_SERVER_VOLUME_GROUP
+		fi
+
+		;;
+
+	remove)
+        lxc_storage_lock aquire
+		lvchange -an /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+		lvremove -f /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+        openqrm_post_event 0 "remove" 5 "openqrm-lxc-storage" "Removed logical volume $LVM_IMAGE_NAME from vg $LVM_STORAGE_SERVER_VOLUME_GROUP"
+        lxc_storage_lock release
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$LVM_OPENQRM_USERNAME" != "" ] && [ "$LVM_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_lv -u $LVM_OPENQRM_USERNAME -p $LVM_OPENQRM_PASSWORD -v $LVM_STORAGE_SERVER_VOLUME_GROUP
+		fi
+
+		;;
+
+	snap)
+		if [ "$LVM_IMAGE_SNAPSHOT_NAME" == "" ]; then
+			#echo "ERROR: Please give a name for the snapshot using the -s cmdline parmeter"
+			lxc_storage_usage
+		fi
+		if [ "$LVM_IMAGE_SIZE" == "" ]; then
+			LVM_IMAGE_SIZE=$DEFAULT_IMAGE_SIZE
+			#echo "Using default size of $DEFAULT_IMAGE_SIZE MB!"
+		fi
+		export LVM_IMAGE_SIZE
+		
+		# check that source fs-images exist
+		if ! `lvdisplay /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME 1>/dev/null`; then
+            openqrm_post_event 0 "snap" 2 "openqrm-lxc-storage" "Could not find /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME on the storage-server"
+			exit 1
+		fi
+        lxc_storage_lock aquire
+		lvchange -ay /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+		lvcreate --size $LVM_IMAGE_SIZE""m --snapshot --name $LVM_IMAGE_SNAPSHOT_NAME /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+		#lvchange -an /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_SNAPSHOT_NAME
+		#lvchange -an /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+        openqrm_post_event 0 "snap" 5 "openqrm-lxc-storage" "Created snapshot from logical volume $LVM_IMAGE_NAME -> $LVM_IMAGE_SNAPSHOT_NAME"
+        lxc_storage_lock release
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$LVM_OPENQRM_USERNAME" != "" ] && [ "$LVM_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_lv -u $LVM_OPENQRM_USERNAME -p $LVM_OPENQRM_PASSWORD -v $LVM_STORAGE_SERVER_VOLUME_GROUP
+		fi
+		;;
+
+	auth)
+		lxc_storage_log auth "Authenticating $LVM_IMAGE_TYPE image $LVM_IMAGE_ROOTDEVICE to $LVM_IMAGE_AUTH"
+        # this is just for starting auth, make sure the device is there, otherwise wait
+		if [ "$LVM_OPENQRM_USERNAME" != "" ] && [ "$LVM_OPENQRM_PASSWORD" != "" ] && [ "$LVM_IMAGE_NAME" != "" ]; then
+            MAX_AUTH_LOOP=0
+            while (true); do
+        		lvchange -ay $LVM_IMAGE_ROOTDEVICE
+                if [ -e "$LVM_IMAGE_ROOTDEVICE" ]; then
+                    break
+                fi
+        		#lvchange -an $LVM_IMAGE_ROOTDEVICE
+                sleep 5
+                if [ "$MAX_AUTH_LOOP" == "$MAX_VOLUME_AUTHENTICATION_LOOP" ]; then
+                    lxc_storage_log auth "ERROR: Volume $LVM_IMAGE_TYPE image $LVM_IMAGE_ROOTDEVICE does not exists, Cannot auth to $LVM_IMAGE_AUTH"
+                    exit 1
+                fi
+                MAX_AUTH_LOOP=$(( MAX_AUTH_LOOP + 1 ))
+            done
+            # if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LVM_OPENQRM_USERNAME --http-password=$LVM_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lvm_storage_command=auth_finished&lxc_storage_image_name=$LVM_IMAGE_NAME"; then
+                lxc_storage_log auth "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP!"
+            fi
+        fi
+		;;
+
+	list)
+		lvm lvs
+		;;
+	post_vg)
+		# echo "Posting current volume group status to the openQRM-server"
+		STORAGE_STATUS_TMP=$resource_id.vg.stat
+		vgs | grep -v VFree | sed -e "s/ \{1,\}//" > $STORAGE_STATUS_TMP
+        sed -i -e "s/ \{1,\}/@/g" $STORAGE_STATUS_TMP
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LVM_OPENQRM_USERNAME --http-password=$LVM_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lvm_storage_command=get_storage; then
+            openqrm_post_event 0 "post_vg" 2 "openqrm-lxc-storage" "Could not post the volume group status to the openQRM-server at $resource_openqrmserver!"
+            lxc_storage_log post_vg "ERROR: Could not post the volume group status to the openQRM-server at $resource_openqrmserver!"
+		fi
+		rm -f $STORAGE_STATUS_TMP
+		rm -f $STORAGE_STATUS_TMP.post
+		;;
+	post_lv)
+		#echo "Posting current $LVM_IMAGE_TYPE logic volume status to the openQRM-server"
+		STORAGE_STATUS_TMP=$resource_id.$LVM_STORAGE_SERVER_VOLUME_GROUP.lv.stat
+		> $STORAGE_STATUS_TMP
+        for LVOL in `lvs $LVM_STORAGE_SERVER_VOLUME_GROUP | grep -v LSize | sed -e "s/ \{1,\}//" | awk {' print $1 '}`; do
+            lvs $LVM_STORAGE_SERVER_VOLUME_GROUP/$LVOL | grep -v LSize | sed -e "s/ \{1,\}//" >> $STORAGE_STATUS_TMP
+		done
+        sed -i -e "s/ \{1,\}/@/g" $STORAGE_STATUS_TMP
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LVM_OPENQRM_USERNAME --http-password=$LVM_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lvm_storage_command=get_storage; then
+            openqrm_post_event 0 "post_lv" 2 "openqrm-lxc-storage" "Could not post the logic volume status to the openQRM-server at $resource_openqrmserver!"
+            lxc_storage_log post_lv "ERROR: Could not post the logic volume status to the openQRM-server at $resource_openqrmserver!"
+		fi
+		rm -f $STORAGE_STATUS_TMP
+		rm -f $STORAGE_STATUS_TMP.post
+		;;
+	post_identifier)
+		#echo "Posting current $LVM_IMAGE_TYPE logical volume identifier to the openQRM-server"
+		STORAGE_STATUS_TMP=$resource_id.lv.lxc-lvm-deployment.ident
+		> $STORAGE_STATUS_TMP
+
+		for LVOL in `lvdisplay | grep "LV Name" | awk {' print $3 '}`; do
+			LVOL_SHORT=`basename $LVOL`
+            IMAGE_NAME=$LVOL_SHORT
+            VOLUME_GROUP=`echo $LVOL | cut -d'/' -f3`
+            echo "$IMAGE_NAME:/dev/$VOLUME_GROUP/$IMAGE_NAME"
+            echo "$IMAGE_NAME:/dev/$VOLUME_GROUP/$IMAGE_NAME" >> $STORAGE_STATUS_TMP
+		
+		done
+
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LVM_OPENQRM_USERNAME --http-password=$LVM_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lvm_storage_command=get_ident; then
+            openqrm_post_event 0 "post_identifier" 2 "openqrm-lxc-storage" "Could not post the logic volume identifier to the openQRM-server at $resource_openqrmserver!"
+            lxc_storage_log post_identifier "ERROR: Could not post the logic volume identifier to the openQRM-server at $resource_openqrmserver!"
+		fi
+		rm -f $STORAGE_STATUS_TMP
+		rm -f $STORAGE_STATUS_TMP.post
+		;;
+
+
+	resize)
+		if [ "$LVM_IMAGE_SIZE" == "" ]; then
+			LVM_IMAGE_SIZE=$DEFAULT_IMAGE_SIZE
+			echo "Using default size of $DEFAULT_IMAGE_SIZE MB!"
+		fi
+		export LVM_IMAGE_SIZE
+        openqrm_post_event 0 "resize" 5 "openqrm-lxc-storage" "Resizing logical volume $LVM_IMAGE_NAME + size $LVM_IMAGE_SIZE MB!"
+        lxc_storage_lock aquire
+		lvchange -ay /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+        lvresize -L +$LVM_IMAGE_SIZE /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME 2>&1 | logger
+		#lvchange -an /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+        lxc_storage_lock release
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$LVM_OPENQRM_USERNAME" != "" ] && [ "$LVM_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_lv -u $LVM_OPENQRM_USERNAME -p $LVM_OPENQRM_PASSWORD -v $LVM_STORAGE_SERVER_VOLUME_GROUP
+		fi
+
+		;;
+
+
+	clone)
+        # cloning is similar to snapshots but since lvm cannot (yet) create snapshots
+        # from snapshots we have to dd the origin (which may be a snapshot) to a
+        # new lvol.
+		if [ "$LVM_IMAGE_SNAPSHOT_NAME" == "" ]; then
+			#echo "ERROR: Please give a name for the clone using the -s cmdline parmeter"
+			lxc_storage_usage
+		fi
+		if [ "$LVM_IMAGE_SIZE" == "" ]; then
+			LVM_IMAGE_SIZE=$DEFAULT_IMAGE_SIZE
+			#echo "Using default size of $DEFAULT_IMAGE_SIZE MB!"
+		fi
+		export LVM_IMAGE_SIZE
+
+        # re-run in background via screen
+        if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+            if [ -x /usr/bin/screen.real ]; then
+                RUNSCREEN="/usr/bin/screen.real"
+            else
+                RUNSCREEN=`which screen`
+            fi
+            export RUN_IN_BACKGROUND=true
+            SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+            $RUNSCREEN -dmS $SCREEN_NAME $FULL_COMMANDLINE
+            exit
+        fi
+
+        openqrm_post_event 0 "clone" 5 "openqrm-lxc-storage" "Cloning logical volume $LVM_IMAGE_NAME to $LVM_IMAGE_SNAPSHOT_NAME!"
+        lxc_storage_lock aquire
+		if ! lvcreate -L$LVM_IMAGE_SIZE -n$LVM_IMAGE_SNAPSHOT_NAME $LVM_STORAGE_SERVER_VOLUME_GROUP; then
+            openqrm_post_event 0 "clone" 2 "openqrm-lxc-storage" "Could not create target logical volume $LVM_IMAGE_SNAPSHOT_NAME!"
+            lxc_storage_lock release
+            exit 1
+        fi
+        # copy content
+        #echo "Running : dd if=/dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME of=/dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_SNAPSHOT_NAME bs=1M" | logger
+        lxc_storage_lock release
+		lvchange -ay /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+        dd if=/dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME of=/dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_SNAPSHOT_NAME bs=1M
+		#lvchange -an /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+		#lvchange -an /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_SNAPSHOT_NAME
+        # here we notify openQRM that cloning has finished
+		# in case we have a username + password post the updated list to the openQRM-server
+        # and notify openQRM that cloning has finished
+		if [ "$LVM_OPENQRM_USERNAME" != "" ] && [ "$LVM_OPENQRM_PASSWORD" != "" ]; then
+            CLONE_FINISHED="$LVM_IMAGE_SNAPSHOT_NAME.clone"
+            touch $CLONE_FINISHED
+            if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LVM_OPENQRM_USERNAME --http-password=$LVM_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $CLONE_FINISHED` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lvm_storage_command=clone_finished; then
+                openqrm_post_event 0 "clone" 2 "openqrm-lxc-storage" "Could not post clone-finished status to the openQRM-server at $resource_openqrmserver!"
+                lxc_storage_log clone "ERROR: Could not post clone-finished status to the openQRM-server at $resource_openqrmserver!"
+            fi
+            # post lv
+			$0 post_lv -u $LVM_OPENQRM_USERNAME -p $LVM_OPENQRM_PASSWORD -v $LVM_STORAGE_SERVER_VOLUME_GROUP
+		fi
+
+		;;
+
+
+############### lxc template functions #############################################
+
+	get_lxc_templates)
+        # this function runs only on the openQRM server, no post via wget needed
+        echo "Posting the list of lxc templates" | logger
+		STORAGE_STATUS="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/storage/lxc-templates.stat"
+		STORAGE_STATUS_TMP="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/storage/lxc-templates.stat.tmp"
+		> $STORAGE_STATUS_TMP
+        rm -f $STORAGE_STATUS
+        if [ ! -f $LXC_TEMPLATE_DIR ]; then
+            mkdir -p $LXC_TEMPLATE_DIR
+        fi
+        for LXC in `ls $LXC_TEMPLATE_DIR/* 2>/dev/null`; do
+            LXC_NAME=`basename $LXC`
+            LXC_SIZE=`du -sh $LXC | awk {' print $1 '}`
+            echo "$LXC_NAME""@""$LXC_SIZE""@" >> $STORAGE_STATUS_TMP
+        done
+        mv -f $STORAGE_STATUS_TMP $STORAGE_STATUS
+		;;
+
+	remove_lxc_template)
+        # this function runs only on the openQRM server
+        if [ -f "$LXC_TEMPLATE_DIR/$LXC_TEMPLATE_NAME" ]; then
+            rm -f $LXC_TEMPLATE_DIR/$LXC_TEMPLATE_NAME
+            openqrm_post_event 0 "remove_lxc_template" 5 "openqrm-lxc-storage" "Removed lxc-template $LXC_TEMPLATE_DIR/$LXC_TEMPLATE_NAME"
+        fi
+		;;
+
+	download_lxc_template)
+        # this function runs only on the openQRM server, no post via wget needed
+        echo "Posting the list of lxc templates" | logger
+        if [ "$LXC_TEMPLATE_URL" == "" ]; then
+            #echo "ERROR: lxc-template url parameter empty" | logger
+            exit 1
+        fi
+        # re-run in background via screen
+        if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+            if [ -x /usr/bin/screen.real ]; then
+                RUNSCREEN="/usr/bin/screen.real"
+            else
+                RUNSCREEN=`which screen`
+            fi
+            export RUN_IN_BACKGROUND=true
+            SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+            $RUNSCREEN -dmS $SCREEN_NAME $FULL_COMMANDLINE
+            exit
+        fi
+        if [ ! -d $LXC_TEMPLATE_TEMP_DIR ]; then
+            mkdir -p $LXC_TEMPLATE_TEMP_DIR
+        fi
+        LXC_TEMPLATE_NAME=`basename $LXC_TEMPLATE_URL`
+		if ! wget -O $LXC_TEMPLATE_TEMP_DIR/$LXC_TEMPLATE_NAME $LXC_TEMPLATE_URL; then
+            openqrm_post_event 0 "download_lxc_template" 2 "openqrm-lxc-storage" "Could not download lxc-template $LXC_TEMPLATE_NAME from $LXC_TEMPLATE_URL!"
+            lxc_storage_lock release
+            exit 1
+		fi
+        mv $LXC_TEMPLATE_TEMP_DIR/$LXC_TEMPLATE_NAME $LXC_TEMPLATE_DIR/$LXC_TEMPLATE_NAME
+		;;
+
+
+	deploy_lxc_template)
+        # this function runs only on the lxc host !
+        if [ "$LXC_TEMPLATE_NAME" == "" ]; then
+            #echo "ERROR: lxc-template parameter empty" | logger
+            exit 1
+        fi
+        # re-run in background via screen
+        if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+            if [ -x /usr/bin/screen.real ]; then
+                RUNSCREEN="/usr/bin/screen.real"
+            else
+                RUNSCREEN=`which screen`
+            fi
+            export RUN_IN_BACKGROUND=true
+            SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+            $RUNSCREEN -dmS $SCREEN_NAME $FULL_COMMANDLINE
+            exit
+        fi
+
+        lxc_storage_lock aquire
+        if [ ! -d $LXC_TEMPLATE_TEMP_DIR ]; then
+            mkdir -p $LXC_TEMPLATE_TEMP_DIR
+        fi
+        if [ -f $LXC_TEMPLATE_TEMP_DIR/$LXC_TEMPLATE_NAME ]; then
+            rm -f $LXC_TEMPLATE_TEMP_DIR/$LXC_TEMPLATE_NAME
+        fi
+		if ! wget -q $WGET_NO_CERT_CHECK -O $LXC_TEMPLATE_TEMP_DIR/$LXC_TEMPLATE_NAME $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/boot-service/lxc-templates/$LXC_TEMPLATE_NAME; then
+            openqrm_post_event 0 "deploy_lxc_template" 2 "openqrm-lxc-storage" "Could not download lxc-template $LXC_TEMPLATE_NAME from openQRM-server at $OPENQRM_SERVER_IP!"
+            lxc_storage_lock release
+            exit 1
+		fi
+        # rescan lvols
+        lvscan
+        # activate
+		lvchange -ay /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+        # mount device in temporary dir
+        MOUNTPOINT=`mktemp -d $LXC_TEMPLATE_TEMP_DIR/$LVM_IMAGE_NAME.XXXXXXXXXX` || exit 1
+        if ! mount /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME $MOUNTPOINT; then
+            openqrm_post_event 0 "deploy_lxc_template" 2 "openqrm-lxc-storage" "Could not mount /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME at $MOUNTPOINT!"
+            rm -f LXC_TEMPLATE_TEMP_DIR/$LXC_TEMPLATE_NAME
+    		#lvchange -an /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+            lxc_storage_lock release
+            exit 1
+        fi
+        if ! tar -C $MOUNTPOINT -xzf $LXC_TEMPLATE_TEMP_DIR/$LXC_TEMPLATE_NAME; then
+            openqrm_post_event 0 "deploy_lxc_template" 2 "openqrm-lxc-storage" "Could not unpack $LXC_TEMPLATE_TEMP_DIR/$LXC_TEMPLATE_NAME!"
+            umount $MOUNTPOINT
+            rmdir $MOUNTPOINT
+            rm -f LXC_TEMPLATE_TEMP_DIR/$LXC_TEMPLATE_NAME
+    		#lvchange -an /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+            lxc_storage_lock release
+            exit 1
+        fi
+        # remove downloaded template + cleanup
+        umount $MOUNTPOINT
+        rmdir $MOUNTPOINT
+        rm -f LXC_TEMPLATE_TEMP_DIR/$LXC_TEMPLATE_NAME
+		#lvchange -an /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME
+        openqrm_post_event 0 "deploy_lxc_template" 5 "openqrm-lxc-storage" "Deployment of $LXC_TEMPLATE_NAME to $LVM_IMAGE_NAME finished successfully"
+        lxc_storage_lock release
+		;;
+
+
+	*)
+		lxc_storage_usage
+		;;
+
+
+esac
+

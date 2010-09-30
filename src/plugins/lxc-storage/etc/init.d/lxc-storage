@@ -1,0 +1,125 @@
+#!/bin/bash
+# this is the boot-service init script for the Lxc-server hosts
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+#
+
+OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
+# for including the package functions
+export OPENQRM_SOURCE_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/"
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-package-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/include/openqrm-plugin-lxc-storage-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/openqrm-plugin-lxc-storage.conf
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	OPENQRM_SERVER_IP=$resource_openqrmserver
+elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+	openqrm_server_get_config
+	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+fi
+OPENQRM_VM_DIR="/var/lib/lxc/"
+export OPENQRM_VM_DIR
+
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+    WGET="wget -q --no-check-certificate"
+else
+    WGET="wget -q"
+fi
+
+# do not start on the intitrd
+if [ -f /etc/initrd-devices.conf ]; then
+	exit 0
+fi
+
+
+function lxc_start() {
+	echo "Starting the openQRM lxc-storage-plugin"
+    # check if this is a lxc host
+	if ! which lxc-start 1>/dev/null; then
+        exit 0
+    fi
+    # be sure we have screen
+   	export FORCE_INSTALL=true
+   	openqrm_install_os_dependency screen
+
+    # get initrd + linuxrc to create idle vms
+    if ! $WGET -O $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-initrd-default.tgz  $openqrm_web_protocol://$resource_openqrmserver/openqrm/boot-service/openqrm-initrd-lxc.tgz; then
+        echo "ERROR: Could not download the lxc-initrd-template from openQRM server at $openqrm_web_protocol://$resource_openqrmserver !"
+        return 1
+    fi
+    if ! $WGET -O $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-client.tgz  $openqrm_web_protocol://$resource_openqrmserver/openqrm/boot-service/openqrm-client.tgz; then
+        echo "ERROR: Could not download the openqrm-client.tgz from openQRM server at $openqrm_web_protocol://$resource_openqrmserver !"
+        return 1
+    fi
+
+    # start the vm status autostart
+    if [ -d "$OPENQRM_VM_DIR" ]; then
+        for VM_CONFIG in `find $OPENQRM_VM_DIR/* -name autostart 2>/dev/null`; do
+            VM_NAME=`dirname $VM_CONFIG`
+            VM_NAME=`basename $VM_NAME`
+            echo "- auto-starting VM $VM_NAME"
+            $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm start -n $VM_NAME
+        done
+    fi
+
+}
+
+
+function lxc_stop() {
+	echo "Stopping the openQRM lxc-storage-plugin"
+
+}
+
+
+
+
+
+case "$1" in
+	start)
+		lxc_start
+		;;
+	stop)
+		lxc_stop
+		;;
+	restart)
+		lxc_stop
+		sleep 1
+		lxc_start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+
+esac
+exit $?
+
+
+
+
+
+
+
+
+
+
+
+
+

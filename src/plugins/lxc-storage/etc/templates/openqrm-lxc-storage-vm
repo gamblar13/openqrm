@@ -1,0 +1,30 @@
+lxc.utsname = @@LXC_VM_NAME@@
+lxc.tty = @@LXC_VM_TTY@@
+#lxc.pts = 1024
+lxc.network.type = veth
+lxc.network.flags = up
+lxc.network.link = @@OPENQRM_PLUGIN_LXC_BRIDGE@@
+lxc.network.name = eth0
+lxc.network.ipv4 = 0.0.0.0
+lxc.network.veth.pair = @@LXC_VM_NAME@@
+lxc.network.hwaddr = @@LXC_VM_MAC@@
+lxc.network.mtu = 1500
+lxc.rootfs = /var/lib/lxc/@@LXC_VM_NAME@@/idle/
+lxc.cgroup.cpuset.cpus = 0
+# security parameter
+lxc.cgroup.devices.deny = a # Deny all access to devices
+lxc.cgroup.devices.allow = c 1:3 rwm # dev/null
+lxc.cgroup.devices.allow = c 1:5 rwm # dev/zero
+lxc.cgroup.devices.allow = c 5:1 rwm # dev/console
+lxc.cgroup.devices.allow = c 5:0 rwm # dev/tty
+lxc.cgroup.devices.allow = c 4:0 rwm # dev/tty0
+lxc.cgroup.devices.allow = c 4:1 rwm # dev/tty1
+lxc.cgroup.devices.allow = c 4:2 rwm # dev/tty2
+lxc.cgroup.devices.allow = c 1:9 rwm # dev/urandon
+lxc.cgroup.devices.allow = c 1:8 rwm # dev/random
+lxc.cgroup.devices.allow = c 136:* rwm # dev/pts/*
+lxc.cgroup.devices.allow = c 5:2 rwm # dev/pts/ptmx
+#rtc
+lxc.cgroup.devices.allow = c 254:0 rwm
+
+
