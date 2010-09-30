@@ -119,7 +119,7 @@ $event = new event();
                     $event->log("update_info", $_SERVER['REQUEST_TIME'], 5, "resource-monitor", "Rejecting statistics from rebooting resource $resource_id", "", "", 0, 0, $resource_id);
                     $resource->update_info($resource_id, $resource_reboot_fields);
                 } else {
-                    $event->log("update_info", $_SERVER['REQUEST_TIME'], 5, "resource-monitor", "Processing statistics from resource $resource_id", "", "", 0, 0, $resource_id);
+                    // $event->log("update_info", $_SERVER['REQUEST_TIME'], 5, "resource-monitor", "Processing statistics from resource $resource_id", "", "", 0, 0, $resource_id);
                     $resource->update_info($resource_id, $resource_fields);
                 }
 			}
