@@ -60,7 +60,7 @@ case "$@" in
 		;;
 	halt)
 		stop_openqrm_monitord
-		sleep 2 && /sbin/halt -f &
+		sleep 2 && /sbin/poweroff -f &
 		exit 0
 		;;
 esac

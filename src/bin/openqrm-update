@@ -1,0 +1,352 @@
+#!/bin/bash
+# this is the openQRM commandline client
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+#
+
+export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/X11R6/bin
+
+if [ "$OPENQRM_SERVER_BASE_DIR" == "" ]; then
+	OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../..
+	OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+fi
+export OPENQRM_SERVER_BASE_DIR
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+
+
+function update_usage() {
+	echo
+	echo "Usage:"
+	echo "`basename $0` help			- This help screen"
+	echo
+	echo "`basename $0` pre <-f>"
+	echo "`basename $0` base <-f>"
+	echo "`basename $0` post <-f>"
+	echo
+}
+
+
+
+function openqrm_apply_old_config() {
+    local NEW_CONF=$1
+    local OLD_CONF=$2
+    local ALL_CONFIG_FILES=""
+    if [ -f "$NEW_CONF" ]; then
+        ALL_CONFIG_FILES="$NEW_CONF"
+    fi
+    if [ -f "$OLD_CONF" ]; then
+        ALL_CONFIG_FILES="$ALL_CONFIG_FILES $OLD_CONF"
+    fi
+
+    # checking new config against old
+    for OPENQRM_CONFIG_PARAM in `cat $ALL_CONFIG_FILES | grep -v ^"#" | grep "[A-Z][A-Z][A-Z][A-Z].*=.*" | cut -d'=' -f1 | uniq`; do
+        #echo "   - checking parameter $OPENQRM_CONFIG_PARAM"
+        # do net adapt version values
+        if [ "$OPENQRM_CONFIG_PARAM" == "OPENQRM_SERVER_VERSION" ]  || [ "$OPENQRM_CONFIG_PARAM" == "OPENQRM_PLUGIN_VERSION" ] || [ "$OPENQRM_CONFIG_PARAM" == "#" ]; then
+            continue
+        fi
+        # do not adapt deps + requires
+        if echo $OPENQRM_CONFIG_PARAM | grep DEPENDENCIES 1>/dev/null; then
+            continue
+        fi
+        if echo $OPENQRM_CONFIG_PARAM | grep REQUIREMENTS 1>/dev/null; then
+            continue
+        fi
+
+        unset OLD_CONFIG_VALUE
+        unset NEW_CONFIG_VALUE
+        unset $OPENQRM_CONFIG_PARAM
+        if [ -f "$OLD_CONF" ]; then
+            . $OLD_CONF
+        else
+            echo "NOTICE: $OLD_CONF does not exist!"
+        fi
+        eval OLD_CONFIG_VALUE=\$$OPENQRM_CONFIG_PARAM
+        unset $OPENQRM_CONFIG_PARAM
+        if [ -f "$NEW_CONF" ]; then
+            . $NEW_CONF
+        else
+            echo "NOTICE: $NEW_CONF does not exist!"
+        fi
+        eval NEW_CONFIG_VALUE=\$$OPENQRM_CONFIG_PARAM
+
+        echo
+        # existing in old config but not in new !
+        if [ "$OLD_CONFIG_VALUE" != "" ] && [ "$NEW_CONFIG_VALUE" == "" ]; then
+            echo
+            if [ "$FORCE_UPDATE" == "false" ]; then
+                echo "    - Config parameter $OPENQRM_CONFIG_PARAM does not exist any more! <ENTER> to go on"
+                read
+            else
+                echo "    - Config parameter $OPENQRM_CONFIG_PARAM does not exist any more!"
+            fi
+            continue
+        fi
+        # existing in new config but not in old !
+        if [ "$OLD_CONFIG_VALUE" == "" ] && [ "$NEW_CONFIG_VALUE" != "" ]; then
+            while (true); do
+                echo
+                echo "    - Config parameter $OPENQRM_CONFIG_PARAM is new!"
+                echo
+                echo "      $OPENQRM_CONFIG_PARAM=$NEW_CONFIG_VALUE"
+                echo
+
+                if [ "$FORCE_UPDATE" == "false" ]; then
+                    echo "    - e - Edit configuration"
+                    echo "    - k - Keep new configuration"
+                    echo
+                    read -n1 APPLY_CONFIG_PARAM
+
+                    case "$APPLY_CONFIG_PARAM" in
+                        e)
+                            echo
+                            echo "   - Editing configuration parameter $OPENQRM_CONFIG_PARAM"
+                            echo
+                            echo -n "  $OPENQRM_CONFIG_PARAM="
+                            read USER_INPUT_OPENQRM_CONFIG_PARAM
+                            if [ -f "$NEW_CONF" ]; then
+                                sed -i -e "s#$OPENQRM_CONFIG_PARAM.*=.*#$OPENQRM_CONFIG_PARAM=\"$USER_INPUT_OPENQRM_CONFIG_PARAM\"#g" $NEW_CONF
+                            else
+                                echo "NOTICE: $NEW_CONF does not exist!"
+                            fi
+                            break
+                            ;;
+                        k)
+                            echo
+                            echo "   - Keeping new configuration for parameter $OPENQRM_CONFIG_PARAM"
+                            break
+                            ;;
+                    esac
+                else
+                            echo "   - Force enabled. Keeping new configuration for parameter $OPENQRM_CONFIG_PARAM"
+                            break
+                fi
+            done
+
+
+        elif [ "$OLD_CONFIG_VALUE" != "$NEW_CONFIG_VALUE" ]; then
+        # existing in both configs but with different value
+        
+            while (true); do
+                echo
+                echo "    - Change detected for parameter $OPENQRM_CONFIG_PARAM"
+                echo
+                echo "      old = $OLD_CONFIG_VALUE"
+                echo "      new = $NEW_CONFIG_VALUE"
+                echo
+
+                if [ "$FORCE_UPDATE" == "false" ]; then
+                    echo "    - o - Apply old configuration"
+                    echo "    - k - Keep new configuration"
+                    echo
+                    read -n1 APPLY_CONFIG_PARAM
+
+                    case "$APPLY_CONFIG_PARAM" in
+                        o)
+                            echo "   - Applying old configuration"
+                            if [ -f "$NEW_CONF" ]; then
+                                sed -i -e "s#$OPENQRM_CONFIG_PARAM.*=.*#$OPENQRM_CONFIG_PARAM=\"$OLD_CONFIG_VALUE\"#g" $NEW_CONF
+                            else
+                                echo "NOTICE: $NEW_CONF does not exist!"
+                            fi
+                            echo
+                            break
+                            ;;
+                        k)
+                            echo "   - Keeping new configuration"
+                            echo
+                            break
+                            ;;
+                    esac
+                else
+                    echo "   - Force enabled. Applying old configuration"
+                    if [ -f "$NEW_CONF" ]; then
+                        sed -i -e "s#$OPENQRM_CONFIG_PARAM.*=.*#$OPENQRM_CONFIG_PARAM=\"$OLD_CONFIG_VALUE\"#g" $NEW_CONF
+                    else
+                        echo "NOTICE: $NEW_CONF does not exist!"
+                    fi
+                    echo
+                    break
+                fi
+            done
+        fi
+    done
+
+}
+
+
+
+
+
+
+function pre_update() {
+        echo "- Running pre update phase"
+        # full backup of basedir
+        echo "  - Taking full backup of $OPENQRM_SERVER_BASE_DIR/openqrm"
+        rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update
+        cp -aR $OPENQRM_SERVER_BASE_DIR/openqrm $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update
+        # db + state backup
+        echo "  - Taking state + db backup"
+        rm -rf $OPENQRM_SERVER_STATE_DIR/openqrm_pre_update*
+#        $OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm state backup -n openqrm_pre_update
+        # now we are save to update files and db
+
+}
+
+
+
+function post_update() {
+        echo "- Running post update phase"
+
+        # keeping origin in state dir
+        mv $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update $OPENQRM_SERVER_STATE_DIR/
+        # restart openQRM server
+#        /etc/init.d/openqrm restart
+
+}
+
+
+
+function base_update() {
+        echo "- Running base update phase"
+        # re-source main config
+        . $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+        # source db-functions according db-type
+        echo "- Database shema sanity check (databasetype $OPENQRM_DATABASE_TYPE)"
+        $OPENQRM_SERVER_BASE_DIR/openqrm/etc/db/$OPENQRM_DATABASE_TYPE/openqrm-$OPENQRM_DATABASE_TYPE-functions update
+        # wait to check by the user if not in force mode
+#        if [ "$FORCE_UPDATE" == "false" ]; then
+            echo "=> Please press <ENTER> to go on"
+            read
+#        fi
+        # config file sanity check
+        for OPENQRM_CONF_FILE in `find $OPENQRM_SERVER_BASE_DIR/openqrm/ -name *.conf | cut -d'/' -f5-`; do
+            echo "  - Checking config file $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE"
+            if ! diff $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE 1>/dev/null 2>/dev/null; then
+                while (true); do
+                    echo "  - Changes detected for config file $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE"
+                    if [ "$FORCE_UPDATE" == "false" ]; then
+                        echo "  - v - View changes"
+                        echo "  - a - Try to apply old configuration"
+                        echo "  - k - Apply new config file"
+                        echo
+
+                        read -n1 APPLY_OLD_CONFIG
+                        case "$APPLY_OLD_CONFIG" in
+                            v)
+                                echo "  - Displaying changes"
+                                echo
+                                if [ ! -f "$OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE" ]; then
+                                    echo "NOTICE: $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE does not exist"
+                                elif [ !-f "$OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE" ]; then
+                                    echo "NOTICE: $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE does not exist"
+                                else
+                                    diff $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE
+                                fi
+                                echo
+                                ;;
+                            a)
+                                echo
+                                echo "  - Trying to apply old configuration"
+                                openqrm_apply_old_config  $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE
+                                echo
+                                break
+                                ;;
+                            k)
+                                echo "   - Keeping new configuration"
+                                echo
+                                break
+                                ;;
+
+                        esac
+                    else
+                        echo
+                        echo "  - Force enabled. Trying to apply old configuration"
+                        openqrm_apply_old_config  $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE
+                        echo
+                        break
+                    fi
+                done
+            fi
+
+        done
+
+        # custom updates from openQRM 4.6 to 4.7
+        # link the tftpboot/boot dir to the boot-services
+        rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/boot
+        ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/ $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/boot
+
+
+
+}
+
+
+
+
+# debug
+# openqrm_apply_old_config /usr/share/openqrm/plugins/kvm/etc/openqrm-plugin-kvm.conf /usr/share/openqrm_pre_update/plugins/kvm/etc/openqrm-plugin-kvm.conf
+
+if [ "$2" == "-f" ]; then
+    export FORCE_UPDATE=true
+else
+    export FORCE_UPDATE=false
+fi
+
+
+# main
+case "$1" in
+	pre)
+        pre_update
+        ;;
+	post)
+        post_update
+        ;;
+	base)
+        base_update
+        ;;
+        *)
+        update_usage
+        ;;
+
+esac
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
