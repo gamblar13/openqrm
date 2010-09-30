@@ -78,9 +78,10 @@ OPENQRM_VM_DIR=$url
 
 function vmware-server2_usage() {
 	vmware_server2_log "Usage : $0 start/stop/reboot/add/delete/remove/list <-n vm-name>"
-	vmware_server2_log "Usage : $0 setboot <-m mac-address> <-b local/net>"
-	vmware_server2_log "Usage : $0 create <-n vm-name> <-m mac-address> <-r memory> [-d disk-size ] [-c cpus ] [-s swap-size ] [-va vnc-password ] [-vp vnc-port ]"
+	vmware_server2_log "        $0 setboot <-m mac-address> <-b local/net>"
+	vmware_server2_log "        $0 create <-n vm-name> <-m mac-address> <-r memory> [-d disk-size ] [-c cpus ] [-s swap-size ] [-va vnc-password ] [-vp vnc-port ]"
 	vmware_server2_log "        $0 post_vm_list <-u username> <-p password>"
+	vmware_server2_log "        $0 fence <-m mac-address>"
 	exit 1
 }
 
@@ -215,7 +216,7 @@ if [ "$VMWARE_SERVER_COMMAND" == "post_vm_list" ]; then
 		fi
 else
 
-	if [ "$VMWARE_SERVER_COMMAND" != "list" ] && [ "$VMWARE_SERVER_COMMAND" != "setboot" ]; then
+	if [ "$VMWARE_SERVER_COMMAND" != "list" ] && [ "$VMWARE_SERVER_COMMAND" != "setboot" ]  && [ "$VMWARE_SERVER_COMMAND" != "fence" ]; then
 		if [ "$VMWARE_SERVER_VM_NAME" == "" ]; then
 			vmware-server2_usage
 		fi
@@ -524,7 +525,7 @@ EOF
 			vmware-server2_usage
 		fi
 		vmware_server2_lock aquire
-		vmware_server2_log "Setting vm with mac $VMWARE_SERVER_VM_MAC to boot from $VMWARE_SERVER_VM_BOOT"
+		vmware_server2_log "Setting VMWare Server2 vm with mac $VMWARE_SERVER_VM_MAC to boot from $VMWARE_SERVER_VM_BOOT"
         # this command is is running from the openQRM engine which does
         # not know about the vm-name
         for VMWARE_SERVER_VM_NET_CONF in `find $OPENQRM_VM_DIR -name *.vmx`; do
@@ -536,7 +537,7 @@ EOF
             fi
         done
         if [ "$VMWARE_SERVER_VM_NAME" == "" ]; then
-    		vmware_server2_log "Cloud not find VMWARE_SERVER vm with mac $VMWARE_SERVER_VM_MAC on this host"
+    		vmware_server2_log "Cloud not find VMWare Server2 vm with mac $VMWARE_SERVER_VM_MAC on this host"
             vmware_server2_lock release
             exit 1
         fi
@@ -551,7 +552,7 @@ EOF
 		# hard restart it to apply its configuration
         # we do it here because the openQRM server engine does not
         # know anything about the vm name to restart it later
-		vmware_server2_log "Rebooting VMware vm $VMWARE_SERVER_VM_NAME"
+		vmware_server2_log "Rebooting VMWare Server2 vm $VMWARE_SERVER_VM_NAME"
 		VMID=`vmware_server2_get_vmid $VMWARE_SERVER_VM_NAME`
 		$VMWARE_VIM_CMD vmsvc/power.off $VMID | logger
 		$OPENQRM_VMWARE_SERVER_CMD_CHECK_DELAY
@@ -563,7 +564,7 @@ EOF
 	post_vm_config)
         VMID=`vmware_server2_get_vmid $VMWARE_SERVER_VM_NAME`
         VMX_CONFIG=`vmware_server2_get_vmx $VMWARE_SERVER_VM_NAME`
-		vmware_server2_log "Posting vm config for $VMWARE_SERVER_VM_NAME (vm-id $VMID)"
+		vmware_server2_log "Posting VMWare Server2 vm config for $VMWARE_SERVER_VM_NAME (vm-id $VMID)"
 		VM_LIST_TMP=$resource_id.$VMWARE_SERVER_VM_NAME.vm_config
         > $VM_LIST_TMP
         # cpus
@@ -711,6 +712,35 @@ EOF
 		if [ "$VMWARE_SERVER_OPENQRM_USERNAME" != "" ] && [ "$VMWARE_SERVER_OPENQRM_PASSWORD" != "" ]; then
 			$0 post_vm_config -n $VMWARE_SERVER_VM_NAME -u $VMWARE_SERVER_OPENQRM_USERNAME -p $VMWARE_SERVER_OPENQRM_PASSWORD
 		fi
+		vmware_server2_lock release
+		;;
+
+	fence)
+        unset VMWARE_SERVER_VM_NAME
+		if [ "$VMWARE_SERVER_VM_MAC" == "" ]; then
+			vmware-server2_usage
+		fi
+		vmware_server2_lock aquire
+		vmware_server2_log "Fencing VMWare Server2 vm with mac $VMWARE_SERVER_VM_MAC"
+        # this command is is running from the openQRM engine which does
+        # not know about the vm-name
+        for VMWARE_SERVER_VM_NET_CONF in `find $OPENQRM_VM_DIR -name *.vmx`; do
+            if grep -i $VMWARE_SERVER_VM_MAC $VMWARE_SERVER_VM_NET_CONF; then
+                VMWARE_SERVER_VM_NAME=`dirname $VMWARE_SERVER_VM_NET_CONF`
+                VMWARE_SERVER_VM_NAME=`basename $VMWARE_SERVER_VM_NAME`
+                vmware_server2_log "found $VMWARE_SERVER_VM_MAC"
+                break
+            fi
+        done
+        if [ "$VMWARE_SERVER_VM_NAME" == "" ]; then
+    		vmware_server2_log "Cloud not find VMWare Server2 vm with mac $VMWARE_SERVER_VM_MAC on this host"
+            vmware_server2_lock release
+            exit 1
+        fi
+		# stop hard
+		vmware_server2_log "Fencing VMWare Server2 vm $VMWARE_SERVER_VM_NAME"
+		VMID=`vmware_server2_get_vmid $VMWARE_SERVER_VM_NAME`
+		$VMWARE_VIM_CMD vmsvc/power.off $VMID | logger
 		vmware_server2_lock release
 		;;
 
