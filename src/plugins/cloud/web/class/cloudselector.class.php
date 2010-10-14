@@ -116,7 +116,7 @@ function get_instance_by_quantity($type, $quantity) {
 		return;
     }
 	if ("$quantity" != "") {
-		$cloudselector_array = &$db->Execute("select * from $CLOUD_SELECTOR_TABLE where type=$type and quantity=\"$quantity\"");
+		$cloudselector_array = &$db->Execute("select * from $CLOUD_SELECTOR_TABLE where type=$type and quantity='$quantity'");
 	} else {
 		$event->log("get_instance", $_SERVER['REQUEST_TIME'], 2, "cloudselector.class.php", "Could not create instance of cloudselector without data", "", "", 0, 0, 0);
 		return;
@@ -169,7 +169,7 @@ function get_next_free_sort_id($cloudselector_type) {
     $max_sort_id = 1000;
     $next_free_sort_id=0;
     while ($next_free_sort_id < $max_sort_id) {
-        $rs = &$db->Execute("select sort_id from $CLOUD_SELECTOR_TABLE where type=\"$cloudselector_type\" and sort_id=$next_free_sort_id");
+        $rs = &$db->Execute("select sort_id from $CLOUD_SELECTOR_TABLE where type='$cloudselector_type' and sort_id=$next_free_sort_id");
         if (!$rs)
             $event->log("get_next_free_sort_id", $_SERVER['REQUEST_TIME'], 2, "cloudselector.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
         else
@@ -188,7 +188,7 @@ function product_exists($cloudselector_type, $cloudselector_quantity) {
 	global $CLOUD_SELECTOR_TABLE;
 	global $event;
 	$db=openqrm_get_db_connection();
-	$rs = &$db->Execute("select id from $CLOUD_SELECTOR_TABLE where type=\"$cloudselector_type\" and quantity=\"$cloudselector_quantity\"");
+	$rs = &$db->Execute("select id from $CLOUD_SELECTOR_TABLE where type='$cloudselector_type' and quantity='$cloudselector_quantity'");
 	if (!$rs)
 		$event->log("product_exists", $_SERVER['REQUEST_TIME'], 2, "cloudselector.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
 	else
@@ -206,7 +206,7 @@ function product_exists_enabled($cloudselector_type, $cloudselector_quantity) {
 	global $CLOUD_SELECTOR_TABLE;
 	global $event;
 	$db=openqrm_get_db_connection();
-	$rs = &$db->Execute("select id from $CLOUD_SELECTOR_TABLE where type=\"$cloudselector_type\" and quantity=\"$cloudselector_quantity\" and state=1");
+	$rs = &$db->Execute("select id from $CLOUD_SELECTOR_TABLE where type='$cloudselector_type' and quantity='$cloudselector_quantity' and state=1");
 	if (!$rs)
 		$event->log("product_exists_enabled", $_SERVER['REQUEST_TIME'], 2, "cloudselector.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
 	else
@@ -296,7 +296,7 @@ function get_count_by_type($cloudselector_type) {
 	global $CLOUD_SELECTOR_TABLE;
 	$count=0;
 	$db=openqrm_get_db_connection();
-	$rs = $db->Execute("select count(id) as num from $CLOUD_SELECTOR_TABLE where type=\"$cloudselector_type\"");
+	$rs = $db->Execute("select count(id) as num from $CLOUD_SELECTOR_TABLE where type='$cloudselector_type'");
 	if (!$rs) {
 		print $db->ErrorMsg();
 	} else {
@@ -332,7 +332,7 @@ function get_price($quantity, $type) {
 	global $CLOUD_SELECTOR_TABLE;
 	global $event;
 	$cloud_price = 0;
-	$query = "select price from $CLOUD_SELECTOR_TABLE where quantity=\"$quantity\" and type=\"$type\"";
+	$query = "select price from $CLOUD_SELECTOR_TABLE where quantity='$quantity' and type='$type'";
 	$db=openqrm_get_db_connection();
 	$rs = $db->Execute($query);
 	if (!$rs)
@@ -380,7 +380,7 @@ function sort($direction, $id, $type) {
         return;
     }
     // find the product with the new_sort_id
-	$query = "select id from $CLOUD_SELECTOR_TABLE where sort_id=$new_sort_id and type=\"$type\"";
+	$query = "select id from $CLOUD_SELECTOR_TABLE where sort_id=$new_sort_id and type='$type'";
 	$rs = $db->Execute($query);
 	if (!$rs)
 		$event->log("sort1", $_SERVER['REQUEST_TIME'], 2, "cloudselector.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
@@ -393,8 +393,8 @@ function sort($direction, $id, $type) {
         return;
     }
     $exchange_id = $product_id_exchange['id'];
-	$update_query1 = "update $CLOUD_SELECTOR_TABLE set sort_id=$current_sort_id where id=$exchange_id and type=\"$type\"";
-	$update_query2 = "update $CLOUD_SELECTOR_TABLE set sort_id=$new_sort_id where id=$id and type=\"$type\"";
+	$update_query1 = "update $CLOUD_SELECTOR_TABLE set sort_id=$current_sort_id where id=$exchange_id and type='$type'";
+	$update_query2 = "update $CLOUD_SELECTOR_TABLE set sort_id=$new_sort_id where id=$id and type='$type'";
 	$rs = $db->Execute($update_query1);
 	$rs = $db->Execute($update_query2);
 
@@ -408,7 +408,7 @@ function display_overview_per_type($type) {
 	global $CLOUD_SELECTOR_TABLE;
 	global $event;
 	$db=openqrm_get_db_connection();
-	$recordSet = &$db->SelectLimit("select * from $CLOUD_SELECTOR_TABLE where type=\"$type\" order by sort_id ASC", -1, 0);
+	$recordSet = &$db->SelectLimit("select * from $CLOUD_SELECTOR_TABLE where type='$type' order by sort_id ASC", -1, 0);
 	$cloudselector_array = array();
 	if (!$recordSet) {
 		$event->log("display_overview_per_type", $_SERVER['REQUEST_TIME'], 2, "cloudselector.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);

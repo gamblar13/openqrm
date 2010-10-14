@@ -241,7 +241,7 @@ function set_users_password($cu_id, $password) {
 	global $CLOUD_USER_TABLE;
 	global $event;
 	$db=openqrm_get_db_connection();
-	$rs = $db->Execute("update $CLOUD_USER_TABLE set cu_password=\"$password\" where cu_id=$cu_id");
+	$rs = $db->Execute("update $CLOUD_USER_TABLE set cu_password='$password' where cu_id=$cu_id");
 }
 
 
@@ -331,7 +331,7 @@ function display_user($clouduser_name) {
 	global $CLOUD_USER_TABLE;
 	global $event;
 	$db=openqrm_get_db_connection();
-	$recordSet = &$db->SelectLimit("select * from $CLOUD_USER_TABLE where cu_name=\"$clouduser_name\"", 1, 0);
+	$recordSet = &$db->SelectLimit("select * from $CLOUD_USER_TABLE where cu_name='$clouduser_name'", 1, 0);
 	$clouduser_array = array();
 	if (!$recordSet) {
 		$event->log("display_user", $_SERVER['REQUEST_TIME'], 2, "clouduser.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);

@@ -269,7 +269,7 @@ function display_user($cloudusergroup_name) {
 	global $CLOUD_USER_GROUPS_TABLE;
 	global $event;
 	$db=openqrm_get_db_connection();
-	$recordSet = &$db->SelectLimit("select * from $CLOUD_USER_GROUPS_TABLE where cu_name=\"$cloudusergroup_name\"", 1, 0);
+	$recordSet = &$db->SelectLimit("select * from $CLOUD_USER_GROUPS_TABLE where cu_name='$cloudusergroup_name'", 1, 0);
 	$clouduser_array = array();
 	if (!$recordSet) {
 		$event->log("display_user", $_SERVER['REQUEST_TIME'], 2, "cloudusergroup.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
