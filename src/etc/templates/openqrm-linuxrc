@@ -117,6 +117,14 @@ function import_kernel() {
     rm -f /mplog1
     echo "- (2) Starting hardware detection (all system components)"
     for module in `/sbin/pcimodules`; do
+        if [ "$module" == "matroxfb_base" ]; then
+            # skip this, it makes the kvm vm vnc console unreadable
+            continue
+        fi
+        if [ "$module" == "cirrusfb" ]; then
+            # skip this, it crashes the xen vm qemu-dm when accessing the vnc console on debian-lenny
+            continue
+        fi
         echo " -- loading $module"
         modprobe -s -k "$module"
     done
