@@ -291,6 +291,8 @@ function openqrm_create_default_initrd_template() {
 	export OPENQRM_PRE_MAKE="cp $OPENQRM_SOURCE_DIR_FULL_PATH/etc/build.conf/busybox.configuration $OPENQRM_SOURCE_COMPONENT_BUILD_DIR/.config && make oldconfig"
 	export OPENQRM_POST_MAKE="make install"
 	openqrm_compile_from_source busybox
+    unset OPENQRM_PRE_MAKE
+    unset OPENQRM_POST_MAKE
 
 	# getting pciutils
 	openqrm_cache_or_download pciutils
@@ -302,12 +304,14 @@ function openqrm_create_default_initrd_template() {
     export OPENQRM_PRE_MAKE="cd $OPENQRM_SOURCE_PCIUTILS_DIR; patch -p1 < $OPENQRM_SOURCE_DIR/etc/build.conf/pciutils-pcimodules.patch; cd -"
 	openqrm_compile_from_source pciutils
     unset LDFLAGS
+    unset OPENQRM_PRE_MAKE
+    unset OPENQRM_POST_MAKE
 
 	# dropbear
 	. $OPENQRM_SOURCE_DIR/etc/build.conf/dropbear.conf
 	OPENQRM_SOURCE_DROPBEAR_DIR="$OPENQRM_BUILD_TMP_DIR/openqrm-build/dropbear/dropbear-$OPENQRM_SOURCE_VERSION/"
 	openqrm_cache_or_download dropbear
-	export OPENQRM_MAKE_TARGET="DROPBEAR_SERVER=1 DROPBEAR_CLIENT=1 MULTI=0 STATIC=1"
+	export OPENQRM_MAKE_TARGET="DROPBEAR_SERVER=1 DROPBEAR_CLIENT=1 MULTI=0 STATIC=0"
 	openqrm_compile_from_source dropbear
 
 	# create the initroot
@@ -455,7 +459,13 @@ EOF
 	cp -a $OPENQRM_SOURCE_DROPBEAR_DIR/dbclient $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/
 	cp -a $OPENQRM_SOURCE_DROPBEAR_DIR/dropbearconvert $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/
 	cp -a $OPENQRM_SOURCE_DROPBEAR_DIR/dropbearkey $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/
-
+    # install dropbear libs
+    for LIB in `openqrm_build_find_libs $OPENQRM_SOURCE_DROPBEAR_DIR/dropbear`; do
+        LIB=`echo $LIB | cut -d'-' -f1 | cut -d'.' -f1`
+        if [ "$LIB" != "/lib/" ]; then
+            cp -af $LIB""* $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/lib/
+        fi
+    done
 	# creating the initrd devices
 	cp -a $OPENQRM_SOURCE_DIR_FULL_PATH/etc/build.conf/initrd-devices.conf $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/etc/
 	rm -rf $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/dev
