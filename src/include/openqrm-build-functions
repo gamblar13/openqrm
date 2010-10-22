@@ -307,7 +307,7 @@ function openqrm_create_default_initrd_template() {
 	. $OPENQRM_SOURCE_DIR/etc/build.conf/dropbear.conf
 	OPENQRM_SOURCE_DROPBEAR_DIR="$OPENQRM_BUILD_TMP_DIR/openqrm-build/dropbear/dropbear-$OPENQRM_SOURCE_VERSION/"
 	openqrm_cache_or_download dropbear
-	export OPENQRM_MAKE_TARGET="DROPBEAR_SERVER=1 DROPBEAR_CLIENT=1 MULTI=0 STATIC=0"
+	export OPENQRM_MAKE_TARGET="DROPBEAR_SERVER=1 DROPBEAR_CLIENT=1 MULTI=0 STATIC=1"
 	openqrm_compile_from_source dropbear
 
 	# create the initroot
