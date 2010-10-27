@@ -49,6 +49,7 @@ $thisfile = basename($_SERVER['PHP_SELF']);
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
 $BaseDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/';
 require_once "$RootDir/include/user.inc.php";
+require_once "$RootDir/class/plugin.class.php";
 require_once "$RootDir/class/image.class.php";
 require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/class/virtualization.class.php";
@@ -138,31 +139,6 @@ function show_progressbar() {
 if(htmlobject_request('action') != '') {
 	switch (htmlobject_request('action')) {
 
-		case 'reload':
-            if (strlen($xen_id)) {
-                show_progressbar();
-                $xen_appliance = new appliance();
-                $xen_appliance->get_instance_by_id($xen_id);
-                $xen = new resource();
-                $xen->get_instance_by_id($xen_appliance->resources);
-                // remove current stat file
-                $statfile="xen-stat/$xen->id.vm_list";
-                if (file_exists($statfile)) {
-                    unlink($statfile);
-                }
-                // send command
-                $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage-vm post_vm_list -u $OPENQRM_USER->name -p $OPENQRM_USER->password";
-                $xen->send_command($xen->ip, $resource_command);
-                // wait for statfile to appear again
-                if (!wait_for_statfile($statfile)) {
-                    $strMsg .= "Error while refreshing Xen vm list ! Please check the Event-Log<br>";
-                } else {
-                    $strMsg .= "Refreshed Xen vm list<br>";
-                }
-                redirect($strMsg, "tab0");
-            }
-			break;
-
 		case 'select':
 			if (isset($_REQUEST['identifier'])) {
 				foreach($_REQUEST['identifier'] as $xen_id) {
@@ -232,6 +208,35 @@ if(htmlobject_request('action_table1') != '') {
                     $xen_appliance->get_instance_by_id($xen_id);
                     $xen = new resource();
                     $xen->get_instance_by_id($xen_appliance->resources);
+                    // get the vnc parameter per vm
+                    $xen_vm_vnc_config_arr = htmlobject_request('xen_vm_vnc');
+                    $xen_vnc_vm_port = $xen_vm_vnc_config_arr[$xen_name];
+                    // get the vm resource
+                    $xen_vm_mac = $xen_vm_mac_ar[$xen_name];
+                    $xen_resource = new resource();
+                    $xen_resource->get_instance_by_mac($xen_vm_mac);
+                    $xen_vm_id=$xen_resource->id;
+
+                    // before we stop the vm we provide a hook for the remote-console plugins to stop the vm console
+                    // check if we have a plugin implementing the remote console
+                    $plugin = new plugin();
+                    $enabled_plugins = $plugin->enabled();
+                    foreach ($enabled_plugins as $index => $plugin_name) {
+                        $plugin_remote_console_running = "$RootDir/plugins/$plugin_name/.running";
+                        $plugin_remote_console_hook = "$RootDir/plugins/$plugin_name/openqrm-$plugin_name-remote-console-hook.php";
+                        if (file_exists($plugin_remote_console_hook)) {
+                            if (file_exists($plugin_remote_console_running)) {
+                                $event->log("console", $_SERVER['REQUEST_TIME'], 5, "xen-manager.php", "Found plugin $plugin_name providing a remote console/ $xen->ip, $xen_vnc_vm_port, $xen_vm_id, $xen_vm_mac, $xen_server_name.", "", "", 0, 0, $resource->id);
+                                require_once "$plugin_remote_console_hook";
+                                $plugin_remote_console_function="openqrm_"."$plugin_name"."_disable_remote_console";
+                                $plugin_remote_console_function=str_replace("-", "_", $plugin_remote_console_function);
+                                $plugin_remote_console_function($xen->ip, $xen_vnc_vm_port, $xen_vm_id, $xen_vm_mac, $xen_name);
+                                $strMsg .="Stopping the remote console to $xen_name on Host $xen->ip<br>";
+                            }
+                        }
+                    }
+
+                    // prepare the vm command
                     // remove current stat file
                     $statfile="xen-stat/$xen->id.vm_list";
                     if (file_exists($statfile)) {
@@ -331,7 +336,7 @@ if(htmlobject_request('action_table1') != '') {
             }
 			break;
 
-		case 'migrate':
+        case 'migrate':
 			if (isset($_REQUEST['identifier_table1'])) {
                 show_progressbar();
 				foreach($_REQUEST['identifier_table1'] as $xen_name) {
@@ -364,6 +369,79 @@ if(htmlobject_request('action_table1') != '') {
                 redirect($strMsg, "tab0");
             }
 			break;
+
+		case 'reload':
+            if (strlen($xen_id)) {
+                show_progressbar();
+                $xen_appliance = new appliance();
+                $xen_appliance->get_instance_by_id($xen_id);
+                $xen = new resource();
+                $xen->get_instance_by_id($xen_appliance->resources);
+                // remove current stat file
+                $statfile="xen-stat/$xen->id.vm_list";
+                if (file_exists($statfile)) {
+                    unlink($statfile);
+                }
+                // send command
+                $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage-vm post_vm_list -u $OPENQRM_USER->name -p $OPENQRM_USER->password";
+                $xen->send_command($xen->ip, $resource_command);
+                // wait for statfile to appear again
+                if (!wait_for_statfile($statfile)) {
+                    $strMsg .= "Error while refreshing Xen vm list ! Please check the Event-Log<br>";
+                } else {
+                    $strMsg .= "Refreshed Xen vm list<br>";
+                }
+                redirect($strMsg, "tab0");
+            }
+			break;
+
+
+        case 'console':
+			if (isset($_REQUEST['identifier_table1'])) {
+				foreach($_REQUEST['identifier_table1'] as $xen_server_name) {
+                    show_progressbar();
+                    // get the vnc parameter per vm
+                    $xen_vm_vnc_config_arr = htmlobject_request('xen_vm_vnc');
+                    $xen_vnc_vm_port = $xen_vm_vnc_config_arr[$xen_server_name];
+                    // get the resource
+                    $xen_vm_mac = $xen_vm_mac_ar[$xen_server_name];
+                    $xen_resource = new resource();
+                    $xen_resource->get_instance_by_mac($xen_vm_mac);
+                    $xen_vm_id=$xen_resource->id;
+
+                    // get the host
+                    $xen_appliance = new appliance();
+                    $xen_appliance->get_instance_by_id($xen_id);
+                    $xen = new resource();
+                    $xen->get_instance_by_id($xen_appliance->resources);
+
+                    // check if we have a plugin implementing the remote console
+                    $plugin = new plugin();
+                    $enabled_plugins = $plugin->enabled();
+                    foreach ($enabled_plugins as $index => $plugin_name) {
+                        $plugin_remote_console_running = "$RootDir/plugins/$plugin_name/.running";
+                        $plugin_remote_console_hook = "$RootDir/plugins/$plugin_name/openqrm-$plugin_name-remote-console-hook.php";
+                        if (file_exists($plugin_remote_console_hook)) {
+                            if (file_exists($plugin_remote_console_running)) {
+                                $event->log("console", $_SERVER['REQUEST_TIME'], 5, "xen-manager.php", "Found plugin $plugin_name providing a remote console.", "", "", 0, 0, $resource->id);
+                                require_once "$plugin_remote_console_hook";
+                                $plugin_remote_console_function="openqrm_"."$plugin_name"."_remote_console";
+                                $plugin_remote_console_function=str_replace("-", "_", $plugin_remote_console_function);
+                                $plugin_remote_console_function($xen->ip, $xen_vnc_vm_port, $xen_vm_id, $xen_vm_mac, $xen_server_name);
+                                $strMsg .="Opening a remote console to $xen_server_name on $xen->ip : $xen_vnc_vm_port<br>";
+                            }
+                        }
+                    }
+
+
+				}
+				redirect($strMsg, "tab0");
+            } else {
+                $strMsg ="No virtual machine selected<br>";
+				redirect($strMsg, "tab0");
+            }
+            break;
+
     }
 }
 
@@ -468,6 +546,7 @@ function xen_display($appliance_id) {
     global $OPENQRM_SERVER_BASE_DIR;
     global $OPENQRM_USER;
     global $thisfile;
+    global $RootDir;
 
     $xen_appliance = new appliance();
     $xen_appliance->get_instance_by_id($appliance_id);
@@ -504,6 +583,21 @@ function xen_display($appliance_id) {
     $loop = 0;
     $xen_vm_count=0;
     $arBody1 = array();
+
+    // check if we have a plugin implementing the remote console
+    $remote_console_login_enabled=false;
+    $plugin = new plugin();
+    $enabled_plugins = $plugin->enabled();
+    foreach ($enabled_plugins as $index => $plugin_name) {
+        $plugin_remote_console_running = "$RootDir/plugins/$plugin_name/.running";
+        $plugin_remote_console_hook = "$RootDir/plugins/$plugin_name/openqrm-$plugin_name-remote-console-hook.php";
+        if (file_exists($plugin_remote_console_hook)) {
+            if (file_exists($plugin_remote_console_running)) {
+                $remote_console_login_enabled=true;
+            }
+        }
+    }
+
     $xen_vm_list_file="xen-stat/$xen->id.vm_list";
     if (file_exists($xen_vm_list_file)) {
         $xen_vm_list_content=file($xen_vm_list_file);
@@ -573,24 +667,32 @@ function xen_display($appliance_id) {
             if ($xen_vm_online == 1) {
                 $xen_vm_state_icon = "/openqrm/base/img/active.png";
                 // online actions
-                $xen_vm_actions= $xen_vm_actions."<a href=\"$thisfile?identifier_table1[]=$xen_name&action_table1=stop&xen_id=$xen_appliance->id\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/stop.png\" border=\"0\"></a>&nbsp;";
-                $xen_vm_actions = $xen_vm_actions."<a href=\"$thisfile?identifier_table1[]=$xen_name&action_table1=reboot&xen_id=$xen_appliance->id\"><img height=16 width=16 src=\"/openqrm/base/img/active.png\" border=\"0\"></a>&nbsp;";
+                $xen_vm_actions= $xen_vm_actions."<nobr><a href=\"$thisfile?identifier_table1[]=$xen_name&action_table1=stop&xen_id=$xen_appliance->id&xen_vm_mac_ar[$xen_name]=$xen_vm_mac&xen_vm_vnc[$xen_name]=$xen_vm_vnc\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/stop.png\" border=\"0\"> Stop</a>&nbsp;";
+                $xen_vm_actions = $xen_vm_actions."<a href=\"$thisfile?identifier_table1[]=$xen_name&action_table1=reboot&xen_id=$xen_appliance->id&xen_vm_mac_ar[$xen_name]=$xen_vm_mac\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/img/active.png\" border=\"0\"> Restart</a>&nbsp;";
+                // remote consle enabled ?
+                if ($remote_console_login_enabled) {
+                    $xen_vm_actions .= "<a href=\"$thisfile?identifier_table1[]=$xen_name&action_table1=console&xen_id=$xen_appliance->id&xen_vm_mac_ar[$xen_name]=$xen_vm_mac&xen_vm_vnc[$xen_name]=$xen_vm_vnc\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"img/login.png\" border=\"0\"> Console</a>";
+                }
+                $xen_vm_actions .= "</nobr>";
+
+                // migration actions
                 if ($xen_openqrm_vm == 1) {
                     $xen_vm_migrate_actions = $xen_vm_migrate_actions."<b><input type='checkbox' name='xen_migrate_type' value='1'> live</b>";
                     $xen_vm_migrate_actions = $xen_vm_migrate_actions.$migrateion_select;
                 }
             } else {
                 $xen_vm_state_icon = "/openqrm/base/img/off.png";
-                $xen_vm_actions= $xen_vm_actions."<a href=\"$thisfile?identifier_table1[]=$xen_name&action_table1=start&xen_id=$xen_appliance->id\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/start.png\" border=\"0\"></a>&nbsp;";
+                $xen_vm_actions= $xen_vm_actions."<nobr><a href=\"$thisfile?identifier_table1[]=$xen_name&action_table1=start&xen_id=$xen_appliance->id\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/start.png\" border=\"0\"> Start</a>&nbsp;";
                 if ($xen_openqrm_vm == 1) {
-                    $xen_vm_actions = $xen_vm_actions."<a href=\"xen-storage-vm-config.php?xen_name=$xen_name&xen_id=$xen_appliance->id\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/plugin.png\" border=\"0\"></a>&nbsp;";
-                    $xen_vm_actions = $xen_vm_actions."<a href=\"$thisfile?identifier_table1[]=$xen_name&action_table1=remove&xen_id=$xen_appliance->id&xen_vm_mac_ar[$xen_name]=$xen_vm_mac\"><img height=16 width=16 src=\"/openqrm/base/img/off.png\" border=\"0\"></a>&nbsp;";
+                    $xen_vm_actions = $xen_vm_actions."<a href=\"xen-storage-vm-config.php?xen_name=$xen_name&xen_id=$xen_appliance->id\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/plugin.png\" border=\"0\"> Config</a>&nbsp;";
+                    $xen_vm_actions = $xen_vm_actions."<a href=\"$thisfile?identifier_table1[]=$xen_name&action_table1=remove&xen_id=$xen_appliance->id&xen_vm_mac_ar[$xen_name]=$xen_vm_mac\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/img/off.png\" border=\"0\"> Remove</a>&nbsp;";
                 }
+                $xen_vm_actions .= "</nobr>";
             }
 
             // add to table1
             $arBody1[] = array(
-                'xen_vm_state' => "<img src=$xen_vm_state_icon><input type='hidden' name='xen_vm_mac_ar[$xen_name]' value=$xen_vm_mac>",
+                'xen_vm_state' => "<img src=$xen_vm_state_icon><input type='hidden' name='xen_vm_mac_ar[$xen_name]' value=$xen_vm_mac><input type='hidden' name='xen_vm_vnc[$xen_name]' value=$xen_vm_vnc>",
                 'xen_vm_id' => $xen_vm_id,
                 'xen_vm_name' => $xen_name,
                 'xen_vm_vnc' => $xen_vm_vnc,
@@ -702,7 +804,7 @@ function xen_display($appliance_id) {
     $table1->head = $arHead1;
     $table1->body = $arBody1;
     if ($OPENQRM_USER->role == "administrator") {
-        $table1->bottom = array('start', 'stop', 'reboot', 'remove', 'migrate', 'reload');
+        $table1->bottom = array('start', 'stop', 'reboot', 'remove', 'migrate', 'reload', 'console');
         $table1->identifier = 'xen_vm_name';
     }
     $table1->max = $xen_vm_count;

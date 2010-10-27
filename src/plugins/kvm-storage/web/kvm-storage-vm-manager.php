@@ -49,6 +49,7 @@ $thisfile = basename($_SERVER['PHP_SELF']);
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
 $BaseDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/';
 require_once "$RootDir/include/user.inc.php";
+require_once "$RootDir/class/plugin.class.php";
 require_once "$RootDir/class/image.class.php";
 require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/class/virtualization.class.php";
@@ -213,6 +214,39 @@ if(htmlobject_request('action') != '') {
                     $kvm_appliance->get_instance_by_id($kvm_server_id);
                     $kvm_server = new resource();
                     $kvm_server->get_instance_by_id($kvm_appliance->resources);
+
+                    // get vnc config
+                    $kvm_vm_vnc_config_arr = htmlobject_request('kvm_vm_vnc');
+                    $kvm_vm_vnc_config = $kvm_vm_vnc_config_arr[$kvm_server_name];
+                    $ksep = strpos($kvm_vm_vnc_config, ":");
+                    $kvm_vnc_host_ip = substr($kvm_vm_vnc_config, 0, $ksep);
+                    $kvm_vnc_vm_port = substr($kvm_vm_vnc_config, $ksep+1);
+                    // get the vm resource
+                    $kvm_vm_mac = $kvm_vm_mac_ar[$kvm_server_name];
+                    $kvm_resource = new resource();
+                    $kvm_resource->get_instance_by_mac($kvm_vm_mac);
+                    $kvm_vm_id=$kvm_resource->id;
+
+                    // before we stop the vm we provide a hook for the remote-console plugins to stop the vm console
+                    // check if we have a plugin implementing the remote console
+                    $plugin = new plugin();
+                    $enabled_plugins = $plugin->enabled();
+                    foreach ($enabled_plugins as $index => $plugin_name) {
+                        $plugin_remote_console_running = "$RootDir/plugins/$plugin_name/.running";
+                        $plugin_remote_console_hook = "$RootDir/plugins/$plugin_name/openqrm-$plugin_name-remote-console-hook.php";
+                        if (file_exists($plugin_remote_console_hook)) {
+                            if (file_exists($plugin_remote_console_running)) {
+                                $event->log("console", $_SERVER['REQUEST_TIME'], 5, "kvm-storage-manager.php", "Found plugin $plugin_name providing a remote console.", "", "", 0, 0, $resource->id);
+                                require_once "$plugin_remote_console_hook";
+                                $plugin_remote_console_function="openqrm_"."$plugin_name"."_disable_remote_console";
+                                $plugin_remote_console_function=str_replace("-", "_", $plugin_remote_console_function);
+                                $plugin_remote_console_function($kvm_server->ip, $kvm_vnc_vm_port, $kvm_vm_id, $kvm_vm_mac, $kvm_server_name);
+                                $strMsg .="Stopping the remote console to $kvm_server_name on Host $kvm_server->ip<br>";
+                            }
+                        }
+                    }
+
+
                     $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-kvm-storage-vm stop -n $kvm_server_name -u $OPENQRM_USER->name -p $OPENQRM_USER->password";
                     // remove current stat file
                     $kvm_server_resource_id = $kvm_server->id;
@@ -325,6 +359,60 @@ if(htmlobject_request('action') != '') {
 			break;
 
 
+
+        case 'console':
+			if (isset($_REQUEST['identifier'])) {
+				foreach($_REQUEST['identifier'] as $kvm_server_name) {
+                    show_progressbar();
+                    // get the vnc parameter per vm
+                    $kvm_vm_vnc_config_arr = htmlobject_request('kvm_vm_vnc');
+                    $kvm_vm_vnc_config = $kvm_vm_vnc_config_arr[$kvm_server_name];
+                    $ksep = strpos($kvm_vm_vnc_config, ":");
+                    $kvm_vnc_host_ip = substr($kvm_vm_vnc_config, 0, $ksep);
+                    $kvm_vnc_vm_port = substr($kvm_vm_vnc_config, $ksep+1);
+                    // get the resource
+                    $kvm_vm_mac = $kvm_vm_mac_ar[$kvm_server_name];
+                    $kvm_resource = new resource();
+                    $kvm_resource->get_instance_by_mac($kvm_vm_mac);
+                    $kvm_vm_id=$kvm_resource->id;
+
+                    // get the host
+                    $kvm_appliance = new appliance();
+                    $kvm_appliance->get_instance_by_id($kvm_server_id);
+                    $kvm_server = new resource();
+                    $kvm_server->get_instance_by_id($kvm_appliance->resources);
+
+                    // check if we have a plugin implementing the remote console
+                    $plugin = new plugin();
+                    $enabled_plugins = $plugin->enabled();
+                    foreach ($enabled_plugins as $index => $plugin_name) {
+                        $plugin_remote_console_running = "$RootDir/plugins/$plugin_name/.running";
+                        $plugin_remote_console_hook = "$RootDir/plugins/$plugin_name/openqrm-$plugin_name-remote-console-hook.php";
+                        if (file_exists($plugin_remote_console_hook)) {
+                            if (file_exists($plugin_remote_console_running)) {
+                                $event->log("console", $_SERVER['REQUEST_TIME'], 5, "kvm-storage-manager.php", "Found plugin $plugin_name providing a remote console.", "", "", 0, 0, $resource->id);
+                                require_once "$plugin_remote_console_hook";
+                                $plugin_remote_console_function="openqrm_"."$plugin_name"."_remote_console";
+                                $plugin_remote_console_function=str_replace("-", "_", $plugin_remote_console_function);
+                                $plugin_remote_console_function($kvm_server->ip, $kvm_vnc_vm_port, $kvm_vm_id, $kvm_vm_mac, $kvm_server_name);
+                                $strMsg .="Opening a remote console to $kvm_server_name on $kvm_server->ip : $kvm_vnc_vm_port<br>";
+                            }
+                        }
+                    }
+
+
+				}
+				redirect($strMsg, "tab0");
+            } else {
+                $strMsg ="No virtual machine selected<br>";
+				redirect($strMsg, "tab0");
+            }
+            break;
+
+
+
+
+
 	}
 }
 
@@ -427,6 +515,7 @@ function kvm_server_display($appliance_id) {
 	global $OPENQRM_USER;
 	global $thisfile;
 	global $OPENQRM_SERVER_BASE_DIR;
+    global $RootDir;
 
 	$table = new htmlobject_table_identifiers_checked('kvm_server_id');
 
@@ -525,6 +614,21 @@ function kvm_server_display($appliance_id) {
 	$arHead1['kvm_vm_actions']['sortable'] = false;
     $arBody1 = array();
 
+    // check if we have a plugin implementing the remote console
+    $remote_console_login_enabled=false;
+    $plugin = new plugin();
+    $enabled_plugins = $plugin->enabled();
+    foreach ($enabled_plugins as $index => $plugin_name) {
+        $plugin_remote_console_running = "$RootDir/plugins/$plugin_name/.running";
+        $plugin_remote_console_hook = "$RootDir/plugins/$plugin_name/openqrm-$plugin_name-remote-console-hook.php";
+        if (file_exists($plugin_remote_console_hook)) {
+            if (file_exists($plugin_remote_console_running)) {
+                $remote_console_login_enabled=true;
+            }
+        }
+    }
+
+    // prepare the vm list
     $kvm_server_vm_list_file="kvm-stat/$kvm_server_resource->id.vm_list";
 	$kvm_vm_registered=array();
     $kvm_vm_count=0;
@@ -560,6 +664,7 @@ function kvm_server_display($appliance_id) {
                 $kvm_vm_mac = trim(substr($kvm_name_second_at_removed, 0, $third_at_pos-1));
                 $kvm_vm_cpus = trim(substr($kvm_name_third_at_removed, 0, $fourth_at_pos-1));
                 $kvm_vm_memory = trim(substr($kvm_name_fourth_at_removed, 0, $fivth_at_pos-1));
+                $kvm_vm_vnc = trim(substr($kvm_name_fivth_at_removed, 0, $sixth_at_pos-1));
                 // get ip
                 $kvm_resource = new resource();
                 $kvm_resource->get_instance_by_mac($kvm_vm_mac);
@@ -570,8 +675,14 @@ function kvm_server_display($appliance_id) {
                 $vm_actions = "";
                 if (!strcmp($kvm_vm_state, "1")) {
                     $state_icon="/openqrm/base/img/active.png";
-                    $vm_actions = "<nobr><a href=\"$thisfile?identifier[]=$kvm_short_name&action=stop&kvm_server_id=$kvm_server_tmp->id\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/stop.png\" border=\"0\"> Stop</a>&nbsp;&nbsp;&nbsp;&nbsp;";
-                    $vm_actions .= "<a href=\"$thisfile?identifier[]=$kvm_short_name&action=restart&kvm_server_id=$kvm_server_tmp->id\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/img/active.png\" border=\"0\"> Restart</a></nobr>";
+                    $vm_actions = "<nobr><a href=\"$thisfile?identifier[]=$kvm_short_name&action=stop&kvm_server_id=$kvm_server_tmp->id&kvm_vm_mac_ar[$kvm_short_name]=$kvm_vm_mac&kvm_vm_vnc[$kvm_short_name]=$kvm_vm_vnc\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/stop.png\" border=\"0\"> Stop</a>&nbsp;&nbsp;&nbsp;&nbsp;";
+                    $vm_actions .= "<a href=\"$thisfile?identifier[]=$kvm_short_name&action=restart&kvm_server_id=$kvm_server_tmp->id&kvm_vm_mac_ar[$kvm_short_name]=$kvm_vm_mac\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/img/active.png\" border=\"0\"> Restart</a>";
+
+                    // remote consle enabled ?
+                    if ($remote_console_login_enabled) {
+                        $vm_actions .= "<a href=\"$thisfile?identifier[]=$kvm_short_name&action=console&kvm_server_id=$kvm_server_tmp->id&kvm_vm_mac_ar[$kvm_short_name]=$kvm_vm_mac&kvm_vm_vnc[$kvm_short_name]=$kvm_vm_vnc\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"img/login.png\" border=\"0\"> Console</a></nobr>";
+                    }
+
                 } else {
                     $state_icon="/openqrm/base/img/off.png";
     				$vm_actions = "<nobr><a href=\"$thisfile?identifier[]=$kvm_short_name&action=start&kvm_server_id=$kvm_server_tmp->id\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/start.png\" border=\"0\"> Start</a>&nbsp;&nbsp;&nbsp;&nbsp;";
@@ -583,7 +694,7 @@ function kvm_server_display($appliance_id) {
                 $kvm_vm_count++;
 
                 $arBody1[] = array(
-                    'kvm_vm_state' => "<img src=$state_icon><input type='hidden' name='kvm_vm_mac_ar[$kvm_short_name]' value=$kvm_vm_mac>",
+                    'kvm_vm_state' => "<img src=$state_icon><input type='hidden' name='kvm_vm_mac_ar[$kvm_short_name]' value=$kvm_vm_mac><input type='hidden' name='kvm_vm_vnc[$kvm_short_name]' value=$kvm_vm_vnc>",
                     'kvm_vm_id' => $kvm_vm_id,
                     'kvm_vm_name' => $kvm_short_name,
                     'kvm_vm_cpus' => $kvm_vm_cpus,
@@ -608,7 +719,7 @@ function kvm_server_display($appliance_id) {
 	$table1->head = $arHead1;
 	$table1->body = $arBody1;
 	if ($OPENQRM_USER->role == "administrator") {
-		$table1->bottom = array('start', 'stop', 'restart', 'delete', 'reload');
+		$table1->bottom = array('start', 'stop', 'restart', 'delete', 'reload', 'console');
 		$table1->identifier = 'kvm_vm_name';
 	}
 	$table1->max = $kvm_vm_count;

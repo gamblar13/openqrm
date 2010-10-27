@@ -29,6 +29,7 @@ if [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
 	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
 	OPENQRM_INTERFACE=$OPENQRM_SERVER_INTERFACE
 	resource_id=0
+    resource_ip=$OPENQRM_SERVER_IP_ADDRESS
 	resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
     openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
 

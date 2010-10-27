@@ -31,6 +31,7 @@ elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
 	openqrm_server_get_config
 	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
 	resource_id=0
+    resource_ip=$OPENQRM_SERVER_IP_ADDRESS
 	resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
     openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
 fi
@@ -346,7 +347,9 @@ case "$KVM_COMMAND" in
 				NEW_VNC_ID=$(( NEW_VNC_ID + 1 ))
 			fi
 		done
-		echo "KVM_VM_VNC=\"127.0.0.1:$NEW_VNC_ID\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/vnc
+        # please make sure to protect the vnc ports on the kvm hosts via iptables
+        # only openQRM should be allowed to access those ports
+		echo "KVM_VM_VNC=\"$resource_ip:$NEW_VNC_ID\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/vnc
 
 		# start
 		chmod +x $OPENQRM_VM_DIR/$KVM_VM_NAME/$KVM_VM_NAME.kvm
@@ -437,13 +440,14 @@ case "$KVM_COMMAND" in
             . $OPENQRM_VM_DIR/$kvmvm/cpus
             . $OPENQRM_VM_DIR/$kvmvm/ram
             . $OPENQRM_VM_DIR/$kvmvm/net1
+            . $OPENQRM_VM_DIR/$kvmvm/vnc
             # check if active
             if ps ax | grep "$KVM_VM_MAC_1" | grep -v grep | grep -i screen 1>/dev/null; then
                 VM_ACTIVE=1
             else
                 VM_ACTIVE=0
             fi
-            echo "$VM_ACTIVE""@""$kvmvm""@""$KVM_VM_MAC_1""@""$KVM_VM_CPUS""@""$KVM_VM_RAM""@" >> $VM_LIST_TMP
+            echo "$VM_ACTIVE""@""$kvmvm""@""$KVM_VM_MAC_1""@""$KVM_VM_CPUS""@""$KVM_VM_RAM""@""$KVM_VM_VNC""@" >> $VM_LIST_TMP
         done
 		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$KVM_OPENQRM_USERNAME --http-password=$KVM_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_LIST_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/kvm/kvm-action.php?kvm_server_command=get_kvm_server; then
 			echo "ERROR: Could not post vm list to the openQRM-server at $OPENQRM_SERVER_IP!"
@@ -469,7 +473,6 @@ case "$KVM_COMMAND" in
 		. $OPENQRM_VM_DIR/$KVM_VM_NAME/disk2
 		. $OPENQRM_VM_DIR/$KVM_VM_NAME/disk3
 		. $OPENQRM_VM_DIR/$KVM_VM_NAME/disk4
-		. $OPENQRM_VM_DIR/$KVM_VM_NAME/vnc
 		. $OPENQRM_VM_DIR/$KVM_VM_NAME/vnc
 		echo "OPENQRM_KVM_VM_CPUS=\"$KVM_VM_CPUS\"" > $VM_CONFIG_TMP
 		echo "OPENQRM_KVM_VM_RAM=\"$KVM_VM_RAM\"" >> $VM_CONFIG_TMP
