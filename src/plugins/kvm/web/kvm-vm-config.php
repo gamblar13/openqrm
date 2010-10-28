@@ -666,7 +666,7 @@ function kvm_vm_config_net() {
 		$vm_config_add_nic_disp .= "<input type=hidden name=kvm_server_id value=$kvm_server_id>";
 		$vm_config_add_nic_disp .= "<input type=hidden name=kvm_server_name value=$kvm_server_name>";
 		$vm_config_add_nic_disp .= "<input type=hidden name=kvm_nic_nr value=$nic_number>";
-		$vm_config_add_nic_disp .= htmlobject_input('kvm_new_nic', array("value" => $suggested_mac, "label" => 'Add Network'), 'text', 10);
+		$vm_config_add_nic_disp .= htmlobject_input('kvm_new_nic', array("value" => $suggested_mac, "label" => 'Add Network'), 'text', 20);
 
         $vm_config_nic_type_disp = "<input type=\"radio\" name=\"kvm_nic_model\" value=\"virtio\" checked=\"checked\" /> virtio - Best performance, Linux only <br>";
         $vm_config_nic_type_disp .= "<input type=\"radio\" name=\"kvm_nic_model\" value=\"e1000\" /> e1000 - Server Operating systems <br>";

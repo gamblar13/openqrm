@@ -642,7 +642,7 @@ function kvm_vm_config_net() {
 		$vm_config_add_nic_disp .= "<input type=hidden name=kvm_server_id value=$kvm_server_id>";
 		$vm_config_add_nic_disp .= "<input type=hidden name=kvm_server_name value=$kvm_server_name>";
 		$vm_config_add_nic_disp .= "<input type=hidden name=kvm_nic_nr value=$nic_number>";
-		$vm_config_add_nic_disp .= htmlobject_input('kvm_new_nic', array("value" => $suggested_mac, "label" => 'Add Network'), 'text', 10);
+		$vm_config_add_nic_disp .= htmlobject_input('kvm_new_nic', array("value" => $suggested_mac, "label" => 'Add Network'), 'text', 20);
 
         // bridge array for the select
         $kvm_internal_bridge = $bridge_store[OPENQRM_PLUGIN_KVM_INTERNAL_BRIDGE];

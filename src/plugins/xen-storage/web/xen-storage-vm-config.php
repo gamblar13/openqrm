@@ -649,7 +649,7 @@ function xen_vm_config_net() {
 		$vm_config_add_nic_disp .= "<input type=hidden name=xen_id value=$xen_id>";
 		$vm_config_add_nic_disp .= "<input type=hidden name=xen_name value=$xen_name>";
 		$vm_config_add_nic_disp .= "<input type=hidden name=xen_nic_nr value=$nic_number>";
-		$vm_config_add_nic_disp .= htmlobject_input('xen_new_nic', array("value" => $suggested_mac, "label" => 'Add Network'), 'text', 10);
+		$vm_config_add_nic_disp .= htmlobject_input('xen_new_nic', array("value" => $suggested_mac, "label" => 'Add Network'), 'text', 20);
         
         $submit = "<input type=submit value='Submit'>";
     } else {
