@@ -330,7 +330,7 @@ function openqrm_server_init() {
 	esac
 
     # create unconfigured file containing a list of available network cards to setup openQRM on
-    ifconfig -a | grep -v inet6  | grep -B1 inet | grep -i link | grep -v lo | awk {' print $1 '} > $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/unconfigured
+    ifconfig -a | grep -v inet6  | grep -B1 inet | grep -i link | grep -v '^lo ' | awk {' print $1 '} > $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/unconfigured
 }
 
 
