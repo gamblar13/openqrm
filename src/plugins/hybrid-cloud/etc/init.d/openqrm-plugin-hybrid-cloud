@@ -1,0 +1,127 @@
+#!/bin/bash
+# init script for the openQRM hybrid-cloud-plugin
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+#
+
+OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/hybrid-cloud/include/openqrm-plugin-hybrid-cloud-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/hybrid-cloud/etc/openqrm-plugin-hybrid-cloud.conf
+# get the ip config
+openqrm_server_get_config
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+export LANG=C
+# define wget to use with https
+if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
+    WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+function openqrm_plugin_hybrid_cloud_start() {
+	echo "Starting the openQRM hybrid-cloud-plugin"
+	touch $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/hybrid-cloud/.running
+}
+
+
+function openqrm_plugin_hybrid_cloud_stop() {
+	echo "Stopping the openQRM hybrid-cloud-plugin"
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/hybrid-cloud/.running
+}
+
+function openqrm_plugin_hybrid_cloud_uninstall() {
+	local USERNAME=$1
+	local PASSWORD=$2
+	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
+		echo -n "hybrid-cloud: Please give a username to uninstall the plugin : "
+		read USERNAME
+		echo	
+		echo -n "hybrid-cloud: Please give the password for user $USERNAME : "
+		read PASSWORD
+		echo
+	fi
+	echo "Uninstalling the openQRM hybrid-cloud-plugin"
+	openqrm_plugin_hybrid_cloud_stop
+
+	# removing the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/hybrid-cloud/hybrid-cloud-action.php?hybrid_cloud_command=uninstall"; then
+		hybrid_cloud_log init "ERROR: Could not drop the hybrid-cloud-plugin tables in the database!"
+		return 1
+	fi
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/hybrid-cloud
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-hybrid-cloud.tgz
+
+
+}
+
+function openqrm_plugin_hybrid_cloud_init() {
+	local USERNAME=$1
+	local PASSWORD=$2
+	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
+		echo -n "hybrid-cloud: Please give a username to init the plugin : "
+		read USERNAME
+		echo	
+		echo -n "hybrid-cloud: Please give the password for user $USERNAME : "
+		read PASSWORD
+		echo
+	fi
+	echo "Initializing the openQRM hybrid-cloud-plugin"
+	# linking the web dir
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/hybrid-cloud/web $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/hybrid-cloud
+	# link the boot-service
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/hybrid-cloud/web/boot-service-hybrid-cloud.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-hybrid-cloud.tgz
+
+	# creating the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/hybrid-cloud/hybrid-cloud-action.php?hybrid_cloud_command=init"; then
+		hybrid_cloud_log init "ERROR: Could not create the hybrid-cloud-plugin tables in the database!"
+		return 1
+	fi
+	
+}
+
+USER=$2
+PASS=$3
+
+case "$1" in
+	start)
+		openqrm_plugin_hybrid_cloud_start
+		;;
+	stop)
+		openqrm_plugin_hybrid_cloud_stop
+		;;
+	restart)
+		openqrm_plugin_hybrid_cloud_stop
+		sleep 1
+		openqrm_plugin_hybrid_cloud_start
+		;;
+	init)
+		openqrm_plugin_hybrid_cloud_init $USER $PASS
+		;;
+	uninstall)
+		openqrm_plugin_hybrid_cloud_uninstall $USER $PASS
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|init|uninstall}"
+		exit 1
+
+esac
+exit $?
+
+
+
+
