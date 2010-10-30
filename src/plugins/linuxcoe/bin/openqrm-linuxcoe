@@ -28,7 +28,7 @@ export OPENQRM_SOURCE_DIR
 . $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/include/openqrm-plugin-linuxcoe-functions
 
 LCOE_BASE_VERSION="4"
-LCOE_SUB_VERSION="2"
+LCOE_SUB_VERSION="3"
 SD_BASE_VERSION="4"
 LCOE_BASE="linuxcoe-sd-$LCOE_BASE_VERSION.$LCOE_SUB_VERSION.tar.gz"
 LCOE_DOCS="linuxcoe-sd-docs-$LCOE_BASE_VERSION.$LCOE_SUB_VERSION.tar.gz"
