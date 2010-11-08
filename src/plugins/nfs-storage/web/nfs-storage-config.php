@@ -322,6 +322,13 @@ function nfs_storage_config($nfs_storage_id) {
 $output = array();
 $output[] = array('label' => 'Nfs Storage Config', 'value' => nfs_storage_config($nfs_storage_id));
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

@@ -310,6 +310,13 @@ if(htmlobject_request('action') != '') {
 	$output[] = array('label' => 'Puppet Manager', 'value' => puppet_select());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

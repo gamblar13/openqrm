@@ -636,6 +636,13 @@ if(htmlobject_request('action') != '') {
 	$output[] = array('label' => 'VirtualBox VM Manager', 'value' => vbox_server_select());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

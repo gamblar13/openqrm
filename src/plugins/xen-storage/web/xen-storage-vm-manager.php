@@ -854,6 +854,13 @@ if(htmlobject_request('action') != '') {
     $output[] = array('label' => 'Xen VM Manager', 'value' => xen_select());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

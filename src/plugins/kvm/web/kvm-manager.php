@@ -764,6 +764,13 @@ if(htmlobject_request('action') != '') {
 	$output[] = array('label' => 'KVM VM Manager', 'value' => kvm_server_select());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

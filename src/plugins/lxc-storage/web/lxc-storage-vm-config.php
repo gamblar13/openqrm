@@ -254,6 +254,13 @@ if ($OPENQRM_USER->role == "administrator") {
     $output[] = array('label' => 'Lxc Configure VM', 'value' => lxc_vm_config());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

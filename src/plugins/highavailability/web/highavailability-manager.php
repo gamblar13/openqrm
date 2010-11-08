@@ -418,6 +418,13 @@ $output = array();
 $output[] = array('label' => 'High-Availability Manager', 'value' => ha_appliance_display());
 $output[] = array('label' => 'HA-Configuration', 'value' => ha_resource_config());
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 ?>
 

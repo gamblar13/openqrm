@@ -710,6 +710,13 @@ if(htmlobject_request('action') != '') {
 	$output[] = array('label' => 'Citrix XenServer VM Manager', 'value' => citrix_server_select());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

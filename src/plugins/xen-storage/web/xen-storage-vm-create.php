@@ -359,6 +359,13 @@ if ($OPENQRM_USER->role == "administrator") {
 	$output[] = array('label' => 'Xen Storage Create VM', 'value' => xen_create());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

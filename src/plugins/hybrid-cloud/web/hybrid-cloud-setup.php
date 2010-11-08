@@ -293,6 +293,13 @@ function hybrid_cloud_setup_account() {
 $output = array();
 $output[] = array('label' => 'Accounts', 'value' => hybrid_cloud_setup_account());
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

@@ -645,6 +645,13 @@ if(htmlobject_request('action') != '') {
 	$output[] = array('label' => 'VMware Server VM Manager', 'value' => vmware_server_select());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

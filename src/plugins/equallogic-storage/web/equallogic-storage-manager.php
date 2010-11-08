@@ -737,6 +737,13 @@ if(htmlobject_request('action') != '') {
 	$output[] = array('label' => 'Select', 'value' => equallogic_select_storage());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

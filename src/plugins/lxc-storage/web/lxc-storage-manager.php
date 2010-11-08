@@ -1018,6 +1018,9 @@ if(htmlobject_request('action') != '') {
         width:800px;
     }
 </style>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
 <?php
 
 echo htmlobject_tabmenu($output);

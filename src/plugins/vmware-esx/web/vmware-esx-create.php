@@ -361,6 +361,13 @@ if ($OPENQRM_USER->role == "administrator") {
 	$output[] = array('label' => 'VMware ESX Create VM', 'value' => vmware_esx_create());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

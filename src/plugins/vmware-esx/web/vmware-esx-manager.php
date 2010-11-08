@@ -702,6 +702,13 @@ if(htmlobject_request('action') != '') {
 	$output[] = array('label' => 'VMware ESX VM Manager', 'value' => vmware_esx_select());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

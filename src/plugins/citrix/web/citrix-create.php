@@ -348,6 +348,13 @@ if ($OPENQRM_USER->role == "administrator") {
 	$output[] = array('label' => 'Citrix Create VM', 'value' => citrix_create());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

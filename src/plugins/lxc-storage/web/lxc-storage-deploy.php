@@ -363,6 +363,9 @@ $output[] = array('label' => 'LXC Templates', 'value' => lxc_select_template($lv
         width:800px;
     }
 </style>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
 <?php
 
 echo htmlobject_tabmenu($output);

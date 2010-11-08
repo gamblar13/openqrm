@@ -342,6 +342,13 @@ if ($OPENQRM_USER->role == "administrator") {
     $output[] = array('label' => 'Lxc Network Configuration', 'value' => lxc_vm_net_config());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

@@ -615,6 +615,13 @@ if(strtolower(OPENQRM_USER_ROLE_NAME) == 'administrator') {
 	$output[] = array('label' => 'New Image-Shelf', 'target' => 'image-shelf-new.php');
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

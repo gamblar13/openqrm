@@ -747,6 +747,13 @@ if ($OPENQRM_USER->role == "administrator") {
 	}
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>

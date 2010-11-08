@@ -646,6 +646,13 @@ if(htmlobject_request('action') != '') {
 	$output[] = array('label' => 'LXC Storage VM Manager', 'value' => lxc_server_select());
 }
 
+
+?>
+<script type="text/javascript">
+    $("#progressbar").remove();
+</script>
+<?php
+
 echo htmlobject_tabmenu($output);
 
 ?>
