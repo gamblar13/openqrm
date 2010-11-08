@@ -39,8 +39,6 @@ RETRY_DELAY=10
 # defines how long commands are allowed to run
 DEFAULT_CMD_TIMEOUT=$OPENQRM_DEFAULT_CMD_TIMEOUT
 
-
-
 function cmd_queue_log() {
     local PRIO=$1
     shift
@@ -68,8 +66,11 @@ function cmd_timeout() {
     return $wait_status
 }
 
-
-
+# dir to store the failed cmds for the ui
+if [ ! -d "$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors" ]; then
+    mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors
+    chmod -R 777 $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors
+fi
 
 cd $OPENQRM_COMMAND_QUEUE
 while (true); do
@@ -96,8 +97,12 @@ while (true); do
                 OPENQRM_COMMAND_OUTPUT=`cat ouput.$COMMAND_TOKEN`
                 cmd_queue_log WARNING "Command with token $FAILED_COMMAND_TOKEN failed : $OPENQRM_COMMAND  ----- $OPENQRM_COMMAND_OUTPUT"
             else
-                cmd_queue_log ERROR "Command with token $FAILED_COMMAND_TOKEN failed : $OPENQRM_COMMAND  ----- $OPENQRM_COMMAND_OUTPUT"
-                openqrm_post_event 0 "base-engine" 2 "openqrm-cmd-queue" "ERROR running token $FAILED_COMMAND_TOKEN"
+                cmd_queue_log ERROR "Command with token $COMMAND_TOKEN failed : $OPENQRM_COMMAND  ----- $OPENQRM_COMMAND_OUTPUT"
+                openqrm_post_event 0 "base-engine" 2 "openqrm-cmd-queue" "ERROR running token $COMMAND_TOKEN"
+                # move to event errors for debug
+                mv -f $OPENQRM_COMMAND_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors/$COMMAND_TOKEN.cmd
+                mv -f ouput.$COMMAND_TOKEN $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors/$COMMAND_TOKEN.out
+                chmod -R 777 $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors/$COMMAND_TOKEN.*
             fi
 		else
 			rm -f $OPENQRM_COMMAND_FILE
@@ -131,10 +136,6 @@ while (true); do
                     cmd_queue_log ERROR "Command $FAILED_COMMAND_TOKEN failed for $RETRY. retries : $FAILED_OPENQRM_COMMAND"
                     openqrm_post_event 0 "base-engine" 2 "openqrm-cmd-queue" "ERROR running token $FAILED_COMMAND_TOKEN"
                     # move to event errors for debug
-                    if [ ! -d "$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors" ]; then
-                        mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors
-                        chmod -R 777 $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors
-                    fi
                     mv -f $FAILED_OPENQRM_COMMAND_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors/$FAILED_COMMAND_TOKEN.cmd
                     mv -f ouput.$FAILED_COMMAND_TOKEN $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors/$FAILED_COMMAND_TOKEN.out
                     chmod -R 777 $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/server/event/errors/$FAILED_COMMAND_TOKEN.*
