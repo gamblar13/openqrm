@@ -383,7 +383,6 @@ if [ "$image_type" == "ram" ] || [ "$image_type" == "" ]; then
 	$WGET -q -O /dev/null "$openqrm_web_protocol://$OPENQRM_SERVER_IP_ADDRESS/openqrm/action/resource-monitor.php?resource_command=update_status&resource_id=$resource_id&resource_state=active&resource_event=available"
 	hostname idle$resource_id
 	# rcs0 will be started here from init
-	
 	# for initramfs initrds we start a shell here
 	if [ -x /init ]; then
 		echo "Detected initrd as initramfs, starting a shell"
@@ -395,6 +394,20 @@ else
 	# -> deployment plugins will take care to mount the root fs
 	#    and do the pivot_root if needed
 
+    # pre-root-mount-hook to setup everything which needs to be done before the root-mount
+	cd /
+    for boot_service in $openqrm_boot_services; do
+        if $WGET -q -O /pre-root-mount-hook.$boot_service "$openqrm_web_protocol://$OPENQRM_SERVER_IP_ADDRESS/openqrm/boot-service/pre-root-mount-hook.$boot_service"; then
+            echo " - Running for pre-root-mount-hook of boot-service $boot_service"
+            chmod +x pre-root-mount-hook.$boot_service
+        	. ./pre-root-mount-hook.$boot_service
+            pre_mount_rootfs
+        else
+            rm -f /pre-root-mount-hook.$boot_service
+        fi
+    done
+
+    # root-mount-hook
 	eval $image_deployment_parameter
 	cd /
 	$WGET -q "$openqrm_web_protocol://$OPENQRM_SERVER_IP_ADDRESS/openqrm/boot-service/root-mount.$image_type"
