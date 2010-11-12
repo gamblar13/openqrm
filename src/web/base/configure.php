@@ -222,7 +222,7 @@ if(htmlobject_request('action') != '') {
 			break;
 
 
-        case 'initialyze':
+        case 'initialize':
             show_progressbar();
             $db_config_lock = "/tmp/openqrm-configure-db-config.lock";
             if (file_exists($db_config_lock)) {
@@ -257,12 +257,12 @@ if(htmlobject_request('action') != '') {
             }
             shell_exec($config_command);
             if (!wait_for_fileremoval("./unconfigured")) {
-                $strMsg="Error initialyzed the openQRM Server !<br>Please check /var/log/messages for more info.";
+                $strMsg="Error initialized the openQRM Server !<br>Please check /var/log/messages for more info.";
                 $step=3;
             } else {
                 // delay a bit for openQRM startup
                 sleep(4);
-                $strMsg="Successfully initialyzed the openQRM Server <br>";
+                $strMsg="Successfully initialized the openQRM Server <br>";
                 $step=4;
             }
             redirect($strMsg);
@@ -441,7 +441,7 @@ function openqrm_server_config_db_setup() {
 	$table->sort='';
 	$table->head = $arHead;
 	$table->body = $arBody;
-    $table->bottom = array('initialyze');
+    $table->bottom = array('initialize');
 	$table->max = 4;
 
     // set template
@@ -461,7 +461,7 @@ function openqrm_server_config_db_setup() {
 
 function openqrm_server_config_db_final() {
 	global $thisfile;
-    $disp = "Successfully initialyzed the openQRM Server <br>";
+    $disp = "Successfully initialized the openQRM Server <br>";
     $disp .= "Please click here to access the openQRM Admin UI <br><br>";
     $disp .= "(automatic forwarding in 10 seconds)<br>";
     echo "<meta http-equiv=\"refresh\" content=\"10; URL=/openqrm\">";
