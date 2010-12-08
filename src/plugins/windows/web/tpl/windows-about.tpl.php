@@ -46,7 +46,7 @@ on the Windows systems as Windows services after integrating them with a simple 
 <br>
 <br>
 <ul type="disc">
-    <li>Download the openQRM Client from here -> <a href="openQRM-Client-4.6.1-setup.exe">openQRM-Client-4.6.1-setup.exe</a></li>
+    <li>Download the openQRM Client from here -> <a href="openQRM-Client-4.7.2-setup.exe">openQRM-Client-4.7.2-setup.exe</a></li>
     <li>Run the openQRM-Client-setup.exe on the Windows system</li>
 </ul>
 <br>
