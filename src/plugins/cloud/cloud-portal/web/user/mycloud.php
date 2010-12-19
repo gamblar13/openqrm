@@ -128,7 +128,7 @@ if (!strlen($request_fields['cr_disk_req'])) {
 // to save the cloud request as profile
 $profile_name = htmlobject_request('profile_name');
 global $profile_name;
-
+global $request_fields;
 
 
 function date_to_timestamp($date) {
@@ -220,12 +220,10 @@ function check_request($request_fields, $request_user) {
     // parse start date
     $startt = $request_fields['cr_start'];
     $tstart = date_to_timestamp($startt);
-    $request_fields['cr_start'] = $tstart;
 
     // parse stop date
     $stopp = $request_fields['cr_stop'];
     $tstop = date_to_timestamp($stopp);
-    $request_fields['cr_stop'] = $tstop;
     $nowstmp = $_SERVER['REQUEST_TIME'];
 
     // check that the new stop time is later than the start time
@@ -302,36 +300,6 @@ function check_request($request_fields, $request_user) {
         }
     }
 
-    // set the eventual selected puppet groups
-    if(htmlobject_request('puppet_groups') != '') {
-        $puppet_groups_array = htmlobject_request('puppet_groups');
-        if (is_array($puppet_groups_array)) {
-            foreach($puppet_groups_array as $puppet_group) {
-                $puppet_groups_str .= "$puppet_group,";
-            }
-            // remove last ,
-            $puppet_groups_str = rtrim($puppet_groups_str, ",");
-            $request_fields['cr_puppet_groups'] = $puppet_groups_str;
-        }
-    }
-
-    // check ip-mgmt
-    if(htmlobject_request('cr_ip_mgmt') != '') {
-        $ip_mgmt_array = htmlobject_request('cr_ip_mgmt');
-        // a select for each nic
-        if (is_array($ip_mgmt_array)) {
-            for ($mnic = 1; $mnic <= $max_network_interfaces; $mnic++) {
-                $ip_mgmt_id = $ip_mgmt_array[$mnic];
-                if ($ip_mgmt_id != -1) {
-                    $ip_mgmt_config_str .= $mnic.":".$ip_mgmt_array[$mnic].",";
-                }
-
-            }
-        }
-    }
-    $ip_mgmt_config_str = rtrim($ip_mgmt_config_str, ",");
-    $request_fields['cr_ip_mgmt'] = $ip_mgmt_config_str;
-
     // ####### start of cloudselector case #######
     // if cloudselector is enabled check if products exist
     $cloud_selector_enabled = $cc_disk_conf->get_value(22);	// cloudselector
@@ -373,8 +341,8 @@ function check_request($request_fields, $request_user) {
             exit(0);
         }
         // puppet
-        if(htmlobject_request('puppet_groups') != '') {
-            $puppet_groups_array = htmlobject_request('puppet_groups');
+        if(htmlobject_request('cr_puppet_groups') != '') {
+            $puppet_groups_array = htmlobject_request('cr_puppet_groups');
             if (is_array($puppet_groups_array)) {
                 foreach($puppet_groups_array as $puppet_group) {
                     if (!$cloudselector->product_exists_enabled("puppet", $puppet_group)) {
@@ -545,7 +513,6 @@ if (htmlobject_request('action') != '') {
                         $ip_mgmt_id = $ip_mgmt_array[$mnic];
                         if ($ip_mgmt_id != -1) {
                             $ip_mgmt_config_str .= $mnic.":".$ip_mgmt_array[$mnic].",";
-
                         }
 
                     }
@@ -553,6 +520,19 @@ if (htmlobject_request('action') != '') {
             }
             $ip_mgmt_config_str = rtrim($ip_mgmt_config_str, ",");
             $request_fields['cr_ip_mgmt'] = $ip_mgmt_config_str;
+
+            // set the eventual selected puppet groups
+            if(htmlobject_request('cr_puppet_groups') != '') {
+                $puppet_groups_array = htmlobject_request('cr_puppet_groups');
+                if (is_array($puppet_groups_array)) {
+                    foreach($puppet_groups_array as $puppet_group) {
+                        $puppet_groups_str .= "$puppet_group,";
+                    }
+                    // remove last ,
+                    $puppet_groups_str = rtrim($puppet_groups_str, ",");
+                    $request_fields['cr_puppet_groups'] = $puppet_groups_str;
+                }
+            }
 
             // check user input
             check_request($request_fields, $request_user);
