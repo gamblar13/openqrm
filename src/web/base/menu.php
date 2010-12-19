@@ -44,7 +44,7 @@ global $OPENQRM_SERVER_BASE_DIR;
 		<script src="js/menu.js" type="text/javascript"></script>
 		<link type="text/css" href="/openqrm/base/js/jquery/development-bundle/themes/smoothness/ui.all.css" rel="stylesheet" />
 		
-		<script type="text/javascript" src="http://code.jquery.com/jquery-latest.js"></script>
+		<script type="text/javascript" src="/openqrm/base/js/jquery/js/jquery-1.3.2.min.js"></script>
 
 		<title>Menu</title>
 		
