@@ -396,6 +396,7 @@ function ha_resource_config() {
 		$table->identifier_disabled = array(0);
 	}
 	$table->max = $resource_tmp->get_count('all') + 1; // adding openqrmserver
+    $table->add_headrow("<input type=\"hidden\" name=\"currenttab\" value=\"tab1\">");
 
   // set template
 	$t = new Template_PHPLIB();
