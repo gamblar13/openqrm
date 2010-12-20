@@ -317,15 +317,11 @@ case "$IMAGE_SHELF_COMMAND" in
 
 		# unpack
 		if ! tar -C $MOUNTPOINT/ -xzf $MOUNTPOINT/$IMAGE_SHELF_FILE; then
-			image_shelf_log "ERROR: Could not unpack Image-template from $IMAGE_SHELF_FILE!"
-			openqrm_post_event 0 "get" 3 "openqrm-image-shelf" "Could not unpack Image-template from $IMAGE_SHELF_FILE!"
-			umount $MOUNTPOINT
-			rmdir $MOUNTPOINT
-			exit 1
+			image_shelf_log "WARNING: Errors while unpacking Image-template from $IMAGE_SHELF_FILE! Trying to continue ..."
 		else
 			image_shelf_log "NOTICE: Unpacked $IMAGE_SHELF_FILE"
-			openqrm_post_event 0 "get" 5 "openqrm-image-shelf" "Unpacked $IMAGE_SHELF_FILE"
 		fi
+        openqrm_post_event 0 "get" 5 "openqrm-image-shelf" "Unpacked $IMAGE_SHELF_FILE"
 		# preperation
 		# set /etc/resolv.conf
 		image_shelf_set_resolv_conf $MOUNTPOINT/
