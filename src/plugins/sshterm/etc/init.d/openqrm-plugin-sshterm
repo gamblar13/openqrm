@@ -48,8 +48,6 @@ function openqrm_plugin_sshterm_start() {
         mkdir -p /root/.webshell/
         openssl req  -config "make_certificate.cfg" -keyout "/root/.webshell/webshell.pem" -newkey rsa:1024 -nodes -x509 -days 365 -out "/root/.webshell/webshell.pem"
     fi
-    # make sure screen can run
-    chmod 777 /var/run/screen
     # start the webshell
 	SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
 	$RUNSCREEN -dmS $SCREEN_NAME ./webshell.py --ssl-cert=/root/.webshell/webshell.pem
