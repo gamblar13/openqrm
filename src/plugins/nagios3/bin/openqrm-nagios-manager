@@ -73,7 +73,7 @@ case "$NAGIOS_CHECK_CMD" in
 		OPENQRM_NETWORK=`echo $OPENQRM_SERVER_IP_ADDRESS | cut -d'.' -f1-3`".*"
 		nagios_manager_lock aquire
 		openqrm_post_event 0 "map" 5 "openqrm-nagios-manager" "Starting to map the openQRM network!"
-		if ! nmap -sS -O -oX $SUBNETFILE $OPENQRM_NETWORK; then
+		if ! nmap --system-dns -sS -O -oX $SUBNETFILE $OPENQRM_NETWORK; then
 			nagios3_log openqrm-nagios-manager "ERROR while running nmap !"
 			nagios_manager_lock release
 			openqrm_post_event 0 "map" 3 "openqrm-nagios-manager" "Mapping the openQRM network failed!"
