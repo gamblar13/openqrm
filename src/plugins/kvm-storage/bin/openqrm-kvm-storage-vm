@@ -257,7 +257,7 @@ case "$KVM_COMMAND" in
 		echo "KVM_VM_RAM=\"$KVM_VM_RAM\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/ram
 
 		# network
-        if [ "$KVM_VM_MAC_BRIDGE" == "$OPENQRM_PLUGIN_KVM_INTERNAL_BRIDGE" ]; then
+        if [ -z "$KVM_VM_MAC_BRIDGE" -o "$KVM_VM_MAC_BRIDGE" == "$OPENQRM_PLUGIN_KVM_INTERNAL_BRIDGE" ]; then
     		echo "KVM_VM_NET_1=\"-net nic,vlan=1,macaddr=$KVM_VM_MAC,model=$KVM_VM_NIC_TYPE -net tap,vlan=1,script=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-kvm-ifup,downscript=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-kvm-ifdown\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net1
         else
     		echo "KVM_VM_NET_1=\"-net nic,vlan=1,macaddr=$KVM_VM_MAC,model=$KVM_VM_NIC_TYPE -net tap,vlan=1,script=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-kvm-ifup-ext,downscript=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-kvm-ifdown-ext\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net1
