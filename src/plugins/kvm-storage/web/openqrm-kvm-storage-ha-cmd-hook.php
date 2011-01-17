@@ -58,7 +58,7 @@ function create_kvm_storage_vm($host_resource_id, $name, $mac, $memory, $cpu, $s
     // virtualization commands are sent from openQRM directly
     $openqrm = new openqrm_server();
     // send command to create vm
-    $vm_create_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-storage-vm create -n ".$name." -m ".$mac." -r ".$memory." -c ".$cpu." -b local ".$additional_nic_str;
+    $vm_create_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-kvm-storage-vm create -n ".$name." -m ".$mac." -r ".$memory." -c ".$cpu." -b local ".$additional_nic_str;
     $host_resource->send_command($host_resource->ip, $vm_create_cmd);
 	$event->log("create_kvm_storage_vm", $_SERVER['REQUEST_TIME'], 5, "kvm-storage-ha-hook", "Running $vm_create_cmd", "", "", 0, 0, 0);
 }
