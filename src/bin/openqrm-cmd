@@ -41,7 +41,8 @@ else
 fi
 
 WHOAMI=`whoami`
-echo "openQRM engine: Running as $WHOAMI cmd : $@" | logger
+FULL_COMMAND=`echo $@ | sed -e 's/-u [^ ]* /-u xxxxxxxx /g' -e 's/-p [^ ]*/-p xxxxxxxx /g'`
+echo "openQRM engine: Running as $WHOAMI cmd : $FULL_COMMAND" | logger
 
 function stop_openqrm_monitord() {
 	killall openqrm-monitord 1>/dev/null 2>&1
@@ -69,7 +70,7 @@ CMD_OUTPUT=$($@ 2>&1)
 CMD_RESULT=$?
 echo $CMD_OUTPUT | logger
 if [ "$CMD_RESULT" != "0" ]; then
-	echo "ERROR: openqrm-cmd failed running : $@"
+	echo "ERROR: openqrm-cmd failed running : $FULL_COMMAND" | logger
 	openqrm_post_event 0 "base-engine" 2 "openqrm-cmd" "ERROR on resource $resource_id while running : $@"
 	exit 1
 fi
