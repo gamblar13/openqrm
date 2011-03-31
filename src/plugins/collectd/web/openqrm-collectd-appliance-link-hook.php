@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
 */
 
 
@@ -34,31 +34,42 @@ global $event;
 
 
 
-function openqrm_collectd_appliance($cmd, $appliance_fields) {
+function get_collectd_appliance_link($appliance_id) {
 	global $event;
+	global $RootDir;
 	global $OPENQRM_SERVER_BASE_DIR;
 	global $OPENQRM_SERVER_IP_ADDRESS;
 	global $OPENQRM_EXEC_PORT;
-	$appliance_id=$appliance_fields["appliance_id"];
-	$appliance_name=$appliance_fields["appliance_name"];
-	$resource = new resource();
-	$resource->get_instance_by_id($appliance_fields["appliance_resources"]);
-	$appliance_ip=$resource->ip;
 
+	$plugin_link='';
+	$appliance_name='';
 
-	$event->log("openqrm_new_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-collectd-appliance-hook.php", "Handling $cmd event $appliance_id/$appliance_name/$appliance_ip", "", "", 0, 0, $appliance_id);
-	// we remove the stats on add and remove
-	switch($cmd) {
-		case "add":
-			$openqrm_server = new openqrm_server();
-			$openqrm_server->send_command("$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/collectd/bin/openqrm-collectd-manager remove $appliance_name now");
-			break;
-		case "remove":
-			$openqrm_server = new openqrm_server();
-			$openqrm_server->send_command("$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/collectd/bin/openqrm-collectd-manager remove $appliance_name now");
-			break;
+	$p_appliance = new appliance();
+	$p_appliance->get_instance_by_id($appliance_id);
 
+	if ($p_appliance->resources != -1) {
+		$appliance_name = $p_appliance->name;
 	}
+	if ($p_appliance->resources == 0) {
+		$appliance_name = "openqrm";
+	}
+	// pending ??
+	$icon_size = "";
+	$graph_link = "";
+	$icon_title = "";
+	$graph_html = $RootDir."/plugins/collectd/graphs/".$appliance_name."/index.html";
+	if (file_exists($graph_html)) {
+		$collectd_statistics_icon = "/openqrm/base/plugins/collectd/img/plugin.png";
+		$graph_link = "/openqrm/base/plugins/collectd/graphs/".$appliance_name."/index.html";
+		$icon_title = "Collectd statistics";
+	} else {
+		$collectd_statistics_icon = "/openqrm/base/img/progress.gif";
+		$icon_size = "width='25' height='25'";
+		$graph_link = "";
+		$icon_title = "Collectd statistics pending";
+	}
+	$plugin_link = "<a href=$graph_link><img title='$icon_title' alt='$icon_title' $icon_size src=$collectd_statistics_icon border=0></a>&nbsp;&nbsp;";
+	return $plugin_link;
 }
 
 
