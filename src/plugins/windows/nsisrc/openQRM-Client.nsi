@@ -10,7 +10,7 @@
 
 
 !define OQPROGRAMNAME "openQRM-Client"
-!define OQPROGRAMVERSION "4.7.2"
+!define OQPROGRAMVERSION "4.8.0"
 !define OQPROGRAMLICENSE "license.txt"
 !define OQSERVERIPCONF "openqrm-server-ip.conf"
 !define OQRESOURCECONF "resource-id.conf"
