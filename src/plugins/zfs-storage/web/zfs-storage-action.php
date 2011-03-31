@@ -16,19 +16,19 @@ $source_tab=$_REQUEST["source_tab"];
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 
 
@@ -97,7 +97,7 @@ unset($zfs_storage_fields["zfs_storage_command"]);
 			fclose($fout);
 			break;
 
-        case 'get_ident':
+		case 'get_ident':
 			if (!file_exists($StorageDir)) {
 				mkdir($StorageDir);
 			}
@@ -109,17 +109,17 @@ unset($zfs_storage_fields["zfs_storage_command"]);
 			fclose($fout);
 			break;
 
-        case 'auth_finished':
-            // remove storage-auth-blocker if existing
-            $authblocker = new authblocker();
-            $authblocker->get_instance_by_image_name($zfs_storage_image_name);
-            if (strlen($authblocker->id)) {
-                $event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "zfs-storage-action", "Removing authblocker for image $zfs_storage_image_name", "", "", 0, 0, 0);
-                $authblocker->remove($authblocker->id);
-            }
-            break;
+		case 'auth_finished':
+			// remove storage-auth-blocker if existing
+			$authblocker = new authblocker();
+			$authblocker->get_instance_by_image_name($zfs_storage_image_name);
+			if (strlen($authblocker->id)) {
+				$event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "zfs-storage-action", "Removing authblocker for image $zfs_storage_image_name", "", "", 0, 0, 0);
+				$authblocker->remove($authblocker->id);
+			}
+			break;
 
-        default:
+		default:
 			$event->log("$zfs_storage_command", $_SERVER['REQUEST_TIME'], 3, "zfs-storage-action", "No such zfs-storage command ($zfs_storage_command)", "", "", 0, 0, 0);
 			break;
 
