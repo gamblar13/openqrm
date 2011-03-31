@@ -22,25 +22,34 @@
 	width:800px;
 }
 </style>
+<form action="{formaction}" method="GET">
 
-<h1>Create new Resource</h1>
+<h1>Manually create new Resource</h1>
+This form is to manually create a new resource which openQRM cannot directly monitor
+ via the openQRM-client e.g. NetApp Filers or EqualLogig Storages.
+ Those resources then can be used as Storage Server managed by openQRM.
+<br>
+<br>
+<b>Resources (physical systems and virtual machines) intended for rapid deployment are automatically
+ added to openQRM by setting their bios to PXE/Net-Boot. Just have the "dhcpd" and "tftpd" plugin enabled and started.</b>
+<br>
+<br>
 
 <div style="float:left;">
-	<h3>as a Virtual Machine</h3>
-	<b>{resource_virtual}</b>
+	<h3>Add new Resource (not monitored)</h3>
 	<br>
-	<h3>or by integrating an existing, local-installed server</h3>
-	<b>{resource_local}</b>
-	<br>
-	<h3>or manual add an un-managed system</h3>
-	<b>{resource_new}</b>
-	<br>
-
+	{resource_hostname}
+	{resource_ip}
+	{resource_mac}
 </div>
+{hidden_resource_id}
+{hidden_resource_command}
 <div style="text-align:center;">
 	<br>
 	<br>
 	<br>
 	<br>
+	{submit}
 </div>
+</form>
 

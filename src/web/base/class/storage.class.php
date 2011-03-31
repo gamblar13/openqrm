@@ -20,10 +20,10 @@
     Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 
-	$RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
-	require_once "$RootDir/include/openqrm-database-functions.php";
-	require_once "$RootDir/class/deployment.class.php";
-	require_once "$RootDir/class/event.class.php";
+$RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
+require_once "$RootDir/include/openqrm-database-functions.php";
+require_once "$RootDir/class/deployment.class.php";
+require_once "$RootDir/class/event.class.php";
 
 /**
  * @package openQRM
@@ -331,7 +331,7 @@ var $_event;
 	}
 
 
-    //--------------------------------------------------
+	//--------------------------------------------------
 	/**
 	* get an array of all storage names
 	* <code>
@@ -423,7 +423,7 @@ var $_event;
 				$recordSet->MoveNext();
 			}
 			$recordSet->Close();
-		}		
+		}
 		return $storage_array;
 	}
 

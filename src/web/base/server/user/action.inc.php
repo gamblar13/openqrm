@@ -26,12 +26,12 @@ switch ($_REQUEST['action']) {
 	//--------------------------------------------------
 	case 'user_update':
 		$user = new user(htmlobject_request('name'));
-		
+
 		if($user->check_user_exists() === true) {
 			//--------------------------------------------------
 			if(htmlobject_request('name') == '') {
 				$strMsg .= 'Login must not be empty<br>';
-				$error = true;			
+				$error = true;
 			} else {
 				if(strstr($OPENQRM_USER->role, "administrator") || htmlobject_request('name') == $OPENQRM_USER->name) {
 					$strCheck = $user->check_string_name(htmlobject_request('name'));
@@ -41,7 +41,7 @@ switch ($_REQUEST['action']) {
 					}
 				} else {
 					$strMsg .= 'You are not allowed to change Login<br>';
-					$error = true;			
+					$error = true;
 				}
 			}
 			//--------------------------------------------------
@@ -50,7 +50,7 @@ switch ($_REQUEST['action']) {
 				$strMsg .= 'You are not allowed to change Role<br>';
 				$error = true;
 			}
-			//--------------------------------------------------		
+			//--------------------------------------------------
 			if(htmlobject_request('password') != '') {
 				$strCheck = $user->check_string_password(htmlobject_request('password'));
 				if ($strCheck != '') {
@@ -66,7 +66,7 @@ switch ($_REQUEST['action']) {
 			$strMsg .= 'User not found<br>';
 			$error = true;
 		}
-		//--------------------------------------------------			
+		//--------------------------------------------------
 		if($error === false) {
 			$user->set_user_from_request();
 			$msg = $user->query_update();
@@ -83,13 +83,13 @@ switch ($_REQUEST['action']) {
 		//--------------------------------------------------
 		if(htmlobject_request('name') == '') {
 			$strMsg .= 'Login must not be empty<br>';
-			$error = true;			
+			$error = true;
 		} else {
 			$strCheck = $user->check_string_name(htmlobject_request('name'));
 			if ($strCheck != '') {
 				$user->name = '';
 				$strMsg .= 'Login must be '.$strCheck.'<br>';
-				$error = true;			
+				$error = true;
 			}
 		}
 		if ($user->check_user_exists() === true) {
@@ -99,12 +99,12 @@ switch ($_REQUEST['action']) {
 		//--------------------------------------------------
 		if(htmlobject_request('password') == '') {
 			$strMsg .= 'Password must not be empty<br>';
-			$error = true;			
+			$error = true;
 		} else {
 			$strCheck = $user->check_string_password(htmlobject_request('password'));
 			if ($strCheck != '') {
 				$strMsg .= 'Password must be '.$strCheck.'<br>';
-				$error = true;			
+				$error = true;
 			}
 			if (htmlobject_request('password') != htmlobject_request('retype_password')) {
 				$strMsg .= 'Password must be the same as Retype Password<br>';
@@ -120,32 +120,32 @@ switch ($_REQUEST['action']) {
 		break;
 	//--------------------------------------------------
 	//  Delete User 1
-	//--------------------------------------------------	
+	//--------------------------------------------------
 	case 'user_delete':
-		if(strstr($OPENQRM_USER->role, "administrator") || htmlobject_request('name') == $OPENQRM_USER->name) {	
+		if(strstr($OPENQRM_USER->role, "administrator") || htmlobject_request('name') == $OPENQRM_USER->name) {
 			$url = $thisfile.'?delete=1&currenttab='.$_REQUEST['currenttab'].'&name='.htmlobject_request('name');
 		} else {
 			$strMsg .= 'You are not allowed to delete Users<br>';
-			$error = true;			
+			$error = true;
 		}
 		break;
 	//--------------------------------------------------
 	//  Delete User 2
-	//--------------------------------------------------	
+	//--------------------------------------------------
 	case 'user_delete_2':
-		if(strstr($OPENQRM_USER->role, "administrator") || htmlobject_request('name') == $OPENQRM_USER->name) {	
+		if(strstr($OPENQRM_USER->role, "administrator") || htmlobject_request('name') == $OPENQRM_USER->name) {
 			$user = new user(htmlobject_request('name'));
 			$user->set_user();
-			if($user->id != 0) {	
-				#$user->query_delete();
+			if($user->id != 0) {
+				$user->query_delete();
 				$strMsg .= 'User <b>'.htmlobject_request('name').'</b> deleted<br>';
 			} else {
 				$strMsg .= 'You are not allowed to delete User id 0<br>';
-				$error = true;	
-			}	
+				$error = true;
+			}
 		} else {
 			$strMsg .= 'You are not allowed to delete Users<br>';
-			$error = true;	
+			$error = true;
 		}
 		break;
 }

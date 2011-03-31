@@ -39,97 +39,97 @@ function redirect($strMsg, $currenttab = 'tab0', $url = '') {
 
 
 if(htmlobject_request('action') != '' && $OPENQRM_USER->role == "administrator") {
-$strMsg = '';
+	$strMsg = '';
 
 	switch (htmlobject_request('action')) {
 		case 'remove':
 			$kernel = new kernel();
-            if(isset($_REQUEST['identifier'])) {
-                foreach($_REQUEST['identifier'] as $id) {
-                    // check that this is not the default kernel
-                    if ($id == 1) {
-                        $strMsg .= "Not removing the default kernel!<br>";
-                        continue;
-                    }
-                    // check that this kernel is not in use any more
-                    $kernel_is_used_by_appliance = "";
-                    $remove_error = 0;
-                    $appliance = new appliance();
-                    $appliance_id_list = $appliance->get_all_ids();
-                    foreach($appliance_id_list as $appliance_list) {
-                        $appliance_id = $appliance_list['appliance_id'];
-                        $app_kernel_remove_check = new appliance();
-                        $app_kernel_remove_check->get_instance_by_id($appliance_id);
-                        if ($app_kernel_remove_check->kernelid == $id) {
-                            $kernel_is_used_by_appliance .= $appliance_id." ";
-                            $remove_error = 1;
-                        }
-                    }
-                    if ($remove_error == 1) {
-                        $strMsg .= "Kernel id ".$id." is used by appliance(s): ".$kernel_is_used_by_appliance." <br>";
-                        $strMsg .= "Not removing kernel id ".$id." !<br>";
-                        continue;
-                    }
+			if(isset($_REQUEST['identifier'])) {
+				foreach($_REQUEST['identifier'] as $id) {
+					// check that this is not the default kernel
+					if ($id == 1) {
+						$strMsg .= "Not removing the default kernel!<br>";
+						continue;
+					}
+					// check that this kernel is not in use any more
+					$kernel_is_used_by_appliance = "";
+					$remove_error = 0;
+					$appliance = new appliance();
+					$appliance_id_list = $appliance->get_all_ids();
+					foreach($appliance_id_list as $appliance_list) {
+						$appliance_id = $appliance_list['appliance_id'];
+						$app_kernel_remove_check = new appliance();
+						$app_kernel_remove_check->get_instance_by_id($appliance_id);
+						if ($app_kernel_remove_check->kernelid == $id) {
+							$kernel_is_used_by_appliance .= $appliance_id." ";
+							$remove_error = 1;
+						}
+					}
+					if ($remove_error == 1) {
+						$strMsg .= "Kernel id ".$id." is used by appliance(s): ".$kernel_is_used_by_appliance." <br>";
+						$strMsg .= "Not removing kernel id ".$id." !<br>";
+						continue;
+					}
 
-                    $strMsg .= $kernel->remove($id);
-                }
-            }
+					$strMsg .= $kernel->remove($id);
+				}
+			}
 			redirect($strMsg);
 			break;
 
 		case 'set-default':
 			$kernel = new kernel();
-            if(isset($_REQUEST['identifier'])) {
-                foreach($_REQUEST['identifier'] as $id) {
-                    // update default kernel in db
-                    $kernel->get_instance_by_id($id);
-                    $ar_kernel_update = array(
-                        'kernel_name' => "default",
-                        'kernel_version' => $kernel->version,
-                        'kernel_capabilities' => $kernel->capabilities,
-                    );
-                    $kernel->update(1, $ar_kernel_update);
-                    // send set-default kernel command to openQRM
-                    $openqrm_server->send_command("openqrm_server_set_default_kernel $kernel->name");
-                    $strMsg .= "Set kernel ".$kernel->name." as the default kernel";
-                    break;
-                }
-                redirect($strMsg);
-            }
+			if(isset($_REQUEST['identifier'])) {
+				foreach($_REQUEST['identifier'] as $id) {
+					// update default kernel in db
+					$kernel->get_instance_by_id($id);
+					$ar_kernel_update = array(
+						'kernel_name' => "default",
+						'kernel_version' => $kernel->version,
+						'kernel_capabilities' => $kernel->capabilities,
+					);
+					$kernel->update(1, $ar_kernel_update);
+					// send set-default kernel command to openQRM
+					$openqrm_server->send_command("openqrm_server_set_default_kernel $kernel->name");
+					$strMsg .= "Set kernel ".$kernel->name." as the default kernel";
+					break;
+				}
+				redirect($strMsg);
+			}
 			break;
 
 		case 'update':
-            $kernel_id = htmlobject_request("kernel_id");
-            $kernel_name = htmlobject_request("kernel_name");
+			$kernel_id = htmlobject_request("kernel_id");
+			$kernel_comment = htmlobject_request("kernel_comment");
 
-            // check that this kernel is not in use any more
-            $kernel_is_used_by_appliance = "";
-            $update_error = 0;
-            $appliance = new appliance();
-            $appliance_id_list = $appliance->get_all_ids();
-            foreach($appliance_id_list as $appliance_list) {
-                $appliance_id = $appliance_list['appliance_id'];
-                $app_kernel_update_check = new appliance();
-                $app_kernel_update_check->get_instance_by_id($appliance_id);
-                if (!strcmp($app_kernel_update_check->state, "stopped")) {
-                    continue;
-                }
-                if ($app_kernel_update_check->kernelid == $kernel_id) {
-                    $kernel_is_used_by_appliance .= $appliance_id." ";
-                    $update_error = 1;
-                }
-            }
-            if ($update_error == 1) {
-                $strMsg .= "Kernel id ".$kernel_id." is used by appliance(s): ".$kernel_is_used_by_appliance." <br>";
-                $strMsg .= "Not updating kernel id ".$kernel_id." !<br>";
-            } else {
-                $kernel = new kernel();
-                $kernel_fields = array();
-                $kernel_fields['kernel_name'] = $kernel_name;
-                $kernel->update($kernel_id, $kernel_fields);
-                $strMsg .= "Updated kernel id ".$kernel_id." <br>";
-            }
-            redirect($strMsg);
+			// check that this kernel is not in use any more
+			$kernel_is_used_by_appliance = "";
+			$update_error = 0;
+			$appliance = new appliance();
+			$appliance_id_list = $appliance->get_all_ids();
+			foreach($appliance_id_list as $appliance_list) {
+				$appliance_id = $appliance_list['appliance_id'];
+				$app_kernel_update_check = new appliance();
+				$app_kernel_update_check->get_instance_by_id($appliance_id);
+				if (!strcmp($app_kernel_update_check->state, "stopped")) {
+					continue;
+				}
+				if ($app_kernel_update_check->kernelid == $kernel_id) {
+					$kernel_is_used_by_appliance .= $appliance_id." ";
+					$update_error = 1;
+				}
+			}
+			if ($update_error == 1) {
+				$strMsg .= "Kernel id ".$kernel_id." is used by appliance(s): ".$kernel_is_used_by_appliance." <br>";
+				$strMsg .= "Not updating kernel id ".$kernel_id." !<br>";
+			} else {
+				$kernel = new kernel();
+				$kernel_fields = array();
+				$kernel_fields['kernel_comment'] = $kernel_comment;
+				$kernel->update($kernel_id, $kernel_fields);
+				$strMsg .= "Updated kernel id ".$kernel_id." <br>";
+			}
+			redirect($strMsg);
 			break;
 
 	}
@@ -162,8 +162,8 @@ function kernel_display() {
 	$arHead['kernel_version'] = array();
 	$arHead['kernel_version']['title'] ='Version';
 
-	$arHead['kernel_capabilities'] = array();
-	$arHead['kernel_capabilities']['title'] ='Capabilities';
+	$arHead['kernel_comment'] = array();
+	$arHead['kernel_comment']['title'] ='Comment';
 
 	$arBody = array();
 	$kernel_array = $kernel_tmp->display_overview($table->offset, $table->limit, $table->sort, $table->order);
@@ -177,7 +177,7 @@ function kernel_display() {
 			'kernel_id' => $kernel_db["kernel_id"],
 			'kernel_name' => $kernel_db["kernel_name"],
 			'kernel_version' => $kernel_db["kernel_version"],
-			'kernel_capabilities' => $kernel_db["kernel_capabilities"],
+			'kernel_comment' => $kernel_db["kernel_comment"],
 		);
 
 	}
@@ -190,15 +190,15 @@ function kernel_display() {
 	$table->form_action = $thisfile;
 	$table->head = $arHead;
 	$table->body = $arBody;
-    $table->identifier_disabled = array(1);
+	$table->identifier_disabled = array(1);
 	if ($OPENQRM_USER->role == "administrator") {
 		$table->bottom = array('edit', 'set-default', 'remove');
 		$table->identifier = 'kernel_id';
 	}
-        $kernel_max = $kernel_tmp->get_count();
+		$kernel_max = $kernel_tmp->get_count();
 	$table->max = $kernel_max - 1;
 	#$table->limit = 10;
-	
+
 	return $disp.$table->get_string();
 }
 
@@ -208,8 +208,8 @@ function kernel_form() {
 	$disp = "<h1>New Kernel</h1>";
 	$disp = $disp."<br>";
 	$disp = $disp."<br>";
-	$disp = $disp."New kernels should be added on the openqrm server with the following command:<br>";
-    $disp = $disp."<br>";
+	$disp = $disp."<b>New kernels should be added on the openqrm server with the following command:</b><br>";
+	$disp = $disp."<br>";
 	$disp = $disp."<br>/usr/share/openqrm/bin/openqrm kernel add -n name -v version -u username -p password [-l location] [-i initramfs/ext2] [-t path-to-initrd-template-file]<br>";
 	$disp = $disp."<br>";
 	$disp = $disp."<b>name</b> can be any identifier as long as it has no spaces or other special characters; it is used as part of the filename.<br>";
@@ -222,12 +222,12 @@ function kernel_form() {
 	$disp = $disp."Example:<br>";
 	$disp = $disp."/usr/share/openqrm/bin/openqrm kernel add -n openqrm-kernel-1 -v 2.6.29 -u openqrm -p openqrm -i initramfs -l / -t /usr/share/openqrm/etc/templates/openqrm-initrd-template.debian.x86_64.tgz<br>";
 	$disp = $disp."<br>";
- 	return $disp;
+	return $disp;
 }
 
 
 function kernel_edit($kernel_id) {
-
+	global $thisfile;
 	if (!strlen($kernel_id))  {
 		echo "No Kernel selected!";
 		exit(0);
@@ -240,8 +240,9 @@ function kernel_edit($kernel_id) {
 	$disp = $disp."<form action='".$thisfile."' method=post>";
 	$disp = $disp."<br>";
 	$disp = $disp."<br>";
-	$disp = $disp.htmlobject_input('kernel_name', array("value" => $kernel->name, "label" => 'Kernel name'), 'text', 20);
-//	$disp = $disp.htmlobject_input('kernel_version', array("value" => $kernel->version, "label" => ' Kernel version'), 'text', 20);
+	$disp = $disp."<b>".$kernel->name."</b><br>";
+	$disp = $disp.htmlobject_input('kernel_comment', array("value" => $kernel->comment, "label" => 'Comment'), 'text', 100);
+	//	$disp = $disp.htmlobject_input('kernel_version', array("value" => $kernel->version, "label" => ' Kernel version'), 'text', 20);
 	$disp = $disp."<input type=hidden name=kernel_id value=$kernel_id>";
 	$disp = $disp."<input type=hidden name=action value='update'>";
 	$disp = $disp."<input type=submit value='Update'>";
@@ -261,29 +262,30 @@ function kernel_edit($kernel_id) {
 $output = array();
 if($OPENQRM_USER->role == "administrator") {
 	if(htmlobject_request('action') != '') {
-        if(isset($_REQUEST['identifier'])) {
-            switch (htmlobject_request('action')) {
-                case 'edit':
-                    foreach($_REQUEST['identifier'] as $id) {
-                        $output[] = array('label' => 'Edit Kernel', 'value' => kernel_edit($id));
-                        break;
-                    }
-                    break;
-            }
-        } else {
-            $output[] = array('label' => 'Kernel-Admin', 'value' => kernel_display());
-            $output[] = array('label' => 'New', 'value' => kernel_form());
-        }
+		if(isset($_REQUEST['identifier'])) {
+			switch (htmlobject_request('action')) {
+				case 'edit':
+					foreach($_REQUEST['identifier'] as $id) {
+						$output[] = array('label' => 'Edit Kernel', 'value' => kernel_edit($id));
+						break;
+					}
+					break;
+			}
+		} else {
+			$output[] = array('label' => 'Kernel-Admin', 'value' => kernel_display());
+			$output[] = array('label' => 'New', 'value' => kernel_form());
+		}
 	} else {
-        $output[] = array('label' => 'Kernel-Admin', 'value' => kernel_display());
-        $output[] = array('label' => 'New', 'value' => kernel_form());
-    }
+		$output[] = array('label' => 'Kernel-Admin', 'value' => kernel_display());
+		$output[] = array('label' => 'New', 'value' => kernel_form());
+	}
 }
 
 
 ?>
 <link rel="stylesheet" type="text/css" href="../../css/htmlobject.css" />
 <link rel="stylesheet" type="text/css" href="kernel.css" />
+
 <?php
 echo htmlobject_tabmenu($output);
 ?>

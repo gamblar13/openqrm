@@ -20,8 +20,8 @@
     Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 
-	$RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
-	require_once "$RootDir/include/openqrm-database-functions.php";
+$RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
+require_once "$RootDir/include/openqrm-database-functions.php";
 
 /**
  * This class represents an event in the openQRM engine
@@ -218,14 +218,14 @@ var $crondaily_time = '943939500';
 		}
 		$db=openqrm_get_db_connection();
 		$result = $db->AutoExecute($this->_db_table, $event_fields, 'INSERT');
-        // patch by tvs
-        if (! $result) {
-            if ((strncmp(strftime("%X", $this->crondaily_time), strftime("%X", $event_fields["event_time"]), 5))!=0) {
-                // try again
-                sleep(1);
-                $result = $db->AutoExecute($this->_db_table, $event_fields, 'INSERT');
-            }
-        }
+		// patch by tvs
+		if (! $result) {
+			if ((strncmp(strftime("%X", $this->crondaily_time), strftime("%X", $event_fields["event_time"]), 5))!=0) {
+				// try again
+				sleep(1);
+				$result = $db->AutoExecute($this->_db_table, $event_fields, 'INSERT');
+			}
+		}
 	}
 
 	//--------------------------------------------------
@@ -239,7 +239,7 @@ var $crondaily_time = '943939500';
 	* $fields['event_source'] = 'kernel-action';
 	* $fields['event_comment'] = 'some comment';
 	* $fields['event_description'] = 'some description';
-	* $fields['event_capabilities'] = 'sometext'; 
+	* $fields['event_capabilities'] = 'sometext';
 	* $fields['event_status'] = 1;
 	* $fields['event_image_id'] = 1;
 	* $fields['event_resource_id'] = 1;
@@ -289,7 +289,7 @@ var $crondaily_time = '943939500';
 			$this->log("log", $_SERVER['REQUEST_TIME'], 2, "event.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
 		else
 		if ($rs->EOF) {
-            // log does not yet exists, add it
+			// log does not yet exists, add it
 			$new_event_id=openqrm_db_get_free_id('event_id', $this->_db_table);
 			$event_fields=array();
 			$event_fields["event_id"]=$new_event_id;
@@ -477,7 +477,7 @@ var $crondaily_time = '943939500';
 				$recordSet->MoveNext();
 			}
 			$recordSet->Close();
-		}		
+		}
 		return $event_array;
 	}
 

@@ -40,7 +40,7 @@ function redirect($strMsg, $currenttab = 'tab0', $url = '') {
 
 
 if(htmlobject_request('action') != '' && strtolower(OPENQRM_USER_ROLE_NAME) == 'administrator') {
-$strMsg = '';
+	$strMsg = '';
 
 	switch (htmlobject_request('action')) {
 		case 'remove':
@@ -62,7 +62,7 @@ $strMsg = '';
 								'image_name' => $image->name,
 								'image_type' => $image->comment,
 							);
-							$str_ident .= htmlobject_input('identifier[]', array('value' => $id), 'hidden');
+							$str_ident .= htmlobject_input('identifier[]', array('value' => $id, 'label' => ''), 'hidden');
 							$args =  array_merge($args, array('id[]' => $id));
 							$checked[] = $id;
 							$i++;
@@ -74,9 +74,9 @@ $strMsg = '';
 						$arHead['image_name']['title'] ='Name';
 						$arHead['image_type'] = array();
 						$arHead['image_type']['title'] ='image Type';
-					
+
 						$table = new htmlobject_table_builder('','','','','','del_');
-						$table->add_headrow('<a href="'.$thisfile.'"><< cancel</a>'.htmlobject_input('action', array('value' => 'remove'), 'hidden').$str_ident);
+						$table->add_headrow('<a href="'.$thisfile.'"><< cancel</a>'.htmlobject_input('action', array('value' => 'remove', 'label' => ''), 'hidden').$str_ident);
 						$table->id = 'Tabelle';
 						$table->css = 'htmlobject_table';
 						$table->border = 1;
@@ -100,27 +100,27 @@ $strMsg = '';
 					$image = new image();
 					if(isset($_REQUEST['delident'])) {
 						foreach($_REQUEST['delident'] as $id) {
-                            // check that image is not still used by an appliance
-                            $image_is_used_by_appliance = "";
-                            $remove_error = 0;
-                            $appliance = new appliance();
-                            $appliance_id_list = $appliance->get_all_ids();
-                            foreach($appliance_id_list as $appliance_list) {
-                                $appliance_id = $appliance_list['appliance_id'];
-                                $app_image_remove_check = new appliance();
-                                $app_image_remove_check->get_instance_by_id($appliance_id);
-                                if ($app_image_remove_check->imageid == $id) {
-                                    $image_is_used_by_appliance .= $appliance_id." ";
-                                    $remove_error = 1;
-                                }
-                            }
-                            if ($remove_error == 1) {
-                                $strMsg .= "Image id ".$id." is used by appliance(s): ".$image_is_used_by_appliance." <br>";
-                                $strMsg .= "Not removing image id ".$id." !<br>";
-                                continue;
-                            }
-                            // here we remove the image
-                            $image->remove($id);
+							// check that image is not still used by an appliance
+							$image_is_used_by_appliance = "";
+							$remove_error = 0;
+							$appliance = new appliance();
+							$appliance_id_list = $appliance->get_all_ids();
+							foreach($appliance_id_list as $appliance_list) {
+								$appliance_id = $appliance_list['appliance_id'];
+								$app_image_remove_check = new appliance();
+								$app_image_remove_check->get_instance_by_id($appliance_id);
+								if ($app_image_remove_check->imageid == $id) {
+									$image_is_used_by_appliance .= $appliance_id." ";
+									$remove_error = 1;
+								}
+							}
+							if ($remove_error == 1) {
+								$strMsg .= "Image id ".$id." is used by appliance(s): ".$image_is_used_by_appliance." <br>";
+								$strMsg .= "Not removing image id ".$id." !<br>";
+								continue;
+							}
+							// here we remove the image
+							$image->remove($id);
 							$strMsg .= "Removed image id ".$id."<br>";
 						}
 						redirect($strMsg);
@@ -129,7 +129,6 @@ $strMsg = '';
 			}
 		break;
 	}
-
 }
 
 
@@ -168,10 +167,6 @@ function image_display() {
 	$arHead['image_comment']['title'] ='Comment';
 	$arHead['image_comment']['sortable'] = false;
 
-	$arHead['image_capabilities'] = array();
-	$arHead['image_capabilities']['title'] ='Capabilities';
-	$arHead['image_capabilities']['sortable'] = false;
-
 	$arHead['image_edit'] = array();
 	$arHead['image_edit']['title'] ='';
 	$arHead['image_edit']['sortable'] = false;
@@ -201,7 +196,6 @@ function image_display() {
 			'image_version' => $image_db["image_version"],
 			'image_type' => $image_deployment->description,
 			'image_comment' => $image_db["image_comment"],
-			'image_capabilities' => $image_db["image_capabilities"],
 			'image_edit' => $strEdit,
 		);
 
@@ -221,11 +215,11 @@ function image_display() {
 		$table->identifier_name = 'id';
 		$table->identifier_disabled = array(1);
 	}
-        // do not show the openQRM server and idle image
-        $image_max = $image_tmp->get_count();
+		// do not show the openQRM server and idle image
+		$image_max = $image_tmp->get_count();
 	$table->max = $image_max-2;
 	#$table->limit = 10;
-	
+
 	return $disp.$table->get_string();
 }
 

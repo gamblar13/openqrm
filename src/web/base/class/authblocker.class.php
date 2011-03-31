@@ -172,18 +172,18 @@ function remove($authblocker_id) {
 
 // updates a authblocker
 function update($ab_id, $ab_fields) {
-    global $AUTH_BLOCKER_TABLE;
-    global $event;
-    if ($ab_id < 0 || ! is_array($ab_fields)) {
-        $this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "authblocker.class.php", "Unable to update authblocker $ab_id", "", "", 0, 0, 0);
-        return 1;
-    }
-    $db=openqrm_get_db_connection();
-    unset($ab_fields["ab_id"]);
-    $result = $db->AutoExecute($this->_db_table, $ab_fields, 'UPDATE', "ab_id = $ab_id");
-    if (! $result) {
-        $this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "authblocker.class.php", "Failed updating authblocker $ab_id", "", "", 0, 0, 0);
-    }
+	global $AUTH_BLOCKER_TABLE;
+	global $event;
+	if ($ab_id < 0 || ! is_array($ab_fields)) {
+		$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "authblocker.class.php", "Unable to update authblocker $ab_id", "", "", 0, 0, 0);
+		return 1;
+	}
+	$db=openqrm_get_db_connection();
+	unset($ab_fields["ab_id"]);
+	$result = $db->AutoExecute($this->_db_table, $ab_fields, 'UPDATE', "ab_id = $ab_id");
+	if (! $result) {
+		$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "authblocker.class.php", "Failed updating authblocker $ab_id", "", "", 0, 0, 0);
+	}
 }
 
 

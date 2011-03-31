@@ -18,29 +18,44 @@
 */
 -->
 <style>
-.htmlobject_tab_box {
-	width:800px;
-}
+
 </style>
+<form action="{thisfile}">
+{currentab}
+{appliance_resources}
+{appliance_imageid}
 
-<h1>Create new Resource</h1>
+<div>
+<h3>Please provide a name for the Appliance</h3>
+<br>
+{appliance_name}
+{appliance_kernelid}
 
-<div style="float:left;">
-	<h3>as a Virtual Machine</h3>
-	<b>{resource_virtual}</b>
-	<br>
-	<h3>or by integrating an existing, local-installed server</h3>
-	<b>{resource_local}</b>
-	<br>
-	<h3>or manual add an un-managed system</h3>
-	<b>{resource_new}</b>
-	<br>
+<h3>optional Requirements</h3>
+
+	<div style="float:left;">
+		{appliance_cpunumber}
+		{appliance_cpuspeed}
+		{appliance_cpumodel}
+		{appliance_memtotal}
+		{appliance_swaptotal}
+		{appliance_nics}
+		{appliance_capabilities}
+	</div>
+	<div style="float:left; margin:0 0 0 50px;">
+
+	</div>
+	<div style="clear:both;line-height:0px;">&#160;</div>
+
+
+
+{appliance_virtualization}
+{appliance_comment}
 
 </div>
-<div style="text-align:center;">
-	<br>
-	<br>
-	<br>
-	<br>
-</div>
 
+
+
+<div style="text-align:right;">{submit_save}</div>
+
+</form>

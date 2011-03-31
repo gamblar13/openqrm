@@ -18,29 +18,16 @@
 */
 -->
 <style>
-.htmlobject_tab_box {
-	width:800px;
-}
+
 </style>
+<form action="{thisfile}">
+{currentab}
 
-<h1>Create new Resource</h1>
+<div>
+<h3>Please select a Resource from the List</h3>
 
-<div style="float:left;">
-	<h3>as a Virtual Machine</h3>
-	<b>{resource_virtual}</b>
-	<br>
-	<h3>or by integrating an existing, local-installed server</h3>
-	<b>{resource_local}</b>
-	<br>
-	<h3>or manual add an un-managed system</h3>
-	<b>{resource_new}</b>
-	<br>
-
-</div>
-<div style="text-align:center;">
-	<br>
-	<br>
-	<br>
-	<br>
+{resource_table}
 </div>
 
+
+</form>

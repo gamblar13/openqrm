@@ -40,7 +40,7 @@ $appliance_id = (htmlobject_request('appliance_id') == '') ? @$_REQUEST['identif
 if($appliance_id != '') {
 	$appliance = new appliance();
 	$appliance->get_instance_by_id($appliance_id);
-	
+
 	$ar_request = array(
 		'appliance_resources' => isset($_REQUEST['identifier'][0]) ? $_REQUEST['identifier'][0] : $appliance->resources,
 		'appliance_name' => (htmlobject_request('appliance_name') != '') ? htmlobject_request('appliance_name') : $appliance->name,
@@ -79,15 +79,15 @@ function redirect($strMsg, $currenttab = 'tab0', $url = '') {
 }
 
 if(htmlobject_request('action') != '' && $appliance_id != '') {
-$strMsg = '';
-$openqrm_server = new openqrm_server();
+	$strMsg = '';
+	$openqrm_server = new openqrm_server();
 
 	switch (htmlobject_request('action')) {
 		case 'save':
 			$error = 0;
 			$ar_request['appliance_name'] = strtolower($ar_request['appliance_name']);
 			if($ar_request['appliance_name'] != '') {
-				if (ereg("^[A-Za-z0-9_-]*$", $ar_request['appliance_name']) === false) {
+				if (!preg_match('#^[A-Za-z0-9_-]*$#', $ar_request['appliance_name'])) {
 					$strMsg .= 'appliance name must be [A-Za-z0-9_-]<br/>';
 					$error = 1;
 				}
@@ -95,37 +95,37 @@ $openqrm_server = new openqrm_server();
 				$strMsg .= "appliance name can not be empty<br/>";
 				$error = 1;
 			}
-                        // checks
-                        $appliance = new appliance();
-                        $appliance->get_instance_by_id($appliance_id);
+						// checks
+						$appliance = new appliance();
+						$appliance->get_instance_by_id($appliance_id);
 
-                        $save_resource_id = $ar_request['appliance_resources'];
-                        $save_image_id = $ar_request['appliance_imageid'];
-                        $save_kernel_id = $ar_request['appliance_kernelid'];
+						$save_resource_id = $ar_request['appliance_resources'];
+						$save_image_id = $ar_request['appliance_imageid'];
+						$save_kernel_id = $ar_request['appliance_kernelid'];
 
-                        // resource changed ?
-                        if ($appliance->resources != $save_resource_id) {
-                        // if resource changed and check that appliance is stopped (do not care about the origin resource)
-                            if (strcmp($appliance->state, "stopped")) {
-                                $strMsg .= "Please stop the appliance $appliance_id before changing its resource!<br>Not saving appliance $appliance_id.<br>";
-                                redirect($strMsg);
-                                $error = 1;
-                            }
-                        }
-                        // image changed ?
-                        if ($appliance->imageid != $save_image_id) {
-                            // if image changed and check that appliance is stopped
-                            if (strcmp($appliance->state, "stopped")) {
-                                $strMsg .= "Image of appliance $appliance_id changed.<br>Please restart appliance $appliance_id to apply the change!<br>";
-                            }
-                        }
-                        // kernel changed ?
-                        if ($appliance->kernelid != $save_kernel_id) {
-                            // if kernel changed and check that appliance is stopped
-                            if (strcmp($appliance->state, "stopped")) {
-                                $strMsg .= "Kernel of appliance $appliance_id changed.<br>Please restart appliance $appliance_id to apply the change!<br>";
-                            }
-                        }
+						// resource changed ?
+						if ($appliance->resources != $save_resource_id) {
+						// if resource changed and check that appliance is stopped (do not care about the origin resource)
+							if (strcmp($appliance->state, "stopped")) {
+								$strMsg .= "Please stop the appliance $appliance_id before changing its resource!<br>Not saving appliance $appliance_id.<br>";
+								redirect($strMsg);
+								$error = 1;
+							}
+						}
+						// image changed ?
+						if ($appliance->imageid != $save_image_id) {
+							// if image changed and check that appliance is stopped
+							if (strcmp($appliance->state, "stopped")) {
+								$strMsg .= "Image of appliance $appliance_id changed.<br>Please restart appliance $appliance_id to apply the change!<br>";
+							}
+						}
+						// kernel changed ?
+						if ($appliance->kernelid != $save_kernel_id) {
+							// if kernel changed and check that appliance is stopped
+							if (strcmp($appliance->state, "stopped")) {
+								$strMsg .= "Kernel of appliance $appliance_id changed.<br>Please restart appliance $appliance_id to apply the change!<br>";
+							}
+						}
 
 
 			if($error == 0) {
@@ -133,7 +133,7 @@ $openqrm_server = new openqrm_server();
 				echo $appliance->update($appliance_id, $ar_request);
 				$strMsg .= "Updated appliance ".$appliance_id."<br>";
 				redirect($strMsg);
-			} 
+			}
 			else { $_REQUEST['strMsg'] = $strMsg; }
 
 		break;
@@ -148,15 +148,35 @@ function appliance_form() {
 	$image = new image();
 	$image_list = array();
 	$image_list = $image->get_list();
+	$image_filtered_list = array();
 	// remove the openqrm + idle image from the list
 	array_shift($image_list);
 	array_shift($image_list);
+	// filter out all local images
+	foreach($image_list as $image_arr) {
+		$image_arr_id = $image_arr['value'];
+		$tmpimage = new image();
+		$tmpimage->get_instance_by_id($image_arr_id);
+		if (!strstr($tmpimage->capabilities, "TYPE=local-server")) {
+			$image_filtered_list[] = $image_arr;
+		}
+	}
 
 	$kernel = new kernel();
 	$kernel_list = array();
 	$kernel_list = $kernel->get_list();
+	$kernel_filtered_list = array();
 	// remove the openqrm kernelfrom the list
 	array_shift($kernel_list);
+	// filter out all local kernels
+	foreach($kernel_list as $kernel_arr) {
+		$kernel_arr_id = $kernel_arr['value'];
+		$tmpkernel = new kernel();
+		$tmpkernel->get_instance_by_id($kernel_arr_id);
+		if (!strstr($tmpkernel->capabilities, "TYPE=local-server")) {
+			$kernel_filtered_list[] = $kernel_arr;
+		}
+	}
 
 	$virtualization = new virtualization();
 	$virtualization_list = array();
@@ -217,7 +237,10 @@ function appliance_form() {
 	}
 	$p_appliance = new appliance();
 	$p_appliance->get_instance_by_id($appliance_id);
-	
+	// set current res_id
+	$current_resource_id = $ar_request['appliance_resources'];
+	$current_resource = new resource();
+	$current_resource->get_instance_by_id($current_resource_id);
 
 	// handle no image available or openqrm server as resource
 	if(count($image_list) > 0 || $ar_request['appliance_resources'] == 0) {
@@ -240,28 +263,34 @@ function appliance_form() {
 				$arHead['resource_id']['title'] ='ID';
 				$arHead['resource_name'] = array();
 				$arHead['resource_name']['title'] ='Name';
-                $arHead['resource_mac'] = array();
-                $arHead['resource_mac']['title'] ='Mac';
+				$arHead['resource_mac'] = array();
+				$arHead['resource_mac']['title'] ='Mac';
 				$arHead['resource_ip'] = array();
 				$arHead['resource_ip']['title'] ='Ip';
-                $arHead['resource_vtype'] = array();
-                $arHead['resource_vtype']['title'] ='Type';
-			
+				$arHead['resource_vtype'] = array();
+				$arHead['resource_vtype']['title'] ='Type';
+
 				$auto_resource_icon="/openqrm/base/img/resource.png";
 				$auto_state_icon="/openqrm/base/img/active.png";
-		
+
 				$arBody = array();
-				// add auto-select resource to table 
+				// add auto-select resource to table
 				$arBody[] = array(
 					'resource_state' => "<img src=$auto_state_icon>",
 					'resource_icon' => "<img width=24 height=24 src=$auto_resource_icon>",
 					'resource_id' => '-1',
 					'resource_name' => "auto-select resource",
-                    'resource_mac' => "x:x:x:x:x:x",
-                    'resource_ip' => "0.0.0.0",
-                    'resource_vtype' => "auto",
+					'resource_mac' => "x:x:x:x:x:x",
+					'resource_ip' => "0.0.0.0",
+					'resource_vtype' => "auto",
 				);
-			
+				// build the disabled array
+				$identifier_disabled_local_res_arr = array();
+				$identifier_disabled_local_res_arr[] = -1; // auto-select
+				$identifier_disabled_local_res_arr[] = 0; // openqrm
+				$identifier_disabled_non_local_res_arr = array();
+				$identifier_disabled_non_local_res_arr[] = 0; // openqrm
+
 				$resource_tmp = new resource();
 				$resource_array = $resource_tmp->display_overview($table->offset, $table->limit, $table->sort, $table->order);
 				foreach ($resource_array as $index => $resource_db) {
@@ -276,23 +305,30 @@ function appliance_form() {
 					if (!file_exists($_SERVER["DOCUMENT_ROOT"]."/".$state_icon)) {
 						$state_icon="/openqrm/base/img/unknown.png";
 					}
-                    if ($resource->id == 0) {
-                        $resource_type_info="openQRM Server";
-                        $resource->mac = "x:x:x:x:x:x";
-                    } else {
-                        $virtualization = new virtualization();
-                        $virtualization->get_instance_by_id($resource->vtype);
-                        $resource_type_info=$virtualization->name." on Res. ".$resource->vhostid;
-                    }
+					if ($resource->id == 0) {
+						$resource_type_info="openQRM Server";
+						$resource->mac = "x:x:x:x:x:x";
+					} else {
+						$virtualization = new virtualization();
+						$virtualization->get_instance_by_id($resource->vtype);
+						$resource_type_info=$virtualization->name." on Res. ".$resource->vhostid;
+					}
+					// add to disabled arr if not the current resource
+					if ($resource->id != $current_resource_id) {
+						$identifier_disabled_local_res_arr[] = $resource->id;
+					}
+					if (strstr($resource->capabilities, "TYPE=local-server")) {
+						$identifier_disabled_non_local_res_arr[] = $resource->id;
+					}
 
 					$arBody[] = array(
 						'resource_state' => "<img src=$state_icon>",
 						'resource_icon' => "<img width=24 height=24 src=$resource_icon_default>",
 						'resource_id' => $resource->id,
 						'resource_name' => $resource->hostname,
-                        'resource_mac' => $resource->mac,
-                        'resource_ip' => $resource->ip,
-                        'resource_vtype' => $resource_type_info,
+						'resource_mac' => $resource->mac,
+						'resource_ip' => $resource->ip,
+						'resource_vtype' => $resource_type_info,
 					);
 				}
 
@@ -307,12 +343,36 @@ function appliance_form() {
 					$table->identifier = 'resource_id';
 					$table->identifier_type = 'radio';
 					$table->identifier_checked = array($ar_request['appliance_resources']);
-					$table->identifier_disabled = array(0); // handle openqrm server as resource 
+					
+					// is local-server resource or non-local-resource ?
+					if (strstr($current_resource->capabilities, "TYPE=local-server")) {
+						$table->identifier_disabled = $identifier_disabled_local_res_arr;
+					} else {
+						$table->identifier_disabled = $identifier_disabled_non_local_res_arr;
+					}
 				}
 				$table->max = count($resource_array) +1;
 				$strTable = '<h3>Resource List</h3>'.$table->get_string();
-				$kernelid = htmlobject_select('appliance_kernelid', $kernel_list, 'Kernel', array($ar_request['appliance_kernelid']));
-				$image = htmlobject_select('appliance_imageid', $image_list, 'Image', array($ar_request['appliance_imageid']));
+
+				// check resource type, local ?
+				$check_resource = new resource();
+				$check_resource->get_instance_by_id($current_resource_id);
+				if (strstr($check_resource->capabilities, "TYPE=local-server")) {
+					// integrated by local-server
+					$local_kernel = new kernel();
+					$local_kernel_name = "resource".$current_resource_id;
+					$local_kernel->get_instance_by_name($local_kernel_name);
+					$local_image = new image();
+					$local_image_name = "resource".$current_resource_id;
+					$local_image->get_instance_by_name($local_image_name);
+					$kernelid = htmlobject_input('appliance_kernelid', array("value" => $local_kernel->id, "label" => "$local_kernel_name"), 'hidden');
+					$image = htmlobject_input('appliance_imageid', array("value" => $local_image->id, "label" => "$local_image_name"), 'hidden');
+
+				} else {
+					// network-deployment
+					$kernelid = htmlobject_select('appliance_kernelid', $kernel_filtered_list, 'Kernel', array($ar_request['appliance_kernelid']));
+					$image = htmlobject_select('appliance_imageid', $image_filtered_list, 'Image', array($ar_request['appliance_imageid']));
+				}
 
 			}
 			// set inputs for openqrm server as resource
@@ -321,11 +381,11 @@ function appliance_form() {
 				$kernelid = htmlobject_input('appliance_kernelid', array("value" => 0, "label" => ''), 'hidden');
 				$image = htmlobject_input('appliance_imageid', array("value" => 0, "label" => ''), 'hidden');
 			}
-	
+
 			// set template
 			$t = new Template_PHPLIB();
 			$t->debug = false;
-			$t->setFile('tplfile', './' . 'appliance-tpl.php');
+			$t->setFile('tplfile', './' . 'appliance-edit-tpl.php');
 			$t->setVar(array(
 				'thisfile' => $thisfile,
 				'step_2' => htmlobject_input('step_2', array("value" => true, "label" => ''), 'hidden'),
@@ -364,7 +424,7 @@ function appliance_form() {
 		$disp .= '</center>';
 		$disp .= '<br><br>';
 	}
-		
+
 	return "<h1>Edit Appliance</h1>". $disp;
 }
 

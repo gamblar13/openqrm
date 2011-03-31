@@ -18,29 +18,20 @@
 */
 -->
 <style>
-.htmlobject_tab_box {
-	width:800px;
-}
+
 </style>
+<form action="{thisfile}">
 
-<h1>Create new Resource</h1>
-
-<div style="float:left;">
-	<h3>as a Virtual Machine</h3>
-	<b>{resource_virtual}</b>
-	<br>
-	<h3>or by integrating an existing, local-installed server</h3>
-	<b>{resource_local}</b>
-	<br>
-	<h3>or manual add an un-managed system</h3>
-	<b>{resource_new}</b>
-	<br>
-
-</div>
-<div style="text-align:center;">
-	<br>
-	<br>
-	<br>
-	<br>
+{currentab}
+<div>
+<h3>Please set the Image for the Appliance</h3>
+<br>
+{appliance_resources}
+{appliance_imageid}
 </div>
 
+
+
+<div style="text-align:center;">{submit_set}</div>
+
+</form>

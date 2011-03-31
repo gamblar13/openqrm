@@ -24,7 +24,7 @@ global $OPENQRM_WEB_PROTOCOL;
 
 
 function documentation_installation() {
-    global $OPENQRM_WEB_PROTOCOL;
+	global $OPENQRM_WEB_PROTOCOL;
 	$disp = "<h1>Installation</h1>";
 	$disp = $disp."<br>";
 	$disp = $disp."openQRM can be easily installed from its source or using the provided binary packages.";

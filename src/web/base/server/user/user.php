@@ -227,7 +227,17 @@ echo htmlobject_head('User Administration');
 </style>
 
 <?php
+
+// if ldap is enabled do not allow access the the openQRM user administration
+if (file_exists("$RootDir/plugins/ldap/.running")) {
+	unset($output);
+	$output[] = array('label' => 'Disabled', 'value' => "The openQRM User-Management is disabled by the LDAP-Plugin!");
+
+}
+
 echo htmlobject_tabmenu($output);
+
+
 ?>
 
 </body>
