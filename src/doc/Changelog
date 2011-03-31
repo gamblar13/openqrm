@@ -1,110 +1,407 @@
 # this is the changelog for the openQRM-server project
 
-12.01.2008	-	created initial framework
-				designed dependencies setup
-				implemented deb-packaging
-13.01.2008	-	added support for rpm-packaging
-14.01.2008	-	made tftpd plugin working
-				made dhcpd plugin working
-16.01.2008	-	added creating default initrd template
-				added creating default boot-image
-17.01.2008	-	added to init network on the intird
-				added build-requirements check
-19.01.2008	-	added root-execution environemnt for the server
-				added to add new detected resources automatically
-				added starting the openrm-client on the booted resources
-20.01.2008	-	cleaned-up init process on the initrd
-				made reboot/halt working
-21.01.2008	-	added basic monitoring framework
-16.03.2008	-	major updates on the basic framework
-				introduced user management and plugg-ability
-				added local, nfs and iscsi deployment types (also plugg-able)
-				added appliance based deployment mechanism
-11.04.2008	-	moved cvs repository to svn	and added svn-commit mails					
+31.03.2011	- for the 4.8 release :
+			- Fixed code indention (complete source code)
+			- Fixed php warnings/errors (complete source code)
+			- Updated openqrm-initrd-templates and openqrm-clients
+			- Updated pciutils + pcimodules patch to version 3.1.7
+			- Added option to overwrite resource-parameter (useful for storage cluster resources with a global cluster ip)
+			- New OpenVZ-Storage Plugin (Support for OpenVZ as an additional Virtualization technology in openQRM)
+			  - Added support for live-migration for OpenVZ VMs
+			  - Integration with Open vSwitch for automated VLAN Management -> http://openvswitch.org/
+			- Improved kvm and kvm-storage Plugins
+			  - Added support for live-migration of KVM/KVM-Storage VMs
+			  - Integration with Open vSwitch for automated VLAN Management
+			- Improved xen and xen-storage Plugins
+			  - Added support for live-migration of Xen/Xen-Storage VMs
+			  - Integration with Open vSwitch for automated VLAN Management
+			- Enhanced Nagios integration (Nagios3 Plugin)
+			  - Added custom service-check configuration for appliances
+			- Initial integration of Icinga (via the Nagios3 Plugin)
+			- New DRBD MC Plugin incorporating Linbit's DRBD Management Console
+			- Improved autostarting VMs after Host reboot
+			- Added "appliance-link-section" hook allowing plugins to add actions to the appliance overview
+			- Improved plugin notification and error event handling
+			- Enhanced usability and user-friendliness
+			- Better "appliance-create" workflow displaying only relevant configuration items
+			- Improved "resource-new" form
+			- Added support to Auto-scale the openQRM Cloud via "Out-of-Band-Management" Plugins (IPMI/WakeUpOnLan)
+			- Progressed with ongoing migration to MVC (removing the frames)
+			- Ported the first plugins (ip-mgmt, ipmi and wakeuponlan) to the
+			  new version of the PHP framework from A. Kuballa -> http://htmlobjects.kuballa.net/
+			  - Fully Object oriented
+			  - Fully translatable (multiple language support)
+			  - Fully templatable (css and javascript integration)
+			  - Automated user-friendly input checking
+			- openQRM 4.8 Bug fixes:
+			3061951 - openqrm-client service on ubuntu
+			2947742 - Create variable for /etc/exports
+			2819000 - snapshot of a LV
+			3153469 - Ubuntu, LXC, Reboot the physical machine
+			2926602 - OpenQRM 4.6 linuxcoe plugin on Centos5.4 64 bit
+			2958647 - OpenSuSE packaging
+			2958640 - OpenSuSE NFS storage
+			2956532 - openqrm-plugin-local-storage-functions not working in sles
+			2803760 - lvm aoe vblade creation
+			3106507 - issue when enabling plugin
+			3111519 - .ssh/authorized_keys wird überschrieben
+			3153471 - LXC_VM_NETWORK param
+			3153463 - Ubuntu, LXC, Reverse DNS
+			3164681 - Templates from shelf, pivot_root error message
+			3170533 - DNS Plugin bug(s), corrupted reverse-zonefile
+			2808601 - xen vm creation with same name
+			3028333 - Renaming kernel in GUI doesn't rename on FS
+			3165328 - WOL Manager is not accessible
+			3195300 - Xen VM cannot be started in Xen 4 with debian 6
+			3195313 - xen plugin Error File descriptor leaked on lvscan invocation
+			3195318 - xen-storage plugin error Volume group "noop" not found
+			3192452 - typo in xen-storage startup script
+			3165331 - Plenty of "Undefined index" messages in Apache/PHP log
+			3157399 - HA plug-in - If more then 1 NIC assigned not creating new VM
+			3156441 - in Nagios werden nicht alle Systeme mit Namen angezeigt
+			3132483 - NAT ist falsch geschrieben
+			3122276 - Build path wrong
+			3118427 - mehere gleichnamige Images möglich
+			2953421 - apt-get problem on Ubuntu at demo
+			2925545 - Different error mess. with integration plugins
+			2897181 - Double IP-Assignment (new ressource)
+			2897175 - New Linux Kernel
+			2840285 - NFS mounting from novell netware server fails
+			2781087 - cloud: turn of avahi service on the ubuntu server-templates
+
+30.09.2010	- for the 4.7 release :
+			- changed halt to poweroff
+			- implemented seamless update
+			- link the tftpboot/boot dir to the boot-services
+			- updated openqrm-client and openqrm-initrd-templates
+			- increased column event_description in event_info table
+			- added database-update functions for mysql
+			- remove the tftpboot link on uninstall
+			- refresh resource-parameters during openqrm-client restart
+			- enhanced openqrm-client start phase for HA
+			- avoid starting bootservices on idle resource for faster startup
+			- clean udev rules on startup to have persistant interface names
+			- heavily increased performance for import_kernel phase
+			- added to detect lvm volumes within the initrd-stage
+			- increased version number, added configuable timeout and retry values for the cmd-queue
+			- added lvm to the initrd
+			- enhanced package-manager update
+			- better handling of setting the default kernel
+			- cmd-queue now using configurable timeout, increased default timeout to 120s
+			- fixed incorrect sequence in the cmd-queue actions
+			- removed sequentially processing-statistics event for better performance
+			- added updated htmlobjects in preparation for the ongoing move to MVC
+			- added authblocker to the appliance.class to enforce the correct start sequence
+			- better handling of adding events avoiding the time of the maintenance cron job
+			- added get_ids_by_storage method to image.class
+			- added additional virtualization and storage infos to resource-parameters
+			- added methods to get and set resource-capabilities
+			- implemented configurable HA timeout per resource
+			- added get_ids_by_storage_type method to storage.class
+			- added constraint-checks for object removal, increasing the useability
+			- updated links to the current documentation
+			- disabled postgres, oracle and db2 support for now, scheduled to be re-worked for version 5.0
+			- added menu section for enterprise plugins
+			- using official htmlobjects release from sf.net
+			- added update target to main Makefile
+			aoe-storage :
+			- added to remove the authblocker when the device is existing auth succeeded
+			- made auto-starting the storage configurable for better HA handling
+			- improved remount_fs for Ubuntu Lucid and Maverick
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+			citrix:
+			- added fencing function, improve HA handling
+			- added constraint-checks for object removal
+			- added cloud-hook, making the Virtualization types completely plug-able
+			- added ha-hook to auto-create and fence VMs
+			cloud:
+			- improved html for the Cloud-portal
+			- added UI-compatible wdsl
+			- implemented Cloud-Profiles including custom-icon-upload for user-friendly deployment
+			- added Visual-Infrastructure-Designer for profile deployment
+			- restructured menu of the Cloud-portal
+			- improved account details
+			- implemented CloudUserGroups
+			- implemented configurable host-limits per resource
+			- implemented CloudPowerSaver for automatic power-off of not-utilized resources
+			- implemented ResourcePools to allow assignment of dedicated Cloud-resources to CloudUserGroups
+			- restructured cloud-actions in the cloud-monitor-hook for much better performance and scalability
+			- added configurable performance parameter
+			- implemented HostStartFromOff, allow the Cloud to automatically power-on Host systems via a plugin-hook for the new out-of-band management plug-ins
+			- improved AutoCreateVMs, monitoring the start-up phase of the VMs
+			- made Cloud-Ip management plug-able
+			- implemented Cloud auto-scaling
+			dhcpd:
+			- improved new-resource action
+			equallogic-storage:
+			- added to remove the authblocker when the device is existing auth succeeded
+			- improved remount_fs for Ubuntu Lucid and Maverick
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+			- fixed gathering the correct 32 or 64bit lib-depenencies for the resize-components
+			highavailability:
+			- added configurable HA time-out per resource
+			- improved to automatically create VMs and to automatically power-on Hosts
+			- added fencing-hook
+			iscsi-storage:
+			- added to remove the authblocker when the device is existing auth succeeded
+			- made auto-starting the storage configurable for better HA handling
+			- improved remount_fs for Ubuntu Lucid and Maverick
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+			kvm:
+			- added fencing function, improve HA handling
+			- added constraint-checks for object removal
+			- added cloud-hook, making the Virtualization types completely plug-able
+			- added ha-hook to auto-create and fence VMs
+			kvm-storage:
+			- added to remove the authblocker when the device is existing auth succeeded
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+			- added support for shared SAN storage
+			- added fencing function, improve HA handling
+			- added constraint-checks for object removal
+			- added cloud-hook, making the Virtualization types completely plug-able
+			- added ha-hook to auto-create and fence VMs
+			local-storage:
+			- added to remove the authblocker when the device is existing auth succeeded
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+			lvm-storage:
+			- added to remove the authblocker when the device is existing auth succeeded
+			- made auto-starting the storage configurable for better HA handling
+			- improved remount_fs for Ubuntu Lucid and Maverick
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+			lxc-storage:
+			- This is the new lxc-storage plugin integrating lxc-containers into openQRM and the openQRM Cloud
+			netapp-storage:
+			- added to remove the authblocker when the device is existing auth succeeded
+			- improved remount_fs for Ubuntu Lucid and Maverick
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+			nfs-storage:
+			- added to remove the authblocker when the device is existing auth succeeded
+			- improved remount_fs for Ubuntu Lucid and Maverick
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+			sanboot-storage:
+			- added to remove the authblocker when the device is existing auth succeeded
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+			sshterm:
+			- a brand-new sshterm plugin using WebShell, improved usability
+			tmpfs-storage:
+			- This new plugin allows to deploy systems directly into memory (RAM)
+			- added to remove the authblocker when the device is existing auth succeeded
+			vbox:
+			- added Virtualbox as additional Virtualization type into openQRM, initial version
+			vmware-esx:
+			- improved VM actions
+			- added fencing function, improve HA handling
+			- added constraint-checks for object removal
+			- added cloud-hook, making the Virtualization types completely plug-able
+			- added ha-hook to auto-create and fence VMs
+			vmware-server:
+			- added fencing function, improve HA handling
+			- added constraint-checks for object removal
+			- added cloud-hook, making the Virtualization types completely plug-able
+			- added ha-hook to auto-create and fence VMs
+			vmware-server2:
+			- added fencing function, improve HA handling
+			- added constraint-checks for object removal
+			- added cloud-hook, making the Virtualization types completely plug-able
+			- added ha-hook to auto-create and fence VMs
+			wakeuponlan:
+			- intgrating WOL (wake-up-on-Lan) as out-of-band management option
+			- providing the capability to automatically power-on Hosts (-> auto-scaling)
+			windows:
+			- updated Windows openQRM-Client.exe
+			- fixing sf.net bug 3028337 - Windows openQRM Client setup fails
+			xen:
+			- added fencing function, improve HA handling
+			- added constraint-checks for object removal
+			- added cloud-hook, making the Virtualization types completely plug-able
+			- added ha-hook to auto-create and fence VMs
+			xen-storage:
+			- added to remove the authblocker when the device is existing auth succeeded
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+			- added support for shared SAN storage
+			- added fencing function, improve HA handling
+			- added constraint-checks for object removal
+			- added cloud-hook, making the Virtualization types completely plug-able
+			- added ha-hook to auto-create and fence VMs
+			zfs-storage:
+			- added to remove the authblocker when the device is existing auth succeeded
+			- improved remount_fs for Ubuntu Lucid and Maverick
+			- added cloud-deployment hook, making the Cloud Storage types completely plug-able
+
+05.01.2010	- for the 4.6 release :
+			- fixed [ openqrm-Bugs-2544993 ] nagios2/nagios3 dependencies are broken for Ubuntu Intrepid
+			- fixed [ openqrm-Bugs-2612552 ] generated debian package breaks dpkg
+			- fixed [ openqrm-Bugs-2781083 ] cloud: requesting 2 appliances ip-config gets confused
+			- fixed [ openqrm-Bugs-2697298 ] restarting appliance in the cloud sets CR to done
+			- fixed [ openqrm-Bugs-2741804 ] openQRM and multiple locations
+			- fixed [ openqrm-Bugs-2897168 ] Rebooting ressources
+			- fixed [ openqrm-Bugs-2806794 ] aoe-lvm not restart after rebooting appliance on remote
+			- fixed [ openqrm-Bugs-2879884 ] Bug in citrix-auth.php
+			- fixed [ openqrm-Bugs-2923976 ] RPM Build: mod_ssl is missing so https doesn't work
+			- fixed [ openqrm-Bugs-2925571 ] Missed File Appliance Manager
+			- implemented [ openqrm-Feature Requests-2053329 ] ng: do we need the run-time dependency mysql-server ?
+			- implemented [ openqrm-Feature Requests-2818510 + 2818521 ] integrate already existing NFS server
+			- implemented [ openqrm-Feature Requests-2874621 ] moving openQRM to https
+			- implemented [ openqrm-Feature Requests-2874620 ] creating complex vms on the fly
+			- implemented [ openqrm-Feature Requests-2871220 ] Autostart feature for all virtualization technolgoies
+			  implemented [ openqrm-Feature Requests-2778127 ] Amazon EC2 API Adapter
+			- new web-based installer
+			- added virtio support to the kvm-plugin
+			- Integration with Amazone EC2
+			- lvm + equallogic storage disk resize
+			- Cloud appliance resize
+			- heavy packaging updates and improvements
+			- new basedir /usr/share   !!
+			- focus and QA for Debian, Ubuntu and CentOS (latest versions)
+			- deprecated old non-maintained plugins (windows)
+			- new build system for debian/ubuntu (debian packaging conform, using pbuilder)
+			- new build system for Centos (much better rpms, much QA)
+			- pimped local-server to allow booting a remote kernel and running a local root-fs (on local-disk)
+			- image resize for cloud appliances
+			- private image feature for the cloud
+			- table sorting + paging fixes all over base + plugins
+			- applied [ openqrm-Patches-2879745 ] solx86 plugin update for derivatives without CSWtop
+			- fixed linuxCOE bugs, updated LinuxCOE to latest 4.2, retested with new LinuxCOE version
+			- added a Cloud Selector to define Cloud Products
+			- implemented automatic billing according to the user-defined Cloud Product prices
+			- implemented seamless support different server architectures (i386 + x86_64)
+			- added initrd-templates for Debian, CentOS and Ubuntu (i386 + x86_64 architecture)
+			- added openqrm-client packages for Debian, CentOS and Ubuntu (i386 + x86_64 architecture)
+			- restructured base and plugin menu, added menu icons
+			- a brand new much better automated hardware detection
+			- .... plus lots of cosmetics
+			- a new local deployment mode for KVM and Xen vms via the kvm-storage and xen-storage plugin
+			  -> this plugin supports easy deployment "as you are used" on local logical volumes on the KVM/Xen host.
+			  -> ... this one adds support for Windows operating system to openQRM
+
+28.06.2009  - for the 4.5 release :
+            - implemented "the Cloud billing should be plug-able"
+            - implemented Cloud NAT feature
+            - improved iSCSI boot for the iscsi-storage and lvm-storage plugin
+            - added Cloud-Mailer
+            - added Cloud VCD - Visual Cloud Designer
+            - added Zabbix monitoring plugin
+            - added Equallogic suppport, plugin development sponsored by XXLWebHosting
+            - re-organized the left tree menu -> plus subsections
+            - re-worked lvm-storage plugin
+            - re-worked ALL storage plugins
+            - completely re-worked the netapp-storage plugin
+              -> added netapp authentication hooks to fit into the storage security framework
+              -> tested with ontap 7.0
+            - added support not "un-managed" nfs-storage server via an option to manually set the export-list
+            - reworked VMware ESX plugin
+              -> tested with VMware ESX 3.5 - ESXi 4.0
+            - reworked VMware Server 2 plugin
+              -> tested with VMware-server-2.0.1-156745.i386
+            - reworked VMware Server plugin
+              -> tested with VMware-server 1
+            - reworked Xen plugin
+              -> tested with Xen 3.2 - 3.4
+            - reworked and finalyzed Citrix XenServer plugin
+              -> tested with Citrix XenServer 5.5.0
+            - reworked KVM plugin
+              -> tested with kvm-62
+            - New landing page with Data-Center summary
+            - Fixed bugs : 2527643, 2636465, 2806793, 2709553, 2806816, 2781100, 2812712
+            - Implemented/Closed Feature requests : 2208009, 2785130, 2208012, 2153370, 2697291
+
+14.03.2009  - for the 4.4 release :
+            - debian build system updated
+            - added nagios3 plugin
+            - enhanced nagios2 integration, provding new automap option
+            - implemented [ 2474672 ] persistant appliances for the cloud
+            - fixed [ 2509597 ] requesting multiple resource does not free up cloud-ips
+            - fixed [ 2520734 ] in openqrm 4.3 xen plugin there's a typo
+            - fixed [ 2529860 ] umounting of /lib/modules before init
+            - fixed [ 2524342 ] xen plugin does not find xen.gz in redhat based installs
+            - fixed [ 2524370 ] xen plugin: xm/new.py requires xen 3.1+
+            - implemented [ 2513579 ] integration of the Puppet groups into the Cloud
+            - fixed [ openqrm-Bugs-2544987 ] xen plugin xm list avoiding dom0 entry
+            - fixed [ openqrm-Bugs-2509728 ] growing event_info table slows down base engine
+            - implemented [ openqrm-Feature Requests-2542613 ] xen-plugin make the location of the cfg files configurable
+            - implemented [ openqrm-Feature Requests-1875784 ] enhancing the LinuxCOE integration
+            - made the command-execution layer plug-able
+            - added new command-execution layer based on dropbear (ssl + shared keys)
+            - implemented [ openqrm-Feature Requests-2468844 ] cloud: on/off switch for the cloud -> being able to take it offline
+            - puppet + webmin
+            - added per-User Cloud-resource limits (quantity, memory, disk, network, cpus)
+            - enhanced sshterm plugin, implemented secure remote access via ajaxterm and pound reverse-ssl-proxy
+            - integrated sshterm-plugin into the Cloud
+            - implemented [ openqrm-Feature Requests-1881578 ] ng: automatic loadbalancing for Xen vms
+            - implemented [ openqrm-Feature Requests-1921180 ] ng: need a way to execute commands on the managed resources
+            - implemented [ openqrm-Feature Requests-2502207 ] Web service plugin.
+
+30.12.2008  - for the 4.3 release :
+            - improved usability for the storage management
+            - implemented storage security features
+            - new debian build system
+            - fixed [ openqrm-Bugs-2298162 ] Selecting the resource-type in the overview is tricky
+            - implemented [ openqrm-Feature Requests-2342603 ] Cloud Plugin Enhancement
+            - implemented "auto-create-virtual-machines" for the Cloud Plugin
+            - implemented [ 2147701 ] Support for VMware-server 2.x
+            - fixed [ 2153376 ] Image-Shelf not extendable
+            - xen plugin enhancements [ openqrm-Feature Requests-1949902 ] ng: booting xen domains via pypxeboot
+            - fixed [ openqrm-Bugs-2413524 ] Nagios on Centos uses wrong dir
+            - implemented [ 2250673 ] assigning default-image
+            - implemented [ 2468842 ] state backups of the openQRM-server
+29.08.2008	- fixed [ 1934416 ] ng: template-based Image-Installer
+24.08.2008	- security fixes, GUI- and Usablility improvements
+08.08.2008	- fixed [ 1992378 ] ng: iscsi- + aoe-storage deployment should auto-partititon
+09.07.2008	- fixed [ 1992381 ] ng: add option for resources to add events
+06.07.2008	- fixed [ openqrm-Bugs-1999014 ] ng: recheck permissions of the boot-service files on Centos
+			  [ openqrm-Feature Requests-1940898 ] ng: update path / backup/restore for plugins
+05.07.2008	- fixed
+			  [ openqrm-Bugs-1999026 ] ng: increase field-length of hostname in resource_info
+			  [ openqrm-Bugs-1992353 ] ng: iscsi-storage plugin needs unique disk-identifier
+			  [ openqrm-Feature Requests-1992366 ] ng: udev on the initrd
+			  [ openqrm-Feature Requests-1992371 ] ng: clean up install-from-local + install-from-local-device
+
+18.06.2008	- initial release version 4.0
+11.04.2008	- moved cvs repository to svn	and added svn-commit mails
 up to the
-18.06.2008	-	full steam ahead on preparing the initial release version
-18.06.2008	-	initial release version 4.0
-05.07.2008	-	fixed 
-				[ openqrm-Bugs-1999026 ] ng: increase field-length of hostname in resource_info
-				[ openqrm-Bugs-1992353 ] ng: iscsi-storage plugin needs unique disk-identifier
-				[ openqrm-Feature Requests-1992366 ] ng: udev on the initrd
-				[ openqrm-Feature Requests-1992371 ] ng: clean up install-from-local + install-from-local-device
-06.07.2008	-	fixed 
-				[ openqrm-Bugs-1999014 ] ng: recheck permissions of the boot-service files on Centos
-				[ openqrm-Feature Requests-1940898 ] ng: update path / backup/restore for plugins
-09.07.2008	-	fixed
-				[ 1992381 ] ng: add option for resources to add events
-08.08.2008	-	[ 1992378 ] ng: iscsi- + aoe-storage deployment should auto-partititon
-				fixed
-24.08.2008	-	security fixes, GUI- and Usablility improvements
-29.08.2008	-	fixed [ 1934416 ] ng: template-based Image-Installer
-30.12.2008  -   for the 4.3 release :
-            -   improved usability for the storage management
-            -   implemented storage security features
-            -   new debian build system
-            -   fixed [ openqrm-Bugs-2298162 ] Selecting the resource-type in the overview is tricky
-            -   implemented [ openqrm-Feature Requests-2342603 ] Cloud Plugin Enhancement
-            -   implemented "auto-create-virtual-machines" for the Cloud Plugin
-            -   implemented [ 2147701 ] Support for VMware-server 2.x
-            -   fixed [ 2153376 ] Image-Shelf not extendable
-            -   xen plugin enhancements [ openqrm-Feature Requests-1949902 ] ng: booting xen domains via pypxeboot
-            -   fixed [ openqrm-Bugs-2413524 ] Nagios on Centos uses wrong dir
-            -   implemented [ 2250673 ] assigning default-image
-            -   implemented [ 2468842 ] state backups of the openQRM-server
-14.03.2009  -   for the 4.4 release :
-            -   debian build system updated
-            -   added nagios3 plugin
-            -   enhanced nagios2 integration, provding new automap option
-            -   implemented [ 2474672 ] persistant appliances for the cloud
-            -   fixed [ 2509597 ] requesting multiple resource does not free up cloud-ips
-            -   fixed [ 2520734 ] in openqrm 4.3 xen plugin there's a typo
-            -   fixed [ 2529860 ] umounting of /lib/modules before init
-            -   fixed [ 2524342 ] xen plugin does not find xen.gz in redhat based installs
-            -   fixed [ 2524370 ] xen plugin: xm/new.py requires xen 3.1+
-            -   implemented [ 2513579 ] integration of the Puppet groups into the Cloud
-            -   fixed [ openqrm-Bugs-2544987 ] xen plugin xm list avoiding dom0 entry
-            -   fixed [ openqrm-Bugs-2509728 ] growing event_info table slows down base engine
-            -   implemented [ openqrm-Feature Requests-2542613 ] xen-plugin make the location of the cfg files configurable
-            -   implemented [ openqrm-Feature Requests-1875784 ] enhancing the LinuxCOE integration
-            -   made the command-execution layer plug-able
-            -   added new command-execution layer based on dropbear (ssl + shared keys)
-            -   implemented [ openqrm-Feature Requests-2468844 ] cloud: on/off switch for the cloud -> being able to take it offline
-            -   puppet + webmin
-            -   added per-User Cloud-resource limits (quantity, memory, disk, network, cpus)
-            -   enhanced sshterm plugin, implemented secure remote access via ajaxterm and pound reverse-ssl-proxy
-            -   integrated sshterm-plugin into the Cloud
-            -   implemented [ openqrm-Feature Requests-1881578 ] ng: automatic loadbalancing for Xen vms
-            -   implemented [ openqrm-Feature Requests-1921180 ] ng: need a way to execute commands on the managed resources
-            -   implemented [ openqrm-Feature Requests-2502207 ] Web service plugin.
-28.06.2009  -   for the 4.5 release :
-            -   implemented "the Cloud billing should be plug-able"
-            -   implemented Cloud NAT feature
-            -   improved iSCSI boot for the iscsi-storage and lvm-storage plugin
-            -   added Cloud-Mailer
-            -   added Cloud VCD - Visual Cloud Designer
-            -   added Zabbix monitoring plugin
-            -   added Equallogic suppport, plugin development sponsored by XXLWebHosting
-            -   re-organized the left tree menu -> plus subsections
-            -   re-worked lvm-storage plugin
-            -   re-worked ALL storage plugins
-            -   completely re-worked the netapp-storage plugin
-                -> added netapp authentication hooks to fit into the storage security framework
-                -> tested with ontap 7.0
-            -   added support not "un-managed" nfs-storage server via an option to manually set the export-list
-            -   reworked VMware ESX plugin
-                -> tested with VMware ESX 3.5 - ESXi 4.0
-            -   reworked VMware Server 2 plugin
-                -> tested with VMware-server-2.0.1-156745.i386
-            -   reworked VMware Server plugin
-                -> tested with VMware-server 1
-            -   reworked Xen plugin
-                -> tested with Xen 3.2 - 3.4
-            -   reworked and finalyzed Citrix XenServer plugin
-                -> tested with Citrix XenServer 5.5.0
-            -   reworked KVM plugin
-                -> tested with kvm-62
-            -   New landing page with Data-Center summary
-            -   Fixed bugs : 2527643, 2636465, 2806793, 2709553, 2806816, 2781100, 2812712
-            -   Implemented/Closed Feature requests : 2208009, 2785130, 2208012, 2153370, 2697291
+18.06.2008	- full steam ahead on preparing the initial release version
+16.03.2008	- major updates on the basic framework
+			  introduced user management and plugg-ability
+			  added local, nfs and iscsi deployment types (also plugg-able)
+			  added appliance based deployment mechanism
+21.01.2008	- added basic monitoring framework
+20.01.2008	- cleaned-up init process on the initrd
+			  made reboot/halt working
+19.01.2008	- added root-execution environemnt for the server
+			  added to add new detected resources automatically
+			  added starting the openrm-client on the booted resources
+17.01.2008	- added to init network on the intird
+			  added build-requirements check
+16.01.2008	- added creating default initrd template
+			  added creating default boot-image
+14.01.2008	- made tftpd plugin working
+			  made dhcpd plugin working
+13.01.2008	- added support for rpm-packaging
+12.01.2008	- created initial framework
+			  designed dependencies setup
+			  implemented deb-packaging
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
