@@ -1,0 +1,140 @@
+#!/bin/bash
+
+
+VM_XEN_CONFIG=/var/run/xen-vm-config.conf
+
+export OPENQRM_SERVER_BASE_DIR=/usr/share
+export OPENVSWITCH=$bridge
+
+export OPENQRM_SOURCE_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/"
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/include/openqrm-plugin-kvm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/etc/openqrm-plugin-kvm.conf
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+    resource_id=0
+	openqrm_server_get_config
+	resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+    openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+fi
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+    WGET="wget -q --no-check-certificate"
+else
+    WGET="wget -q"
+fi
+
+
+dir=$(dirname "$0")
+. "$dir/vif-common.sh"
+
+bridge=${bridge:-}
+bridge=$(xenstore_read_default "$XENBUS_PATH/bridge" "$bridge")
+
+if [ -z "$bridge" ]
+then
+  bridge=$(brctl show | cut -d "
+" -f 2 | cut -f 1)
+
+  if [ -z "$bridge" ]
+  then
+     fatal "Could not find bridge, and none was specified"
+  fi
+else
+  if [ ! -e "/sys/class/net/$bridge" ] && [ -z "${bridge##xenbr*}" ]
+  then
+     if [ -e "/sys/class/net/eth${bridge#xenbr}/bridge" ]
+     then
+        bridge="eth${bridge#xenbr}"
+     fi
+  fi
+fi
+
+RET=0
+ip link show $bridge 1>/dev/null 2>&1 || RET=1
+if [ "$RET" -eq 1 ]
+then
+    fatal "Could not find bridge device $bridge"
+fi
+
+
+
+case "$command" in
+    online)
+	if [ ! -f "$VM_XEN_CONFIG" ]; then
+		> $VM_XEN_CONFIG
+
+		VM_NAME=`echo $vif | cut -d'.' -f1`
+		APP_NIC=`echo $vif | cut -d'.' -f2`
+		export APP_NIC
+		HOST_TAP_DEVICES=`ifconfig | grep ^tap | wc -l`
+
+		echo "VM_NAME=$VM_NAME" >> $VM_XEN_CONFIG
+		echo "APP_NIC=$VM_NAME" >> $VM_XEN_CONFIG
+		echo "HOST_TAP_DEVICES=$HOST_TAP_DEVICES" >> $VM_XEN_CONFIG
+
+
+		# find out the name
+		VM_BASE_DIR=/var/lib/xen/openqrm/$VM_NAME
+		# get the net config of the vm
+		XEN_VM_MAC=`cat $VM_BASE_DIR/mac1`
+
+		# get vms resource parameters
+		if ! $WGET -q -t 1 -T 4 -O $VM_BASE_DIR/openqrm-resource.conf "$openqrm_web_protocol://${resource_openqrmserver}/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$XEN_VM_MAC"; then
+		    echo "ERROR: Could not refresh VMs resource-parameters!" | logger
+		else
+		    . $VM_BASE_DIR/openqrm-resource.conf
+		fi
+		# get ip config
+		eval $appliance_capabilities
+		if [ "$IPT" != "" ]; then
+		    IP_TOKEN=`echo $IPT | cut -d'=' -f1`
+		    NICCOUNT=$(( $resource_nics - 1 ))
+
+echo "!!!!!!!!!!!!!!! niccount $NICCOUNT" | logger
+
+		    for APP_NIC in `seq 0 $NICCOUNT`; do
+			    echo "- getting network configuration for token $IP_TOKEN nic $APP_NIC" | logger
+			    if ! $WGET -O $VM_BASE_DIR/openqrm-network.$APP_NIC.conf "$openqrm_web_protocol://${resource_openqrmserver}/openqrm/boot-service/ip-mgmt-appliance-config.php?ip_mgmt_command=get_config&appliance_id=$appliance_id&ip_mgmt_nic_id=$APP_NIC&ip_mgmt_token=$IP_TOKEN"; then
+				echo "ERROR: Could not get ip-configuration from openQRM-server at ${resource_openqrmserver}!" | logger
+				exit -1
+			    fi
+			    . $VM_BASE_DIR/openqrm-network.$APP_NIC.conf
+			    echo "VM_TAP_$APP_NIC=$VLAN_ID" >> $VM_XEN_CONFIG
+		    done
+		else
+		    echo "NOTICE: No ip-configuration for VM available. Continuing..." | logger
+		fi
+
+		# starting to active or idle ?
+		if [ "$appliance_id" == "" ]; then
+			echo "VM_STATUS=idle" >> $VM_XEN_CONFIG
+		else
+			echo "VM_STATUS=active" >> $VM_XEN_CONFIG
+		fi
+		echo "VM_NICS=$resource_nics" >> $VM_XEN_CONFIG
+		
+	fi
+
+	setup_bridge_port "$vif"
+	ovs-vsctl add-port "$bridge" "$vif" 
+	ip link set "$vif" up
+        ;;
+
+    offline)
+	do_without_error ovs-vsctl del-port "$bridge" "$vif"
+        do_without_error ifconfig "$vif" down
+	screen -dmS tapclean /etc/xen/scripts/openqrm-tap-cleanup 
+        ;;
+esac
+
+handle_iptable
+
+log debug "Successful vif-bridge $command for $vif, bridge $bridge."
+if [ "$command" == "online" ]
+then
+  success
+fi

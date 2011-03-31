@@ -1,0 +1,10 @@
+Those script integrating Xen with openvswitch.
+First install and start openvswitch on your Xen Host replacing the regular bridging.
+Then please copy them to /etc/xen/scripts on your Xen Host, make them executable
+and adjust its configuration to use the openqrm-vif-bridge network-script.
+
+The Xen Host will then use the setting from the ip-mgmt plugin to set the vlan ids
+for each interface correctly.
+
+
+
