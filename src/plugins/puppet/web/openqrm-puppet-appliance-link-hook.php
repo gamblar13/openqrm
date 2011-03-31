@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
 */
 
 
@@ -34,33 +34,14 @@ global $event;
 
 
 
-function openqrm_puppet_appliance($cmd, $appliance_fields) {
+function get_puppet_appliance_link($appliance_id) {
 	global $event;
 	global $OPENQRM_SERVER_BASE_DIR;
 	global $OPENQRM_SERVER_IP_ADDRESS;
 	global $OPENQRM_EXEC_PORT;
-	$appliance_id=$appliance_fields["appliance_id"];
-	$appliance_name=$appliance_fields["appliance_name"];
-	$resource = new resource();
-	$resource->get_instance_by_id($appliance_fields["appliance_resources"]);
-	$appliance_ip=$resource->ip;
-
-
-	$event->log("openqrm_new_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-puppet-appliance-hook.php", "Handling $cmd event $appliance_id/$appliance_name/$appliance_ip", "", "", 0, 0, $appliance_id);
-	switch($cmd) {
-		case "start":
-			$openqrm_server = new openqrm_server();
-			$openqrm_server->send_command("$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/puppet/bin/openqrm-puppet-manager start $appliance_id $appliance_name $appliance_ip");
-			break;
-		case "stop":
-			$openqrm_server = new openqrm_server();
-			$openqrm_server->send_command("$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/puppet/bin/openqrm-puppet-manager stop $appliance_id $appliance_name $appliance_ip");
-			break;
-
-	}
+	$plugin_link = "<a href='/openqrm/base/plugins/puppet/puppet-manager.php?selectmax=10&selectsort=appliance_id&selectorder=ASC&selectoffset=0&selectlimit=20&identifier[]=".$appliance_id."&action=select'><img title='Configuration management' alt='Configuration management' src='/openqrm/base/plugins/puppet/img/plugin.png' border=0></a>&nbsp;&nbsp;";
+	return $plugin_link;
 }
-
-
 
 ?>
 
