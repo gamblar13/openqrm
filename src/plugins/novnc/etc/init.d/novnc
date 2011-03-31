@@ -1,0 +1,89 @@
+#!/bin/bash
+# this is the boot-service init script for the novnc resources
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+#
+
+OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
+# for including the package functions
+export OPENQRM_SOURCE_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/"
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-package-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/novnc/include/openqrm-plugin-novnc-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/novnc/etc/openqrm-plugin-novnc.conf
+. $OPENQRM_RESOURCE_PARAMETER_FILE
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+# do not run on idle resources
+if [ "$resource_image" == "idle" ]; then
+	exit 0
+fi
+# also do not run before the real init of the rootfs
+# if we have this file /etc/initrd-devices.conf we are still in the initrd
+if [ -f /etc/initrd-devices.conf ]; then
+	exit 0
+fi
+
+
+function novnc_start() {
+	echo "Starting the openQRM novnc-plugin"
+	novnc_stop 1>/dev/null 2>&1
+	return 0
+}
+
+
+function novnc_stop() {
+	echo "Stopping the openQRM novnc-plugin"
+	return 0
+}
+
+
+
+case "$1" in
+	start)
+		novnc_start
+		;;
+	stop)
+		novnc_stop
+		;;
+	restart)
+		novnc_stop
+		sleep 1
+		novnc_start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|createcert}"
+		exit 1
+
+esac
+exit $?
+
+
+
+
+
+
+
+
+
+
+
+
+

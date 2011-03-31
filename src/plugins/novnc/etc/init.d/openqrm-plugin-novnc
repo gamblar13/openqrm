@@ -1,0 +1,100 @@
+#!/bin/bash
+# init script for the openQRM novnc plugin
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/novnc/include/openqrm-plugin-novnc-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/novnc/etc/openqrm-plugin-novnc.conf
+# for the post-event to work
+openqrm_server_get_config
+OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+resource_id=0
+resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+# which screen binary to use
+if [ -x /usr/bin/screen.real ]; then
+	RUNSCREEN="/usr/bin/screen.real"
+else
+	RUNSCREEN=`which screen`
+fi
+
+
+function openqrm_plugin_novnc_start() {
+	echo "Starting the openQRM novnc-plugin"
+	local CURRENTDIR=`pwd`
+	openqrm_plugin_novnc_stop 1>/dev/null 2>&1
+
+	touch $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/novnc/.running
+	return 0
+}
+
+function openqrm_plugin_novnc_stop() {
+	echo "Stopping the openQRM novnc-plugin"
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/novnc/.running
+	return 0
+}
+
+
+function openqrm_plugin_novnc_init() {
+	echo "Initializing the openQRM novnc-plugin"
+	# linking the web dir
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/novnc/web $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/novnc
+	# link the boot-service
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/novnc/web/boot-service-novnc.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-novnc.tgz
+	return 0
+}
+
+
+function openqrm_plugin_novnc_uninstall() {
+	echo "Uninstalling the openQRM novnc-plugin"
+	openqrm_plugin_novnc_stop
+	# remove bootservice
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-novnc.tgz
+	# unlinking the web dir
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/novnc
+}
+
+
+case "$1" in
+	start)
+		openqrm_plugin_novnc_start
+		;;
+	stop)
+		openqrm_plugin_novnc_stop
+		;;
+	restart)
+		openqrm_plugin_novnc_stop
+		sleep 1
+		openqrm_plugin_novnc_start
+		;;
+	init)
+		openqrm_plugin_novnc_init
+		;;
+	uninstall)
+		openqrm_plugin_novnc_uninstall
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|init|uninstall|createcert}"
+		exit 1
+
+esac
+exit $?
+
+
