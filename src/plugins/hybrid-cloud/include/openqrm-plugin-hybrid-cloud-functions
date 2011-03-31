@@ -36,7 +36,7 @@ function hybrid_cloud_log() {
 function hybrid_cloud_lock() {
 	local COMMAND=$1
 	local RET=1
-	
+
 	if [ ! -d `dirname $HYBRID_CLOUD_LOCK_FILE` ]; then
 		mkdir -p `dirname $HYBRID_CLOUD_LOCK_FILE`
 	fi
@@ -56,7 +56,7 @@ function hybrid_cloud_lock() {
 		*)
 			hybrid_cloud_log hybrid_cloud_lock "No such command. Try 'aquire' or 'release'"
 			return 1
-			;;	
+			;;
 	esac
 }
 

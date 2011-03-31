@@ -2,19 +2,19 @@
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
 */
 -->
 <h1><img border=0 src="/openqrm/base/plugins/hybrid-cloud/img/plugin.png"> Hybrid-Cloud plugin</h1>
@@ -28,10 +28,10 @@ Create a new Hybrid-Cloud Account configuration using the "Accounts" menu item.
 The following informations are required :
 <br>
 <ul type="disc">
-    <li>Hybrid-Cloud Account Name</li>
-    <li>rc-config (file)</li>
-    <li>SSH-Key (file)</li>
-    <li>Description</li>
+	<li>Hybrid-Cloud Account Name</li>
+	<li>rc-config (file)</li>
+	<li>SSH-Key (file)</li>
+	<li>Description</li>
 </ul>
 
 The rc-config file is typically provided by the Public-Cloud Provider.
@@ -52,9 +52,9 @@ provides the console login to the Public Cloud systems.
 To import an Cloud Server (-> the AMI of an active EC2 Instance) follow the steps below :
 <br>
 <ul type="disc">
-    <li>Select an Hybrid-Cloud Account to use for the import</li>
-    <li>Select an active Public-Cloud Instance running the AMI to import</li>
-    <li>Select an (empty) openQRM Server image (from type NFS- or LVM-NFS)</li>
+	<li>Select an Hybrid-Cloud Account to use for the import</li>
+	<li>Select an active Public-Cloud Instance running the AMI to import</li>
+	<li>Select an (empty) openQRM Server image (from type NFS- or LVM-NFS)</li>
 </ul>
 <br>
 This will automatically import the AMI from the selcted Public-Cloud Instance into the (previously created) empty Server Image in openQRM.
@@ -70,9 +70,9 @@ The imported AMI now can be used with all existing "resource-types" in openQRM s
 To export an openQRM Image to a Public-Cloud Server as an AMI follow the steps below :
 <br>
 <ul type="disc">
-    <li>Select an Hybrid-Cloud Account to use for the export</li>
-    <li>Select the Image (from type NFS- or LVM-NFS) to turn into an AMI for the export</li>
-    <li>Provide a name for the AMI, its size and architecture</li>
+	<li>Select an Hybrid-Cloud Account to use for the export</li>
+	<li>Select the Image (from type NFS- or LVM-NFS) to turn into an AMI for the export</li>
+	<li>Provide a name for the AMI, its size and architecture</li>
 </ul>
 <br>
 This will automatically export the selected openQRM Image to the Public-Cloud Provider.
