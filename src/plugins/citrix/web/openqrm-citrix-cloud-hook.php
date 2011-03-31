@@ -49,17 +49,17 @@ function create_citrix_vm($host_resource_id, $name, $mac, $memory, $cpu, $swap, 
 	global $OPENQRM_SERVER_IP_ADDRESS;
 	global $OPENQRM_EXEC_PORT;
 	global $RESOURCE_INFO_TABLE;
-    global $event;
-	$event->log("create_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-cloud-hook", "Creating Citrix VM $name on Host $host_resource_ip", "", "", 0, 0, 0);
+	global $event;
+	$event->log("create_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-cloud-hook", "Creating Citrix VM $name on Host resource $host_resource_id", "", "", 0, 0, 0);
 	// start the vm on the host
 	$host_resource = new resource();
 	$host_resource->get_instance_by_id($host_resource_id);
-    // we need to have an openQRM server object too since some of the
-    // virtualization commands are sent from openQRM directly
-    $openqrm = new openqrm_server();
-    // send command to create vm
-    $vm_create_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/bin/openqrm-citrix create -i ".$host_resource->ip." -n ".$name." -r ".$memory." -c ".$cpu." -m ".$mac." ".$additional_nic_str;
-    $openqrm->send_command($vm_create_cmd);
+	// we need to have an openQRM server object too since some of the
+	// virtualization commands are sent from openQRM directly
+	$openqrm = new openqrm_server();
+	// send command to create vm
+	$vm_create_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/bin/openqrm-citrix create -i ".$host_resource->ip." -n ".$name." -r ".$memory." -c ".$cpu." -m ".$mac." ".$additional_nic_str;
+	$openqrm->send_command($vm_create_cmd);
 	$event->log("create_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-cloud-hook", "Running $vm_create_cmd", "", "", 0, 0, 0);
 }
 
@@ -74,16 +74,16 @@ function remove_citrix_vm($host_resource_id, $name, $mac) {
 	global $event;
 
 	// remove the vm from host
-    $host_resource = new resource();
-    $host_resource->get_instance_by_id($host_resource_id);
-	$event->log("remove_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-cloud-hook", "Removing Citrix VM $name/$mac from Host $host_resource_id", "", "", 0, 0, 0);
-    // we need to have an openQRM server object too since some of the
-    // virtualization commands are sent from openQRM directly
-    $openqrm = new openqrm_server();
-    // send command to create the vm on the host
-    $vm_remove_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/bin/openqrm-citrix remove -i ".$host_resource->ip." -n ".$name;
+	$host_resource = new resource();
+	$host_resource->get_instance_by_id($host_resource_id);
+	$event->log("remove_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-cloud-hook", "Removing Citrix VM $name/$mac from Host resource $host_resource_id", "", "", 0, 0, 0);
+	// we need to have an openQRM server object too since some of the
+	// virtualization commands are sent from openQRM directly
+	$openqrm = new openqrm_server();
+	// send command to create the vm on the host
+	$vm_remove_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/bin/openqrm-citrix remove -i ".$host_resource->ip." -n ".$name;
 	$event->log("remove_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-cloud-hook", "Running $vm_remove_cmd", "", "", 0, 0, 0);
-    $openqrm->send_command($vm_remove_cmd);
+	$openqrm->send_command($vm_remove_cmd);
 }
 
 

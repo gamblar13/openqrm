@@ -49,17 +49,17 @@ function create_citrix_vm($host_resource_id, $name, $mac, $memory, $cpu, $swap, 
 	global $OPENQRM_SERVER_IP_ADDRESS;
 	global $OPENQRM_EXEC_PORT;
 	global $RESOURCE_INFO_TABLE;
-    global $event;
-	$event->log("create_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-ha-hook", "Creating Citrix VM $name on Host $host_resource_ip", "", "", 0, 0, 0);
+	global $event;
+	$event->log("create_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-ha-hook", "Creating Citrix VM $name on Host resource $host_resource_id", "", "", 0, 0, 0);
 	// start the vm on the host
 	$host_resource = new resource();
 	$host_resource->get_instance_by_id($host_resource_id);
-    // we need to have an openQRM server object too since some of the
-    // virtualization commands are sent from openQRM directly
-    $openqrm = new openqrm_server();
-    // send command to create vm
-    $vm_create_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/bin/openqrm-citrix create -i ".$host_resource->ip." -n ".$name." -r ".$memory." -c ".$cpu." -m ".$mac." ".$additional_nic_str;
-    $openqrm->send_command($vm_create_cmd);
+	// we need to have an openQRM server object too since some of the
+	// virtualization commands are sent from openQRM directly
+	$openqrm = new openqrm_server();
+	// send command to create vm
+	$vm_create_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/bin/openqrm-citrix create -i ".$host_resource->ip." -n ".$name." -r ".$memory." -c ".$cpu." -m ".$mac." ".$additional_nic_str;
+	$openqrm->send_command($vm_create_cmd);
 	$event->log("create_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-ha-hook", "Running $vm_create_cmd", "", "", 0, 0, 0);
 }
 
@@ -74,16 +74,16 @@ function fence_citrix_vm($host_resource_id, $mac) {
 	global $event;
 
 	// fences the vm on its host
-    $host_resource = new resource();
-    $host_resource->get_instance_by_id($host_resource_id);
-	$event->log("fence_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-ha-hook", "Fencing Citrix VM $mac from Host $host_resource_id", "", "", 0, 0, 0);
-    // we need to have an openQRM server object too since some of the
-    // virtualization commands are sent from openQRM directly
-    $openqrm = new openqrm_server();
-    // send command to fence the vm on the host
-    $vm_fence_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/bin/openqrm-citrix fence -i ".$host_resource->ip." -m ".$mac;
+	$host_resource = new resource();
+	$host_resource->get_instance_by_id($host_resource_id);
+	$event->log("fence_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-ha-hook", "Fencing Citrix VM $mac from Host resource $host_resource_id", "", "", 0, 0, 0);
+	// we need to have an openQRM server object too since some of the
+	// virtualization commands are sent from openQRM directly
+	$openqrm = new openqrm_server();
+	// send command to fence the vm on the host
+	$vm_fence_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/bin/openqrm-citrix fence -i ".$host_resource->ip." -m ".$mac;
 	$event->log("fence_citrix_vm", $_SERVER['REQUEST_TIME'], 5, "citrix-ha-hook", "Running $vm_fence_cmd", "", "", 0, 0, 0);
-    $openqrm->send_command($vm_fence_cmd);
+	$openqrm->send_command($vm_fence_cmd);
 }
 
 
