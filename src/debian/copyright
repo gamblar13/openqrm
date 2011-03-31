@@ -24,17 +24,9 @@ Copyright: 1999-2005 Erik Andersen
 X-Comment: On Debian GNU/Linux systems, the complete text of the
  GNU General Public License can be found in /usr/share/common-licenses/GPL-2
 
-Files: thirdparty/openqrm-build/hwdata-knoppix/source/hwdata-knoppix_0.172-5.tar.gz
-License: GPL-2 / XFree86
-Copyright: Copyright 2002 Red Hat, Inc.
-           Klaus Knopper <knoppix@knopper.net>
-X-Comment: On Debian GNU/Linux systems, the complete text of the
- GNU General Public License can be found in /usr/share/common-licenses/GPL-2
-X-Comment: The XFree86 license text is included below
-
-Files: thirdparty/openqrm-build/hwsetup/source/hwsetup_1.2-7.tar.gz
+Files: thirdparty/openqrm-build/pciutils//source/pciutils-3.1.4.tar.gz
 License: GPL-2
-Copyright: Copyright Klaus Knopper <knoppix@knopper.net>
+Copyright (c) 1997--2009 Martin Mares <mj@ucw.cz>
 X-Comment: On Debian GNU/Linux systems, the complete text of the
  GNU General Public License can be found in /usr/share/common-licenses/GPL-2
 
@@ -58,17 +50,17 @@ X-Comment: On Debian GNU/Linux systems, the complete text of the
  GNU General Public License can be found in /usr/share/common-licenses/GPL-2
 X-Comment: The MIT license text is included below
 
-Files: thirdparty/openqrm-build/kudzu-knoppix/source/kudzu-knoppix_1.1.67-2.tar.gz
-License: GPL2
-Copyright: Copyright 2000-2003 Red Hat, Inc.
+Files: thirdparty/openqrm-build/adodb/
+License: GPL2 / MIT
+Copyright (c) 2000, 2001, 2002, 2003, 2004 John Lim
 X-Comment: On Debian GNU/Linux systems, the complete text of the
  GNU General Public License can be found in /usr/share/common-licenses/GPL-2
+X-Comment: The MIT license text is included below
 
 Files: thirdparty/openqrm-build/kvm-nic-bios/source/kvm-nic-bios-1.1.tgz
-License: GPL2
+License: MIT
 Copyright: Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
-X-Comment: On Debian GNU/Linux systems, the complete text of the
- GNU General Public License can be found in /usr/share/common-licenses/GPL-2
+X-Comment: The MIT license text is included below
 
 Files: plugins/cloud/cloud-portal/web/js/datetimepicker.js
 Copyright: Copyright (c) 2003 TengYong Ng <contact@rainforestnet.com>
