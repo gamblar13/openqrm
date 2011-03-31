@@ -2,19 +2,19 @@
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 
 
@@ -59,69 +59,69 @@ function create_clone_netapp_deployment($cloud_image_id, $image_clone_name, $dis
 	global $event;
 	$event->log("create_clone", $_SERVER['REQUEST_TIME'], 5, "netapp-deployment-cloud-hook", "Creating clone of image on storage", "", "", 0, 0, 0);
 
-    // we got the cloudimage id here, get the image out of it
-    $cloudimage = new cloudimage();
-    $cloudimage->get_instance_by_id($cloud_image_id);
-    // get image, this is already the new logical clone
-    // we just need to physical snapshot it and update the rootdevice
-    $image = new image();
-    $image->get_instance_by_id($cloudimage->image_id);
-    $image_id = $image->id;
-    $image_name = $image->name;
-    $image_type = $image->type;
-    $image_version = $image->version;
-    $image_rootdevice = $image->rootdevice;
-    $image_rootfstype = $image->rootfstype;
-    $image_storageid = $image->storageid;
-    $image_isshared = $image->isshared;
-    $image_comment = $image->comment;
-    $image_capabilities = $image->capabilities;
-    $image_deployment_parameter = $image->deployment_parameter;
+	// we got the cloudimage id here, get the image out of it
+	$cloudimage = new cloudimage();
+	$cloudimage->get_instance_by_id($cloud_image_id);
+	// get image, this is already the new logical clone
+	// we just need to physical snapshot it and update the rootdevice
+	$image = new image();
+	$image->get_instance_by_id($cloudimage->image_id);
+	$image_id = $image->id;
+	$image_name = $image->name;
+	$image_type = $image->type;
+	$image_version = $image->version;
+	$image_rootdevice = $image->rootdevice;
+	$image_rootfstype = $image->rootfstype;
+	$image_storageid = $image->storageid;
+	$image_isshared = $image->isshared;
+	$image_comment = $image->comment;
+	$image_capabilities = $image->capabilities;
+	$image_deployment_parameter = $image->deployment_parameter;
 
-    // get image storage
-    $storage = new storage();
-    $storage->get_instance_by_id($image_storageid);
-    $storage_resource_id = $storage->resource_id;
-    // get storage resource
-    $resource = new resource();
-    $resource->get_instance_by_id($storage_resource_id);
-    $resource_id = $resource->id;
-    $resource_ip = $resource->ip;
-    // netapp-storage
-    $netapp_volume_name=basename($image_rootdevice);
-    // we need to special take care that the volume name does not contain special characters
-    $image_clone_name = str_replace(".", "", $image_clone_name);
-    $image_clone_name = str_replace("_", "", $image_clone_name);
-    $image_clone_name = str_replace("-", "", $image_clone_name);
-    // and do not let the volume name start with a number
-    $image_clone_name = "na".$image_clone_name;
-    // get the password for the netapp-filer
-    $na_storage = new netapp_storage();
-    $na_storage->get_instance_by_storage_id($storage->id);
-    if (!strlen($na_storage->storage_id)) {
-        $strMsg = "NetApp Storage server $storage->id not configured yet<br>";
-        $event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "netapp-deployment-cloud-hook", $strMsg, "", "", 0, 0, 0);
-    } else {
-        // generate a new image password for the clone
-        $image->get_instance_by_id($image_id);
-        $image_password = $image->generatePassword(14);
-        $image->set_deployment_parameters("IMAGE_ISCSI_AUTH", $image_password);
-        $na_storage_ip = $resource_ip;
-        $na_password = $na_storage->storage_password;
-        // update the image rootdevice parameter
-        $clone_image_root_device = str_replace($netapp_volume_name, $image_clone_name, $image_rootdevice);
-        $ar_image_update = array(
-            'image_rootdevice' => $clone_image_root_device,
-        );
-        $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "netapp-deployment-cloud-hook", "Updating rootdevice of image $image_id / $image_name with $clone_image_root_device", "", "", 0, 0, 0);
-        $image->update($image_id, $ar_image_update);
-        // send command
-        $image_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/netapp-storage/bin/openqrm-netapp-storage snap -n $netapp_volume_name -s $image_clone_name -i $image_password -p $na_password -e $na_storage_ip";
-        $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "netapp-deployment-cloud-hook", "Running : $image_clone_cmd", "", "", 0, 0, 0);
-        $output = shell_exec($image_clone_cmd);
+	// get image storage
+	$storage = new storage();
+	$storage->get_instance_by_id($image_storageid);
+	$storage_resource_id = $storage->resource_id;
+	// get storage resource
+	$resource = new resource();
+	$resource->get_instance_by_id($storage_resource_id);
+	$resource_id = $resource->id;
+	$resource_ip = $resource->ip;
+	// netapp-storage
+	$netapp_volume_name=basename($image_rootdevice);
+	// we need to special take care that the volume name does not contain special characters
+	$image_clone_name = str_replace(".", "", $image_clone_name);
+	$image_clone_name = str_replace("_", "", $image_clone_name);
+	$image_clone_name = str_replace("-", "", $image_clone_name);
+	// and do not let the volume name start with a number
+	$image_clone_name = "na".$image_clone_name;
+	// get the password for the netapp-filer
+	$na_storage = new netapp_storage();
+	$na_storage->get_instance_by_storage_id($storage->id);
+	if (!strlen($na_storage->storage_id)) {
+		$strMsg = "NetApp Storage server $storage->id not configured yet<br>";
+		$event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "netapp-deployment-cloud-hook", $strMsg, "", "", 0, 0, 0);
+	} else {
+		// generate a new image password for the clone
+		$image->get_instance_by_id($image_id);
+		$image_password = $image->generatePassword(14);
+		$image->set_deployment_parameters("IMAGE_ISCSI_AUTH", $image_password);
+		$na_storage_ip = $resource_ip;
+		$na_password = $na_storage->storage_password;
+		// update the image rootdevice parameter
+		$clone_image_root_device = str_replace($netapp_volume_name, $image_clone_name, $image_rootdevice);
+		$ar_image_update = array(
+			'image_rootdevice' => $clone_image_root_device,
+		);
+		$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "netapp-deployment-cloud-hook", "Updating rootdevice of image $image_id / $image_name with $clone_image_root_device", "", "", 0, 0, 0);
+		$image->update($image_id, $ar_image_update);
+		// send command
+		$image_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/netapp-storage/bin/openqrm-netapp-storage snap -n $netapp_volume_name -s $image_clone_name -i $image_password -p $na_password -e $na_storage_ip";
+		$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "netapp-deployment-cloud-hook", "Running : $image_clone_cmd", "", "", 0, 0, 0);
+		$output = shell_exec($image_clone_cmd);
 
 
-    }
+	}
 }
 
 
@@ -135,47 +135,47 @@ function remove_netapp_deployment($cloud_image_id) {
 	global $event;
 	$event->log("remove_netapp_deployment", $_SERVER['REQUEST_TIME'], 5, "netapp-deployment-cloud-hook", "Removing image on storage", "", "", 0, 0, 0);
 
-    $cloudimage = new cloudimage();
-    $cloudimage->get_instance_by_id($cloud_image_id);
-    // get image
-    $image = new image();
-    $image->get_instance_by_id($cloudimage->image_id);
-    $image_id = $image->id;
-    $image_name = $image->name;
-    $image_type = $image->type;
-    $image_version = $image->version;
-    $image_rootdevice = $image->rootdevice;
-    $image_rootfstype = $image->rootfstype;
-    $image_storageid = $image->storageid;
-    $image_isshared = $image->isshared;
-    $image_comment = $image->comment;
-    $image_capabilities = $image->capabilities;
-    $image_deployment_parameter = $image->deployment_parameter;
+	$cloudimage = new cloudimage();
+	$cloudimage->get_instance_by_id($cloud_image_id);
+	// get image
+	$image = new image();
+	$image->get_instance_by_id($cloudimage->image_id);
+	$image_id = $image->id;
+	$image_name = $image->name;
+	$image_type = $image->type;
+	$image_version = $image->version;
+	$image_rootdevice = $image->rootdevice;
+	$image_rootfstype = $image->rootfstype;
+	$image_storageid = $image->storageid;
+	$image_isshared = $image->isshared;
+	$image_comment = $image->comment;
+	$image_capabilities = $image->capabilities;
+	$image_deployment_parameter = $image->deployment_parameter;
 
-    // get image storage
-    $storage = new storage();
-    $storage->get_instance_by_id($image_storageid);
-    $storage_resource_id = $storage->resource_id;
-    // get storage resource
-    $resource = new resource();
-    $resource->get_instance_by_id($storage_resource_id);
-    $resource_id = $resource->id;
-    $resource_ip = $resource->ip;
-    // netapp-storage
-    $netapp_volume_name=basename($image_rootdevice);
-    // get the password for the netapp-filer
-    $na_storage = new netapp_storage();
-    $na_storage->get_instance_by_storage_id($storage->id);
-    if (!strlen($na_storage->storage_id)) {
-        $strMsg = "NetApp Storage server $storage->id not configured yet<br>";
-        $event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "netapp-deployment-cloud-hook", $strMsg, "", "", 0, 0, 0);
-    } else {
-        $na_storage_ip = $resource_ip;
-        $na_password = $na_storage->storage_password;
-        $image_remove_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/netapp-storage/bin/openqrm-netapp-storage remove -n $netapp_volume_name -p $na_password -e $na_storage_ip";
-        $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "netapp-deployment-cloud-hook", "Running : $image_remove_clone_cmd", "", "", 0, 0, 0);
-        $output = shell_exec($image_remove_clone_cmd);
-    }
+	// get image storage
+	$storage = new storage();
+	$storage->get_instance_by_id($image_storageid);
+	$storage_resource_id = $storage->resource_id;
+	// get storage resource
+	$resource = new resource();
+	$resource->get_instance_by_id($storage_resource_id);
+	$resource_id = $resource->id;
+	$resource_ip = $resource->ip;
+	// netapp-storage
+	$netapp_volume_name=basename($image_rootdevice);
+	// get the password for the netapp-filer
+	$na_storage = new netapp_storage();
+	$na_storage->get_instance_by_storage_id($storage->id);
+	if (!strlen($na_storage->storage_id)) {
+		$strMsg = "NetApp Storage server $storage->id not configured yet<br>";
+		$event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "netapp-deployment-cloud-hook", $strMsg, "", "", 0, 0, 0);
+	} else {
+		$na_storage_ip = $resource_ip;
+		$na_password = $na_storage->storage_password;
+		$image_remove_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/netapp-storage/bin/openqrm-netapp-storage remove -n $netapp_volume_name -p $na_password -e $na_storage_ip";
+		$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "netapp-deployment-cloud-hook", "Running : $image_remove_clone_cmd", "", "", 0, 0, 0);
+		$output = shell_exec($image_remove_clone_cmd);
+	}
 }
 
 
