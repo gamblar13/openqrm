@@ -81,11 +81,9 @@ for OLD_FILE in `find $DESTINATION_PLUGIN/ -type f`; do
 			echo "adjusting content in $OLD_FILE"
 		fi
 		cat $OLD_FILE | \
-			sed -e "s/$SOURCE_NAME_UPPER_CASE/$DESTINATION_NAME_UPPER_CASE/g" | \
-			sed -e "s/$SOURCE_NAME_LOWER_CASE/$DESTINATION_NAME_LOWER_CASE/g" | \
-			sed -e "s/SOURCE_NAME_START_UPPER_CASE/$DESTINATION_NAME_START_UPPER_CASE/g" > $OLD_FILE.new
-		#mkdir -p `dirname $OLD_FILE`
-		/bin/mv -f $OLD_FILE.new $OLD_FILE
+			sed -i -e "s/$SOURCE_NAME_UPPER_CASE/$DESTINATION_NAME_UPPER_CASE/g" $OLD_FILE
+			sed -i -e "s/$SOURCE_NAME_LOWER_CASE/$DESTINATION_NAME_LOWER_CASE/g" $OLD_FILE
+			sed -i -e "s/$SOURCE_NAME_START_UPPER_CASE/$DESTINATION_NAME_START_UPPER_CASE/g" $OLD_FILE
 	else
 		if [ ! -z "$DEBUG" ]; then
 			echo "skipping to adjust the content of $OLD_FILE"
@@ -97,11 +95,11 @@ for OLD_FILE in `find $DESTINATION_PLUGIN/ -type f`; do
 		NEW_FILE=`echo $OLD_FILE | \
 			sed -e "s/$SOURCE_NAME_UPPER_CASE/$DESTINATION_NAME_UPPER_CASE/g" | \
 			sed -e "s/$SOURCE_NAME_LOWER_CASE/$DESTINATION_NAME_LOWER_CASE/g" | \
-			sed -e "s/SOURCE_NAME_START_UPPER_CASE/$DESTINATION_NAME_START_UPPER_CASE/g"`
+			sed -e "s/$SOURCE_NAME_START_UPPER_CASE/$DESTINATION_NAME_START_UPPER_CASE/g"`
 		if [ ! -z "$DEBUG" ]; then
 			echo "renaming $OLD_FILE to $NEW_FILE"
 		fi
-		#mkdir -p `dirname $OLD_FILE`
+		mkdir -p `dirname $NEW_FILE`
 		/bin/mv $OLD_FILE $NEW_FILE
 	else
 		if [ ! -z "$DEBUG" ]; then
@@ -113,10 +111,17 @@ done
 
 # remove .svn dir
 for svn in `find $WORKSPACE/$DESTINATION_PLUGIN/* -name .svn`; do
+	if [ ! -z "$DEBUG" ]; then
+		echo "removing $svn"
+	fi
 	rm -rf $svn
 done
+if [ ! -z "$DEBUG" ]; then
+	echo "removing $WORKSPACE/$DESTINATION_PLUGIN/.svn"
+fi
+rm -rf $WORKSPACE/$DESTINATION_PLUGIN/.svn
 
-echo ":) finished creating new plugin $DESTINATION_PLUGIN"
+echo "Finished creating new plugin template $DESTINATION_PLUGIN"
 
 
 
