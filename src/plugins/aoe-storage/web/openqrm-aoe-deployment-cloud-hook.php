@@ -56,69 +56,69 @@ function create_clone_aoe_deployment($cloud_image_id, $image_clone_name, $disk_s
 	global $event;
 	$event->log("create_clone", $_SERVER['REQUEST_TIME'], 5, "aoe-deployment-cloud-hook", "Creating clone of image on storage", "", "", 0, 0, 0);
 
-    // we got the cloudimage id here, get the image out of it
-    $cloudimage = new cloudimage();
-    $cloudimage->get_instance_by_id($cloud_image_id);
-    // get image, this is already the new logical clone
-    // we just need to physical snapshot it and update the rootdevice
-    $image = new image();
-    $image->get_instance_by_id($cloudimage->image_id);
-    $image_id = $image->id;
-    $image_name = $image->name;
-    $image_type = $image->type;
-    $image_version = $image->version;
-    $image_rootdevice = $image->rootdevice;
-    $image_rootfstype = $image->rootfstype;
-    $image_storageid = $image->storageid;
-    $image_isshared = $image->isshared;
-    $image_comment = $image->comment;
-    $image_capabilities = $image->capabilities;
-    $image_deployment_parameter = $image->deployment_parameter;
+	// we got the cloudimage id here, get the image out of it
+	$cloudimage = new cloudimage();
+	$cloudimage->get_instance_by_id($cloud_image_id);
+	// get image, this is already the new logical clone
+	// we just need to physical snapshot it and update the rootdevice
+	$image = new image();
+	$image->get_instance_by_id($cloudimage->image_id);
+	$image_id = $image->id;
+	$image_name = $image->name;
+	$image_type = $image->type;
+	$image_version = $image->version;
+	$image_rootdevice = $image->rootdevice;
+	$image_rootfstype = $image->rootfstype;
+	$image_storageid = $image->storageid;
+	$image_isshared = $image->isshared;
+	$image_comment = $image->comment;
+	$image_capabilities = $image->capabilities;
+	$image_deployment_parameter = $image->deployment_parameter;
 
-    // get image storage
-    $storage = new storage();
-    $storage->get_instance_by_id($image_storageid);
-    $storage_resource_id = $storage->resource_id;
-    // get storage resource
-    $resource = new resource();
-    $resource->get_instance_by_id($storage_resource_id);
-    $resource_id = $resource->id;
-    $resource_ip = $resource->ip;
+	// get image storage
+	$storage = new storage();
+	$storage->get_instance_by_id($image_storageid);
+	$storage_resource_id = $storage->resource_id;
+	// get storage resource
+	$resource = new resource();
+	$resource->get_instance_by_id($storage_resource_id);
+	$resource_id = $resource->id;
+	$resource_ip = $resource->ip;
 
-    // parse the volume group info in the identifier
-    $ident_separate=strpos($image_rootdevice, ":");
-    $image_location_name=substr($image_rootdevice, 0, $ident_separate);
-    $root_device=substr($image_rootdevice, $ident_separate+1);
-    // set default snapshot size
-    if (!strlen($disk_size)) {
-        $disk_size=5000;
-    }
-    $image_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/aoe-storage/bin/openqrm-aoe-storage snap -n $image_location_name -s $image_clone_name -m $disk_size";
-    $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "aoe-deployment-cloud-hook", "Running : $image_clone_cmd", "", "", 0, 0, 0);
-    $resource->send_command($resource_ip, $image_clone_cmd);
-    // wait for clone
-    sleep(4);
-    // find the new rootdevice of the snapshot, get it via the storage-ident hook
-    $rootdevice_identifier_hook = "$BaseDir/boot-service/image.aoe-deployment.php";
-    // require once
-    require_once "$rootdevice_identifier_hook";
-    $rootdevice_identifier_arr = array();
-    $rootdevice_identifier_arr = get_image_rootdevice_identifier($image->storageid);
-    foreach($rootdevice_identifier_arr as $id) {
-        foreach($id as $aoe_identifier_string) {
-            if (strstr($aoe_identifier_string, $image_clone_name)) {
-                $aoe_clone_rootdevice_tmp=strrchr($aoe_identifier_string, ":");
-                $aoe_clone_rootdevice=trim(str_replace(":", "", $aoe_clone_rootdevice_tmp));
-                break;
-            }
-        }
-    }
-    // update the image rootdevice parameter
-    $ar_image_update = array(
-        'image_rootdevice' => "$image_clone_name:$aoe_clone_rootdevice",
-    );
-    $image->update($image_id, $ar_image_update);
-    $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "aoe-deployment-cloud-hook", "Updating rootdevice of image $image_id / $image_name with $image_clone_name:$aoe_clone_rootdevice", "", "", 0, 0, 0);
+	// parse the volume group info in the identifier
+	$ident_separate=strpos($image_rootdevice, ":");
+	$image_location_name=substr($image_rootdevice, 0, $ident_separate);
+	$root_device=substr($image_rootdevice, $ident_separate+1);
+	// set default snapshot size
+	if (!strlen($disk_size)) {
+		$disk_size=5000;
+	}
+	$image_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/aoe-storage/bin/openqrm-aoe-storage snap -n $image_location_name -s $image_clone_name -m $disk_size";
+	$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "aoe-deployment-cloud-hook", "Running : $image_clone_cmd", "", "", 0, 0, 0);
+	$resource->send_command($resource_ip, $image_clone_cmd);
+	// wait for clone
+	sleep(4);
+	// find the new rootdevice of the snapshot, get it via the storage-ident hook
+	$rootdevice_identifier_hook = "$BaseDir/boot-service/image.aoe-deployment.php";
+	// require once
+	require_once "$rootdevice_identifier_hook";
+	$rootdevice_identifier_arr = array();
+	$rootdevice_identifier_arr = get_image_rootdevice_identifier($image->storageid);
+	foreach($rootdevice_identifier_arr as $id) {
+		foreach($id as $aoe_identifier_string) {
+			if (strstr($aoe_identifier_string, $image_clone_name)) {
+				$aoe_clone_rootdevice_tmp=strrchr($aoe_identifier_string, ":");
+				$aoe_clone_rootdevice=trim(str_replace(":", "", $aoe_clone_rootdevice_tmp));
+				break;
+			}
+		}
+	}
+	// update the image rootdevice parameter
+	$ar_image_update = array(
+		'image_rootdevice' => "$image_clone_name:$aoe_clone_rootdevice",
+	);
+	$image->update($image_id, $ar_image_update);
+	$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "aoe-deployment-cloud-hook", "Updating rootdevice of image $image_id / $image_name with $image_clone_name:$aoe_clone_rootdevice", "", "", 0, 0, 0);
 }
 
 
@@ -132,40 +132,40 @@ function remove_aoe_deployment($cloud_image_id) {
 	global $event;
 	$event->log("remove_aoe_deployment", $_SERVER['REQUEST_TIME'], 5, "aoe-deployment-cloud-hook", "Removing image on storage", "", "", 0, 0, 0);
 
-    // we got the cloudimage id here, get the image out of it
-    $cloudimage = new cloudimage();
-    $cloudimage->get_instance_by_id($cloud_image_id);
-    // get image
-    $image = new image();
-    $image->get_instance_by_id($cloudimage->image_id);
-    $image_id = $image->id;
-    $image_name = $image->name;
-    $image_type = $image->type;
-    $image_version = $image->version;
-    $image_rootdevice = $image->rootdevice;
-    $image_rootfstype = $image->rootfstype;
-    $image_storageid = $image->storageid;
-    $image_isshared = $image->isshared;
-    $image_comment = $image->comment;
-    $image_capabilities = $image->capabilities;
-    $image_deployment_parameter = $image->deployment_parameter;
+	// we got the cloudimage id here, get the image out of it
+	$cloudimage = new cloudimage();
+	$cloudimage->get_instance_by_id($cloud_image_id);
+	// get image
+	$image = new image();
+	$image->get_instance_by_id($cloudimage->image_id);
+	$image_id = $image->id;
+	$image_name = $image->name;
+	$image_type = $image->type;
+	$image_version = $image->version;
+	$image_rootdevice = $image->rootdevice;
+	$image_rootfstype = $image->rootfstype;
+	$image_storageid = $image->storageid;
+	$image_isshared = $image->isshared;
+	$image_comment = $image->comment;
+	$image_capabilities = $image->capabilities;
+	$image_deployment_parameter = $image->deployment_parameter;
 
-    // get image storage
-    $storage = new storage();
-    $storage->get_instance_by_id($image_storageid);
-    $storage_resource_id = $storage->resource_id;
-    // get storage resource
-    $resource = new resource();
-    $resource->get_instance_by_id($storage_resource_id);
-    $resource_id = $resource->id;
-    $resource_ip = $resource->ip;
-    // parse the volume group info in the identifier
-    $ident_separate=strpos($image_rootdevice, ":");
-    $image_location_name=substr($image_rootdevice, 0, $ident_separate);
-    $root_device=substr($image_rootdevice, $ident_separate+1);
-    $image_remove_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/aoe-storage/bin/openqrm-aoe-storage remove -n $image_location_name";
-    $event->log("remove_aoe_deployment", $_SERVER['REQUEST_TIME'], 5, "aoe-deployment-cloud-hook", "Running : $image_remove_clone_cmd", "", "", 0, 0, 0);
-    $resource->send_command($resource_ip, $image_remove_clone_cmd);
+	// get image storage
+	$storage = new storage();
+	$storage->get_instance_by_id($image_storageid);
+	$storage_resource_id = $storage->resource_id;
+	// get storage resource
+	$resource = new resource();
+	$resource->get_instance_by_id($storage_resource_id);
+	$resource_id = $resource->id;
+	$resource_ip = $resource->ip;
+	// parse the volume group info in the identifier
+	$ident_separate=strpos($image_rootdevice, ":");
+	$image_location_name=substr($image_rootdevice, 0, $ident_separate);
+	$root_device=substr($image_rootdevice, $ident_separate+1);
+	$image_remove_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/aoe-storage/bin/openqrm-aoe-storage remove -n $image_location_name";
+	$event->log("remove_aoe_deployment", $_SERVER['REQUEST_TIME'], 5, "aoe-deployment-cloud-hook", "Running : $image_remove_clone_cmd", "", "", 0, 0, 0);
+	$resource->send_command($resource_ip, $image_remove_clone_cmd);
 }
 
 

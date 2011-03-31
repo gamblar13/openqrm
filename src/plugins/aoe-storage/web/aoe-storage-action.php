@@ -48,44 +48,44 @@ if ($OPENQRM_USER->role != "administrator") {
 
 $event->log("$aoe_storage_command", $_SERVER['REQUEST_TIME'], 5, "aoe-storage-action", "Processing aoe-storage command $aoe_storage_command", "", "", 0, 0, 0);
 switch ($aoe_storage_command) {
-    case 'get_storage':
-        if (!file_exists($StorageDir)) {
-            mkdir($StorageDir);
-        }
-        $filename = $StorageDir."/".$_POST['filename'];
-        $filedata = base64_decode($_POST['filedata']);
-        echo "<h1>$filename</h1>";
-        $fout = fopen($filename,"wb");
-        fwrite($fout, $filedata);
-        fclose($fout);
-        break;
+	case 'get_storage':
+		if (!file_exists($StorageDir)) {
+			mkdir($StorageDir);
+		}
+		$filename = $StorageDir."/".$_POST['filename'];
+		$filedata = base64_decode($_POST['filedata']);
+		echo "<h1>$filename</h1>";
+		$fout = fopen($filename,"wb");
+		fwrite($fout, $filedata);
+		fclose($fout);
+		break;
 
-    case 'get_ident':
-        if (!file_exists($StorageDir)) {
-            mkdir($StorageDir);
-        }
-        $filename = $StorageDir."/".$_POST['filename'];
-        $filedata = base64_decode($_POST['filedata']);
-        echo "<h1>$filename</h1>";
-        $fout = fopen($filename,"wb");
-        fwrite($fout, $filedata);
-        fclose($fout);
-        break;
+	case 'get_ident':
+		if (!file_exists($StorageDir)) {
+			mkdir($StorageDir);
+		}
+		$filename = $StorageDir."/".$_POST['filename'];
+		$filedata = base64_decode($_POST['filedata']);
+		echo "<h1>$filename</h1>";
+		$fout = fopen($filename,"wb");
+		fwrite($fout, $filedata);
+		fclose($fout);
+		break;
 
-    case 'auth_finished':
-        // remove storage-auth-blocker if existing
-        $authblocker = new authblocker();
-        $authblocker->get_instance_by_image_name($aoe_image_name);
-        if (strlen($authblocker->id)) {
-            $event->log("auth_finished", $_SERVER['REQUEST_TIME'], 5, "aoe-storage-action", "Removing authblocker for image $aoe_image_name", "", "", 0, 0, 0);
-            $authblocker->remove($authblocker->id);
-        }
-        break;
+	case 'auth_finished':
+		// remove storage-auth-blocker if existing
+		$authblocker = new authblocker();
+		$authblocker->get_instance_by_image_name($aoe_image_name);
+		if (strlen($authblocker->id)) {
+			$event->log("auth_finished", $_SERVER['REQUEST_TIME'], 5, "aoe-storage-action", "Removing authblocker for image $aoe_image_name", "", "", 0, 0, 0);
+			$authblocker->remove($authblocker->id);
+		}
+		break;
 
 
-    default:
-        $event->log("$aoe_storage_command", $_SERVER['REQUEST_TIME'], 3, "aoe-storage-action", "No such aoe-storage command ($aoe_storage_command)", "", "", 0, 0, 0);
-        break;
+	default:
+		$event->log("$aoe_storage_command", $_SERVER['REQUEST_TIME'], 3, "aoe-storage-action", "No such aoe-storage command ($aoe_storage_command)", "", "", 0, 0, 0);
+		break;
 
 
 }
