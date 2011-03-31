@@ -24,9 +24,9 @@ OPENQRM_RESOURCE_PARAMETER_FILE="/var/openqrm/openqrm-resource.conf"
 export LANG=C
 
 if [ ! -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
-    echo "ERROR: Not initialyzed yet ! Please run :"
-    echo "  /bin/openqrm-start-vmware-esx-init <openqrm-server-ip-address> <esx-server-ip-address> <openqrm-user> <openqrm-password>"
-    exit 1
+	echo "ERROR: Not initialyzed yet ! Please run :"
+	echo "  /bin/openqrm-start-vmware-esx-init <openqrm-server-ip-address> <esx-server-ip-address> <openqrm-user> <openqrm-password>"
+	exit 1
 fi
 . $OPENQRM_RESOURCE_PARAMETER_FILE
 
@@ -36,14 +36,14 @@ if [ "$MONITOR_CMD" == "stop" ]; then
 		kill `cat $MONITORD_LOCKFILE`
 		rm -f $MONITORD_LOCKFILE
 	fi
-    kill `ps -c | grep openqrm | grep vmware-esx | grep -v grep | awk {' print $1 '}` 2>/dev/null
+	kill `ps -c | grep openqrm | grep vmware-esx | grep -v grep | awk {' print $1 '}` 2>/dev/null
 fi
 
 # create lockfile
 if [ -f "$MONITORD_LOCKFILE" ]; then
-    kill `cat $MONITORD_LOCKFILE` 2>/dev/null
-    rm -f $MONITORD_LOCKFILE
-    kill `ps -c | grep openqrm | grep vmware-esx | grep -v grep | awk {' print $1 '}` 2>/dev/null
+	kill `cat $MONITORD_LOCKFILE` 2>/dev/null
+	rm -f $MONITORD_LOCKFILE
+	kill `ps -c | grep openqrm | grep vmware-esx | grep -v grep | awk {' print $1 '}` 2>/dev/null
 fi
 echo "starting $0"
 echo $$ > $MONITORD_LOCKFILE
@@ -56,19 +56,19 @@ openqrm_web_protocol="http"
 # try to register all vms
 ESX_VER=$(vmware -v | awk '{print $4}')
 if [ -f /bin/vim-cmd ]; then
-    VMWARE_CMD=/bin/vim-cmd
+	VMWARE_CMD=/bin/vim-cmd
 elif [ -f /usr/bin/vmware-vim-cmd ]; then
-    VMWARE_CMD=/usr/bin/vmware-vim-cmd
+	VMWARE_CMD=/usr/bin/vmware-vim-cmd
 elif [[ "${ESX_VER}" == "3.0.3" ]] || [[ "${ESX_VER}" == "3.0.2" ]] || [[ "${ESX_VER}" == "3.0.1" ]] || [[ "${ESX_VER}" == "3.0.0" ]]; then
-    VMWARE_CMD=/usr/bin/vimsh
+	VMWARE_CMD=/usr/bin/vimsh
 else
-    echo "WARNING: Host type is not ESX 3.x+ or ESXi"
+	echo "WARNING: Host type is not ESX 3.x+ or ESXi"
 fi
 if [ "$VMWARE_CMD" != "" ]; then
-    for VM_CONF in `find /vmfs/volumes/ -name *.vmx`; do
-        echo "NOTICE: Trying to register $VM_CONF"
-        $VMWARE_CMD solo/registervm $VM_CONF
-    done
+	for VM_CONF in `find /vmfs/volumes/ -name *.vmx`; do
+		echo "NOTICE: Trying to register $VM_CONF"
+		$VMWARE_CMD solo/registervm $VM_CONF
+	done
 fi
 
 # loop

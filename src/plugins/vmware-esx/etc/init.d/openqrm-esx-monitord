@@ -14,11 +14,11 @@ prog="openqrm-esx-monitord"
 start()
 {
 	echo "Starting $prog: "
-    if `which screen 2>/dev/null`; then
-    	screen -dmS monitord /bin/openqrm-vmware-esx-monitord
-    else
-        /bin/openqrm-vmware-esx-monitord &
-    fi
+	if `which screen 2>/dev/null`; then
+		screen -dmS monitord /bin/openqrm-vmware-esx-monitord
+	else
+		/bin/openqrm-vmware-esx-monitord &
+	fi
 }
 
 stop()
