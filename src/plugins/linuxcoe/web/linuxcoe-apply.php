@@ -51,7 +51,7 @@ $step = htmlobject_request('step');
 if (!strlen($step)) {
 	$step = 1;
 }
-
+$lcoe_profile_name = htmlobject_request('lcoe_profile_name');
 
 function redirect($strMsg, $currenttab = 'tab0', $url = '') {
 	global $thisfile;
@@ -177,7 +177,7 @@ function linuxcoe_profile_manager() {
 		if (file_exists("$RootDir/plugins/linuxcoe/profiles/$lcoe/openqrm.info")) {
 			$lcoe_profile_comment_str = file_get_contents("$RootDir/plugins/linuxcoe/profiles/$lcoe/openqrm.info");
 		}
-		$lcoe_profile_comment = htmlobject_input("lcoe_profile_comment[$lcoe]", array('value' => $lcoe_profile_comment_str), 'text');
+		$lcoe_profile_comment = htmlobject_input("lcoe_profile_comment[$lcoe]", array('value' => $lcoe_profile_comment_str, 'label' => ''), 'text');
 
 		$arBody[] = array(
 			'lcoe_profile_id' => $lcoe_profile_count,
@@ -249,7 +249,8 @@ function linuxcoe_select_resource($lcoe_profile_name) {
 
 	$arBody = array();
 	$resource_tmp = new resource();
-	$resource_array = $resource_tmp->display_idle_overview($table->offset, $table->limit, $table->sort, $table->order);
+	$resource_array = $resource_tmp->display_overview($table->offset, $table->limit, $table->sort, $table->order);
+	array_shift($resource_array);
 
 	foreach ($resource_array as $index => $resource_db) {
 		// prepare the values for the array
