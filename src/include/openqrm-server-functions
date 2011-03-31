@@ -60,7 +60,7 @@ function openqrm_server_get_config() {
 
 	# make sure /sbin and /usr/sbin are in our PATH, because we might be running as the webserver user,
 	# in which case the ifconfig and route commands will fail, leaving the variables empty (bad!)
-        PATH=/sbin:/usr/sbin:$PATH
+		PATH=/sbin:/usr/sbin:$PATH
 
 	# get ip configuration
 	export OPENQRM_SERVER_IP_ADDRESS=`ifconfig $OPENQRM_SERVER_INTERFACE | grep inet | grep -v inet6 | cut -d':' -f2 | awk {' print $1 '} | head -n 1`
@@ -73,9 +73,9 @@ openqrm_server_get_config
 
 # define wget to use with https
 if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
-    export WGET="wget --no-check-certificate"
+	export WGET="wget --no-check-certificate"
 else
-    export WGET="wget"
+	export WGET="wget"
 fi
 
 
@@ -95,14 +95,37 @@ function openqrm_server_create_kernel() {
 	# OPENQRM_SERVER_KERNEL_TYPE can be "ext2" or "initramfs"
 	OPENQRM_SERVER_KERNEL_TYPE=$4
 	OPENQRM_SERVER_INITRD_TEMPLATE=$5
-	
+
 	if [ "$OPENQRM_SERVER_KERNEL_TYPE" == "" ]; then
-		export OPENQRM_SERVER_KERNEL_TYPE="ext2"
+		export OPENQRM_SERVER_KERNEL_TYPE="initramfs"
 	fi
 	if [ "$OPENQRM_SERVER_INITRD_TEMPLATE" == "" ]; then
 		export OPENQRM_SERVER_INITRD_TEMPLATE=$OPENQRM_DEFAULT_INITRD_TEMPLATE
 	fi
-	
+	# kernel there ?
+	if [ ! -f "$OPENQRM_SERVER_KERNEL_LOCATION/boot/vmlinuz-$OPENQRM_SERVER_KERNEL_VERSION" ]; then
+		echo "ERROR: Cannot find kernel file at $OPENQRM_SERVER_KERNEL_LOCATION/boot/vmlinuz-$OPENQRM_SERVER_KERNEL_VERSION!"
+		return 1
+	fi
+	# system.map there ?
+	if [ ! -f "$OPENQRM_SERVER_KERNEL_LOCATION/boot/System.map-$OPENQRM_SERVER_KERNEL_VERSION" ]; then
+		echo "ERROR: Cannot find System.map at $OPENQRM_SERVER_KERNEL_LOCATION/boot/System.map-$OPENQRM_SERVER_KERNEL_VERSION!"
+		return 1
+	fi
+	# module dir there ?
+	if [ ! -d "$OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION" ]; then
+		echo "ERROR: Cannot find kernel module directory at $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION!"
+		return 1
+	fi
+	# modules.pcimap there ?
+	if [ ! -f "$OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/modules.pcimap" ]; then
+		echo "WARNING: Cannot find modules.pcimap in kernel module directory at $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION. Trying to create it ..."
+		if ! depmod -a -m -F $OPENQRM_SERVER_KERNEL_LOCATION/boot/System.map-$OPENQRM_SERVER_KERNEL_VERSION -b $OPENQRM_SERVER_KERNEL_LOCATION $OPENQRM_SERVER_KERNEL_VERSION; then
+			echo "WARNING: Could not create modules.pcimap in kernel module directory at $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION! Trying to continue ..."
+		else
+			echo "NOTICE: Created modules.pcimap in kernel module directory at $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION."
+		fi
+	fi
 	echo "Creating kernel $OPENQRM_SERVER_KERNEL_NAME version $OPENQRM_SERVER_KERNEL_VERSION ($OPENQRM_SERVER_KERNEL_TYPE initrd)"
 	# copy kernel + System-map
 	cp -a $OPENQRM_SERVER_KERNEL_LOCATION/boot/vmlinuz-$OPENQRM_SERVER_KERNEL_VERSION $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-$OPENQRM_SERVER_KERNEL_NAME
@@ -118,15 +141,15 @@ function openqrm_server_create_kernel() {
 			/bin/cp -f $MODULE $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION
 		fi
 	done
-    # also need virtio* for kvm virtio pci network card
-    for MODULE in `find $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/kernel/drivers -type f -name virtio*`; do
-        MODULE_NAME=`echo $MODULE | sed -e "s/.*\///"`
-        if ! echo $OPENQRM_UNWANTED_MODULES | grep $MODULE_NAME 1>/dev/null; then
-            /bin/cp -f $MODULE $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION
-        fi
-    done
-    # also we need to take the modules.pcimap for the hardware detection to work
-    cp -a $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/modules.* $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/
+	# also need virtio* for kvm virtio pci network card
+	for MODULE in `find $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/kernel/drivers -type f -name virtio*`; do
+		MODULE_NAME=`echo $MODULE | sed -e "s/.*\///"`
+		if ! echo $OPENQRM_UNWANTED_MODULES | grep $MODULE_NAME 1>/dev/null; then
+			/bin/cp -f $MODULE $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION
+		fi
+	done
+	# also we need to take the modules.pcimap for the hardware detection to work
+	cp -a $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/modules.* $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/
 	# unpack the initrd-template
 	echo "-> using initrd-template from $OPENQRM_SERVER_INITRD_TEMPLATE"
 	tar -C $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME -xzf $OPENQRM_SERVER_INITRD_TEMPLATE
@@ -139,7 +162,7 @@ function openqrm_server_create_kernel() {
 		return 1
 	fi
 
-    # take udev from kernel-location
+	# take udev from kernel-location
 	rm -rf $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/etc/udev
 	cp -aR $OPENQRM_SERVER_KERNEL_LOCATION/etc/udev $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/etc/
 	# and /lib/udev
@@ -196,7 +219,7 @@ function openqrm_server_create_kernel() {
 	for OPENQRM_PLUGIN in `ls $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/`; do
 		if [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$OPENQRM_PLUGIN/include/openqrm-plugin-$OPENQRM_PLUGIN-kernel-hook ]; then
 			. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$OPENQRM_PLUGIN/include/openqrm-plugin-$OPENQRM_PLUGIN-kernel-hook
-            PLUGIN_FUNCTION_NAME=`echo $OPENQRM_PLUGIN | sed -e "s/-/_/g"`""_kernel_hook
+			PLUGIN_FUNCTION_NAME=`echo $OPENQRM_PLUGIN | sed -e "s/-/_/g"`""_kernel_hook
 			$PLUGIN_FUNCTION_NAME $OPENQRM_SERVER_KERNEL_NAME $OPENQRM_SERVER_KERNEL_VERSION $OPENQRM_SERVER_KERNEL_LOCATION $OPENQRM_SERVER_KERNEL_TYPE
 		fi
 	done
@@ -241,12 +264,12 @@ function openqrm_server_manage_kernel() {
 function openqrm_server_set_default_kernel() {
 	OPENQRM_KERNEL_NAME=$1
 	echo "openQRM-server: Setting kernel $OPENQRM_KERNEL_NAME as default kernel" | logger
-    if [ "$OPENQRM_KERNEL_NAME" != "default" ]; then
-        cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-$OPENQRM_KERNEL_NAME $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-default
-        cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/System.map-$OPENQRM_KERNEL_NAME $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/System.map-default
-        cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-$OPENQRM_KERNEL_NAME.img $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-default.img
-        cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/modules-$OPENQRM_KERNEL_NAME.tgz $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/modules-default.tgz
-    fi
+	if [ "$OPENQRM_KERNEL_NAME" != "default" ]; then
+		cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-$OPENQRM_KERNEL_NAME $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-default
+		cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/System.map-$OPENQRM_KERNEL_NAME $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/System.map-default
+		cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-$OPENQRM_KERNEL_NAME.img $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-default.img
+		cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/modules-$OPENQRM_KERNEL_NAME.tgz $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/modules-default.tgz
+	fi
 }
 
 
@@ -383,16 +406,16 @@ function openqrm_server_create_pxe_config() {
 		sed -e "s/OPENQRM_RESOURCE_ID/$RESOURCE_ID/g" |	\
 		sed -e "s/OPENQRM_SERVER_IP_ADDRESS/$OPENQRM_SERVER_IP_ADDRESS/g" \
 		> $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
-		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+	chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
 
-		# allow plugin to re-write the pxe-config
-		for OPENQRM_PLUGIN in `ls $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/`; do
-			if [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$OPENQRM_PLUGIN/include/openqrm-plugin-$OPENQRM_PLUGIN-assign-hook ]; then
-				. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$OPENQRM_PLUGIN/include/openqrm-plugin-$OPENQRM_PLUGIN-assign-hook
-				OPENQRM_PLUGIN=`echo $OPENQRM_PLUGIN | sed -e "s/-/_/g"`
-				$OPENQRM_PLUGIN""_assign_hook $RESOURCE_ID $KERNEL_NAME $RESOURCE_PXELINUXCFG_FILE
-			fi
-		done
+	# allow plugin to re-write the pxe-config
+	for OPENQRM_PLUGIN in `ls $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/`; do
+		if [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$OPENQRM_PLUGIN/include/openqrm-plugin-$OPENQRM_PLUGIN-assign-hook ]; then
+			. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/$OPENQRM_PLUGIN/include/openqrm-plugin-$OPENQRM_PLUGIN-assign-hook
+			OPENQRM_PLUGIN=`echo $OPENQRM_PLUGIN | sed -e "s/-/_/g"`
+			$OPENQRM_PLUGIN""_assign_hook $RESOURCE_ID $KERNEL_NAME $RESOURCE_PXELINUXCFG_FILE
+		fi
+	done
 }
 
 
@@ -473,7 +496,7 @@ function openqrm_get_resource_parameter() {
 	for param in `cat /tmp/$mac`; do
 		KEY=`echo $param | cut -d'=' -f1`
 		if [ "$KEY" != '"' ]; then
-			export $KEY
+			export $KEY 2>/dev/null
 		fi
 	done
 }
@@ -528,8 +551,8 @@ function openqrm_server_state() {
 	if [ "$CMD" != "list" ] && [ "$NAME" == "" ]; then
 		echo $USAGE
 		return 1
-	fi	
-	
+	fi
+
 
 
 	case $CMD in
@@ -537,7 +560,7 @@ function openqrm_server_state() {
 				echo "openQRM-server: Creating backup of the server state $NAME-$NOW"
 				rm -rf $OPENQRM_SERVER_STATE_DIR/$NAME
 				mkdir -p $OPENQRM_SERVER_STATE_DIR/$NAME
-				
+
 				# dirs
 				# adding the plugin-backup dirs to the dirlist
 				for OPENQRM_PLUGIN in `ls $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/`; do
@@ -554,7 +577,7 @@ function openqrm_server_state() {
 						cp -aR $DIR `dirname $OPENQRM_SERVER_STATE_DIR/$NAME/$DIR`
 					fi
 				done
-				
+
 				# files
 				# first add the enabled plugins state file
 				for RUNNING in `ls $OPENQRM_SERVER_BASE_DIR/openqrm/web/base/plugins/`; do
@@ -587,7 +610,7 @@ function openqrm_server_state() {
 				tar -C $OPENQRM_SERVER_STATE_DIR/$NAME -czf $OPENQRM_SERVER_STATE_DIR/$NAME-$NOW.tgz $RELATIVE_OPENQRM_SERVER_BASE_DIR/openqrm
 				rm -rf $OPENQRM_SERVER_STATE_DIR/$NAME
 				;;
-				
+
 		restore)
 				if [ -f $OPENQRM_SERVER_STATE_DIR/$NAME.tgz ]; then
 					echo "openQRM-server: Restoring server state from $OPENQRM_SERVER_STATE_DIR/$NAME.tgz"
@@ -601,7 +624,7 @@ function openqrm_server_state() {
 					return 1
 				fi
 				;;
-				
+
 		remove)
 				if [ -f $OPENQRM_SERVER_STATE_DIR/$NAME.tgz ]; then
 					echo "openQRM-server: Removing server state $NAME-$NOW"
@@ -614,23 +637,15 @@ function openqrm_server_state() {
 		list)
 				ls $OPENQRM_SERVER_STATE_DIR | sed -s "s/\.tgz//g"
 				;;
-	
+
 		*)
 				echo "openQRM-server: No such server-state command!"
 				return 1
 				;;
-	
-	
-	
+
+
+
 	esac
-
-
-
-
-
-
-
-
 
 }
 

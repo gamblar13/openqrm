@@ -112,7 +112,7 @@ function openqrm_build_find_libs() {
 #
 function openqrm_check_build_requirements() {
 	echo "Checking requirements for the compilation phase"
-    export FORCE_INSTALL=true
+	export FORCE_INSTALL=true
 	# check which command to use for checking the requirements
 	if [ -f /etc/debian_version ]; then
 		OPENQRM_PACKAGE_TYPE=deb
@@ -212,7 +212,7 @@ function openqrm_cache_or_download() {
 				" and try again."
 			exit 1
 		fi
-    	cd $CURRENT_DIR
+		cd $CURRENT_DIR
 	fi
 	cd $CURRENT_DIR
 }
@@ -291,21 +291,21 @@ function openqrm_create_default_initrd_template() {
 	export OPENQRM_PRE_MAKE="cp $OPENQRM_SOURCE_DIR_FULL_PATH/etc/build.conf/busybox.configuration $OPENQRM_SOURCE_COMPONENT_BUILD_DIR/.config && make oldconfig"
 	export OPENQRM_POST_MAKE="make install"
 	openqrm_compile_from_source busybox
-    unset OPENQRM_PRE_MAKE
-    unset OPENQRM_POST_MAKE
+	unset OPENQRM_PRE_MAKE
+	unset OPENQRM_POST_MAKE
 
 	# getting pciutils
 	openqrm_cache_or_download pciutils
-    # compile static
+	# compile static
 	export LDFLAGS="-static"
-    # patch for pcimodules
+	# patch for pcimodules
 	. $OPENQRM_SOURCE_DIR/etc/build.conf/pciutils.conf
 	OPENQRM_SOURCE_PCIUTILS_DIR="$OPENQRM_BUILD_TMP_DIR/openqrm-build/pciutils/pciutils-$OPENQRM_SOURCE_VERSION/"
-    export OPENQRM_PRE_MAKE="cd $OPENQRM_SOURCE_PCIUTILS_DIR; patch -p1 < $OPENQRM_SOURCE_DIR/etc/build.conf/pciutils-pcimodules.patch; cd -"
+	export OPENQRM_PRE_MAKE="cd $OPENQRM_SOURCE_PCIUTILS_DIR; patch -p1 < $OPENQRM_SOURCE_DIR/etc/build.conf/pciutils-pcimodules.patch; cd -"
 	openqrm_compile_from_source pciutils
-    unset LDFLAGS
-    unset OPENQRM_PRE_MAKE
-    unset OPENQRM_POST_MAKE
+	unset LDFLAGS
+	unset OPENQRM_PRE_MAKE
+	unset OPENQRM_POST_MAKE
 
 	# dropbear
 	. $OPENQRM_SOURCE_DIR/etc/build.conf/dropbear.conf
@@ -333,7 +333,7 @@ function openqrm_create_default_initrd_template() {
 			cp -a $LIB""* $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/lib/
 		fi
 	done
-    # remove wget link
+	# remove wget link
 	rm -f $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/wget
 	# add some more utils + their libs
 	for UTIL in $OPENQRM_INITRD_COMPONENTS; do
@@ -348,10 +348,10 @@ function openqrm_create_default_initrd_template() {
 	done
 	# fix wget
 	rm -f $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/usr/bin/wget
-    # if lvm is a link to lvm.static (e.g. on centos)
-    if [ -x /sbin/lvm.static ]; then
-        cp -a /sbin/lvm.static $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/
-    fi
+	# if lvm is a link to lvm.static (e.g. on centos)
+	if [ -x /sbin/lvm.static ]; then
+		cp -a /sbin/lvm.static $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/
+	fi
 	# create default udhcpc script
 	mkdir -p $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/usr/share/udhcpc
 	cat > $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/usr/share/udhcpc/default.script << EOF
@@ -385,23 +385,23 @@ exit 0
 EOF
 	chmod 755 $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/usr/share/udhcpc/default.script
 
-    # take vol_id or blkid
-    if [ -x  /lib/udev/vol_id ]; then
-        UDEV_UTIL="/lib/udev/vol_id"
-    elif [ -x /sbin/blkid ]; then
-        UDEV_UTIL="/sbin/blkid"
-    fi
-    cp -a $UDEV_UTIL $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin
-    echo "Adding $UDEV_UTIL to default initrd-template"
-    for LIB in `openqrm_build_find_libs $UDEV_UTIL`; do
-        LIB=`echo $LIB | cut -d'-' -f1 | cut -d'.' -f1`
-        if [ "$LIB" != "/lib/" ]; then
-            cp -af $LIB""* $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/lib/
-        fi
-    done
-    if [ "$UDEV_UTIL" == "/sbin/blkid" ]; then
-        cp -af $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/blkid $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/vol_id
-    fi
+	# take vol_id or blkid
+	if [ -x  /lib/udev/vol_id ]; then
+		UDEV_UTIL="/lib/udev/vol_id"
+	elif [ -x /sbin/blkid ]; then
+		UDEV_UTIL="/sbin/blkid"
+	fi
+	cp -a $UDEV_UTIL $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin
+	echo "Adding $UDEV_UTIL to default initrd-template"
+	for LIB in `openqrm_build_find_libs $UDEV_UTIL`; do
+		LIB=`echo $LIB | cut -d'-' -f1 | cut -d'.' -f1`
+		if [ "$LIB" != "/lib/" ]; then
+			cp -af $LIB""* $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/lib/
+		fi
+	done
+	if [ "$UDEV_UTIL" == "/sbin/blkid" ]; then
+		cp -af $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/blkid $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/vol_id
+	fi
 
 
 	# fix reboot for the initrd -> reboot -f (it's simply faster)
@@ -425,7 +425,7 @@ EOF
 	ln -sf rc.d/init.d init.d
 	touch localtime
 	# create shells file
-	echo "/bin/bash" > shells	
+	echo "/bin/bash" > shells
 	echo "none            /dev/pts        devpts        gid=0,mode=620    0 0" > fstab
 	# passwd + group
 	echo "root:x:0:0:root:/root:/bin/bash" > passwd
@@ -459,13 +459,13 @@ EOF
 	cp -a $OPENQRM_SOURCE_DROPBEAR_DIR/dbclient $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/
 	cp -a $OPENQRM_SOURCE_DROPBEAR_DIR/dropbearconvert $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/
 	cp -a $OPENQRM_SOURCE_DROPBEAR_DIR/dropbearkey $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/
-    # install dropbear libs
-    for LIB in `openqrm_build_find_libs $OPENQRM_SOURCE_DROPBEAR_DIR/dropbear`; do
-        LIB=`echo $LIB | cut -d'-' -f1 | cut -d'.' -f1`
-        if [ "$LIB" != "/lib/" ]; then
-            cp -af $LIB""* $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/lib/
-        fi
-    done
+	# install dropbear libs
+	for LIB in `openqrm_build_find_libs $OPENQRM_SOURCE_DROPBEAR_DIR/dropbear`; do
+		LIB=`echo $LIB | cut -d'-' -f1 | cut -d'.' -f1`
+		if [ "$LIB" != "/lib/" ]; then
+			cp -af $LIB""* $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/lib/
+		fi
+	done
 	# creating the initrd devices
 	cp -a $OPENQRM_SOURCE_DIR_FULL_PATH/etc/build.conf/initrd-devices.conf $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/etc/
 	rm -rf $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/dev
@@ -513,19 +513,19 @@ function openqrm_pack_default_initrd_template() {
 	# pack
 	CURRENT_DIR=`pwd`
 	OPENQRM_SOURCE_DIR_FULL_PATH=`cd $OPENQRM_SOURCE_DIR && pwd && cd $CURRENT_DIR`
-    mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/sbin $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/bin
+	mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/sbin $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/bin
 	cd $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/
-    if grep debianized $OPENQRM_SOURCE_DIR_FULL_PATH/etc/Makefile 1>/dev/null; then
-        # on debian/ubuntu we have a runtime dependency on dropbear
-        tar -czf $DESTINATION_DIR/etc/openqrm/templates/openqrm-initrd-default.tgz *
-    else
-        tar -czf $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz *
-        # copy dropbear
-        cp -af $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/sbin/dropbear $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/
-        cp -af $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/dbclient $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/bin/
-        cp -af $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/dropbearconvert $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/bin/
-        cp -af $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/dropbearkey $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/bin/
-    fi
+	if grep debianized $OPENQRM_SOURCE_DIR_FULL_PATH/etc/Makefile 1>/dev/null; then
+		# on debian/ubuntu we have a runtime dependency on dropbear
+		tar -czf $DESTINATION_DIR/etc/openqrm/templates/openqrm-initrd-default.tgz *
+	else
+		tar -czf $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz *
+		# copy dropbear
+		cp -af $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/sbin/dropbear $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/
+		cp -af $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/dbclient $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/bin/
+		cp -af $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/dropbearconvert $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/bin/
+		cp -af $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/bin/dropbearkey $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/bin/
+	fi
 	cd $CURRENT_DIR
 }
 
@@ -573,8 +573,8 @@ function openqrm_install_api_docu() {
 # function to get the jquery bundle
 # -> this is for "make " phase
 function openqrm_get_jquery_bundle() {
-    # TODO gather version from build.conf file
-    JQUERY_VERSION="1.3.2"
+	# TODO gather version from build.conf file
+	JQUERY_VERSION="1.3.2"
 	CURRENT_DIR=`pwd`
 	openqrm_cache_or_download jquery
 	cd $OPENQRM_BUILD_TMP_DIR/openqrm-build/jquery/
@@ -585,23 +585,23 @@ function openqrm_get_jquery_bundle() {
 # function to install the jquery-bundle
 # -> this is for "make install" phase
 function openqrm_install_jquery_bundle() {
-    JQUERY_VERSION="1.3.2"
+	JQUERY_VERSION="1.3.2"
 	mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/js/jquery
 	mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/css/jquery
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/jquery/jquery-$JQUERY_VERSION/* $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/js/jquery/
-    # exclude .txt files
-    rm -f $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/js/jquery/development-bundle/*.txt
-    # css
-    rm -rf $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/js/jquery/css
+	# exclude .txt files
+	rm -f $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/js/jquery/development-bundle/*.txt
+	# css
+	rm -rf $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/js/jquery/css
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/jquery/jquery-$JQUERY_VERSION/css/* $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/css/jquery/
-    # also install it for the cloud plugin
+	# also install it for the cloud plugin
 	mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/js
 	mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/css
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/jquery/jquery-$JQUERY_VERSION/* $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/js/
-    # exclude .txt files
-    rm -f $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/js/development-bundle/*.txt
-    # css
-    rm -rf $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/js/css
+	# exclude .txt files
+	rm -f $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/js/development-bundle/*.txt
+	# css
+	rm -rf $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/js/css
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/jquery/jquery-$JQUERY_VERSION/css/* $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/css/
 }
 
@@ -609,15 +609,15 @@ function openqrm_install_jquery_bundle() {
 # function to get the interface js
 # -> this is for "make " phase
 function openqrm_get_js_interface() {
-    # TODO gather version from build.conf file
-    INTERFACE_VERSION="1.2"
+	# TODO gather version from build.conf file
+	INTERFACE_VERSION="1.2"
 	CURRENT_DIR=`pwd`
 	openqrm_cache_or_download js-interface
-    rm -rf "$OPENQRM_BUILD_TMP_DIR/openqrm-build/js-interface/interface $INTERFACE_VERSION"
-    rm -rf "$OPENQRM_BUILD_TMP_DIR/openqrm-build/js-interface/interface_$INTERFACE_VERSION"
+	rm -rf "$OPENQRM_BUILD_TMP_DIR/openqrm-build/js-interface/interface $INTERFACE_VERSION"
+	rm -rf "$OPENQRM_BUILD_TMP_DIR/openqrm-build/js-interface/interface_$INTERFACE_VERSION"
 	cd $OPENQRM_BUILD_TMP_DIR/openqrm-build/js-interface/
 	unzip -q source/interface_$INTERFACE_VERSION.zip
-    for f in *; do mv "$f" `echo $f | tr ' ' '_'` 2>/dev/null; done
+	for f in *; do mv "$f" `echo $f | tr ' ' '_'` 2>/dev/null; done
 	cd $CURRENT_DIR
 }
 
@@ -625,10 +625,10 @@ function openqrm_get_js_interface() {
 # function to install the jquery-bundle
 # -> this is for "make install" phase
 function openqrm_install_js_interface() {
-    INTERFACE_VERSION="1.2"
+	INTERFACE_VERSION="1.2"
 	mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/js/interface
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/js-interface/interface_$INTERFACE_VERSION/interface.js $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/js/interface/
-    # also install it for the cloud plugin
+	# also install it for the cloud plugin
 	mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/js
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/js-interface/interface_$INTERFACE_VERSION/interface.js $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/js/
 }
@@ -638,11 +638,12 @@ function openqrm_install_js_interface() {
 # function to get the htmlobjects
 # -> this is for "make " phase
 function openqrm_get_htmlobjects() {
+	HTMLOBJECTS_VERSION="v.1.0_r144"
 	CURRENT_DIR=`pwd`
 	openqrm_cache_or_download htmlobjects
-    rm -rf "$OPENQRM_BUILD_TMP_DIR/openqrm-build/htmlobjects/htmlobjects"
+	rm -rf "$OPENQRM_BUILD_TMP_DIR/openqrm-build/htmlobjects/htmlobjects"
 	cd $OPENQRM_BUILD_TMP_DIR/openqrm-build/htmlobjects/
-    tar -xzf source/htmlobjects.tar.gz
+	tar -xzf source/htmlobjects_$HTMLOBJECTS_VERSION.tar.gz
 	cd $CURRENT_DIR
 }
 
@@ -686,7 +687,7 @@ function openqrm_get_openqrm_clients() {
 # function to install the additional initrd-templates
 # -> this is for "make install" phase
 function openqrm_install_initrd_templates() {
-    CLIENT_VERSION="4.7.2"
+	CLIENT_VERSION="4.8.0"
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.centos.i386/source/openqrm-initrd-template.$CLIENT_VERSION.centos.i386.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-template.centos.i386.tgz
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.centos.x86_64/source/openqrm-initrd-template.$CLIENT_VERSION.centos.x86_64.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-template.centos.x86_64.tgz
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.debian.i386/source/openqrm-initrd-template.$CLIENT_VERSION.debian.i386.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-template.debian.i386.tgz
@@ -699,8 +700,8 @@ function openqrm_install_initrd_templates() {
 # function to install the additional openqrm-client packages
 # -> this is for "make install" phase
 function openqrm_install_openqrm_clients() {
-    CLIENT_VERSION="4.7.2"
-    mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/
+	CLIENT_VERSION="4.8.0"
+	mkdir -p $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-client.centos.i386/source/openqrm-client.$CLIENT_VERSION.centos.i386.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/openqrm-client.centos.i386.tgz
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-client.centos.x86_64/source/openqrm-client.$CLIENT_VERSION.centos.x86_64.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/openqrm-client.centos.x86_64.tgz
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-client.debian.i386/source/openqrm-client.$CLIENT_VERSION.debian.i386.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/openqrm-client.debian.i386.tgz
@@ -718,17 +719,17 @@ function openqrm_install_openqrm_clients() {
 
 # function to run commands before the update of openQRM
 function openqrm_pre_update() {
-    $OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update pre -f
+	$OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update pre -f
 }
 
 # function to run commands after the update of openQRM
 function openqrm_post_update() {
-    $OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update post -f
+	$OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update post -f
 }
 
 # function to update openQRM base
 function openqrm_base_update() {
-    $OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update base -f
+	$OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update base -f
 }
 
 

@@ -64,11 +64,11 @@ function openqrm_chkconfig() {
 					done
 				fi
 				if [ $do_chkconfig ]; then
-                	        	chkconfig --add ${service}
+								chkconfig --add ${service}
 					if [ ! -f /etc/UnitedLinux-release ]; then
-                        	        	chkconfig ${service} on
+										chkconfig ${service} on
 					else
-	                        	        chkconfig --add ${service}
+										chkconfig --add ${service}
 					fi
 				fi
 				;;
@@ -80,16 +80,37 @@ function openqrm_chkconfig() {
 				;;
 
 		esac
-	# For Debian
+	# For Debian/Ubuntu
 	elif [ -x /usr/sbin/update-rc.d ] ; then
 		# according to manuals, update-rc.d does nothing if links already exist
 		if [ $action == "add" ] ; then
-            # check for start + stop leven
-            start_l=`grep chkconfig /etc/init.d/${service} | grep ^'#' | awk {' print $4 '}`
-            stop_l=`grep chkconfig /etc/init.d/${service} | grep ^'#' | awk {' print $5 '}`
+			# check for start + stop leven
+			start_l=`grep chkconfig /etc/init.d/${service} | grep ^'#' | awk {' print $4 '}`
+			stop_l=`grep chkconfig /etc/init.d/${service} | grep ^'#' | awk {' print $5 '}`
 			update-rc.d ${service}  defaults $start_l $stop_l
+			# check for upstart
+			if [ "$service" == "openqrm-client" ]; then
+				# debian 6 using insserv, be sure to start in rc 2
+				/bin/cp -a /etc/rc3.d/S*openqrm-client /etc/rc2.d/
+				if [ -d /etc/init/ ]; then
+					echo '# openQRM Client - starts the openQRM' > /etc/init/openqrm-client.conf
+					echo 'description       "openQRM Client"' >> /etc/init/openqrm-client.conf
+					echo 'start on net-device-up' >> /etc/init/openqrm-client.conf
+					echo 'script' >> /etc/init/openqrm-client.conf
+					echo 'exec /etc/init.d/openqrm-client start' >> /etc/init/openqrm-client.conf
+					echo 'end script' >> /etc/init/openqrm-client.conf
+				fi
+			fi
 		elif [ $action == "del" ] ; then
 			update-rc.d -f ${service} remove 1>/dev/null 2>&1
+			# check for upstart
+			if [ "$service" == "openqrm-client" ]; then
+				# debian 6 using insserv, remove from rc 2
+				rm -f /etc/rc2.d/S*openqrm-client
+				if [ -e /etc/init/openqrm-client.conf ]; then
+					rm -f /etc/init/openqrm-client.conf
+				fi
+			fi
 		fi
 	# "Manual".  Uses S91 by default
 	else
@@ -98,18 +119,18 @@ function openqrm_chkconfig() {
 
 		# Find directory for script links
 		if [ -d /etc/rc.d/ ] ; then
-		        rcdir=/etc/rc.d/rc${runlevel}.d
+				rcdir=/etc/rc.d/rc${runlevel}.d
 		else
-		        rcdir=/etc/rc${runlevel}.d
+				rcdir=/etc/rc${runlevel}.d
 		fi
 
 		if [ $action == "add" ] ; then
 			if [ ! -f $rcdir/S??${service} ] && [ -f /etc/init.d/${service} ] ; then
-			       ln -s /etc/init.d/${service} $rcdir/S91${service}
+				   ln -s /etc/init.d/${service} $rcdir/S91${service}
 			fi
 		elif [ $action == "del" ] ; then
 			if [ -f $rcdir/S??${service} ] ; then
-			       rm $rcdir/S??${service}
+				   rm $rcdir/S??${service}
 			fi
 		fi
 	fi
@@ -119,8 +140,7 @@ function openqrm_chkconfig() {
 
 
 # create short name for distro for the package stage
-function openqrm_get_distro()
-{
+function openqrm_get_distro() {
 	# find out which distribution it is
 	# find out which version it is
 	# give the ROOT_DIR as the first cmdline param
@@ -240,7 +260,6 @@ function openqrm_get_distro()
 	else
 		echo "generic"
 	fi
-
 }
 
 #
@@ -248,10 +267,9 @@ function openqrm_get_distro()
 # $1:      root directory of the installation (optional; default is "/")
 # returns: one of fedora|rhel|suse|ubuntu|debian|unknown
 #
-function openqrm_get_distro_name()
-{
+function openqrm_get_distro_name() {
 	local ROOT_DIR=${1:-/}
-	if [-f "$ROOT_DIR/etc/fedora-release" ]; then 
+	if [-f "$ROOT_DIR/etc/fedora-release" ]; then
 		echo "fedora"
 	elif [ -f "$ROOT_DIR/etc/redhat-release" ]; then
 		# CentOS uses /etc/redhat-release, too
@@ -295,8 +313,7 @@ function openqrm_get_distro_name()
 # $2:      root directory of the installation (optional; default is "/")
 # returns: the distribution's version number
 #
-function openqrm_get_distro_version()
-{
+function openqrm_get_distro_version() {
 	local RETURN_AS=$1
 	if [ "$1" == '' ]; then
 		RETURN_AS=string
@@ -318,31 +335,31 @@ function openqrm_get_distro_version()
 			# tested with: CentOS 5.1
 			# XXX: RHEL/CentOS does not give us the service release number (e.g. only 5 instead of 5.1)
 			local VERSION=$(cat "$ROOT_DIR/etc/redhat-release" | head -n1 | sed 's/.*release \([0-9]\+\).*/\1/')
-                        echo $VERSION
+						echo $VERSION
 		;;
 		"fedora")
 			# tested with: Fedora Core 3, Fedora Core 6, Fedora 8
-                        local VERSION=$(cat "$ROOT_DIR/etc/fedora-release" | head -n1 | sed 's/.*release \([0-9]\+\) .*/\1/')
-                        echo $VERSION
+						local VERSION=$(cat "$ROOT_DIR/etc/fedora-release" | head -n1 | sed 's/.*release \([0-9]\+\) .*/\1/')
+						echo $VERSION
 		;;
 		"debian")
 			# tested with: 4.0 (etch), unstable/testing
 			if [ $RETURN_AS == 'string' ]; then
-                                local VERSION=$(cat "$ROOT_DIR/etc/debian_version")
-                                echo $VERSION
-                        elif [ $RETURN_AS == 'integer' ]; then
+								local VERSION=$(cat "$ROOT_DIR/etc/debian_version")
+								echo $VERSION
+						elif [ $RETURN_AS == 'integer' ]; then
 				if [ `cat "$ROOT_DIR/etc/debian_version"` == 'testing/unstable' ]; then
 					echo -1
 				else
-                                	local VERSION=$(cat "$ROOT_DIR/etc/debian_version" | sed 's/\([0-9]\+\)\.\([0-9]\)/\1\2/')
-                                	echo $VERSION
+									local VERSION=$(cat "$ROOT_DIR/etc/debian_version" | sed 's/\([0-9]\+\)\.\([0-9]\)/\1\2/')
+									echo $VERSION
 				fi
 			fi
 			;;
-    		*)
-    		echo 0
-    		;;
-    esac
+			*)
+			echo 0
+			;;
+	esac
 }
 
 
@@ -380,7 +397,7 @@ function urlencodechar() {
 	UCHAR=${UCHAR/\//%2F}
 	# whitespace
 	if [ -z $UCHAR ]; then
-	        UCHAR=%20
+			UCHAR=%20
 	fi
 	echo "$UCHAR"
 }
@@ -409,21 +426,21 @@ function openqrm_post_event() {
 	event_priority=`urlencodestring $3`
 	event_source=`urlencodestring $4`
 	event_description=`urlencodestring $5`
-    # are we on the openQRM server or on a resource ?
-    if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
-        . $OPENQRM_RESOURCE_PARAMETER_FILE
-    elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
-        . $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
-        . $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
-        openqrm_server_get_config
-        resource_id=0
-        resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
-        openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
-    fi
-    # define wget to use with https
-    if [ "$openqrm_web_protocol" == "https" ]; then
-        WGET_NO_CERT_CHECK="--no-check-certificate"
-    fi
+	# are we on the openQRM server or on a resource ?
+	if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+		. $OPENQRM_RESOURCE_PARAMETER_FILE
+	elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
+		. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+		. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+		openqrm_server_get_config
+		resource_id=0
+		resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+		openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+	fi
+	# define wget to use with https
+	if [ "$openqrm_web_protocol" == "https" ]; then
+		WGET_NO_CERT_CHECK="--no-check-certificate"
+	fi
 	MESSAGEDATA="resource_id=$resource_id&event_name=$event_name&event_priority=$event_priority&event_source=$event_source&event_description=$event_description";
 	OPENQRM_RESOURCE_EVENT_URL="$openqrm_web_protocol://$resource_openqrmserver/openqrm/action/resource-monitor.php?resource_command=post_event&$MESSAGEDATA"
 	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null "$OPENQRM_RESOURCE_EVENT_URL"; then
@@ -468,25 +485,25 @@ function openqrm_validate_ip() {
 	IFS=.
 	set -- $IP_A
 	if [ "$#" -ne "4" ]; then
-        IFS=$OLDIFS
+		IFS=$OLDIFS
 		return 1
 	fi
 
 	for oct in $1 $2 $3 $4; do
 		echo $oct | egrep "^[0-9]+$" >/dev/null 2>&1
 		if [ "$?" -ne "0" ]; then
-            IFS=$OLDIFS
+			IFS=$OLDIFS
 			return 1
 		else
 			if [ "$oct" -lt "0" -o "$oct" -gt "255" ]; then
-                IFS=$OLDIFS
-                return 1
+				IFS=$OLDIFS
+				return 1
 			fi
 		fi
 	done
 	echo "$IP_A" | grep "\.$" >/dev/null 2>&1
 	if [ "$?" -eq "0" ]; then
-        IFS=$OLDIFS
+		IFS=$OLDIFS
 		return 1
 	fi
 	IFS=$OLDIFS
