@@ -28,7 +28,7 @@ export OPENQRM_SOURCE_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/"
 . $OPENQRM_RESOURCE_PARAMETER_FILE
 # define wget to use with https
 if [ "$openqrm_web_protocol" == "https" ]; then
-    WGET_NO_CERT_CHECK="--no-check-certificate"
+	WGET_NO_CERT_CHECK="--no-check-certificate"
 fi
 
 # do not run on idle resources
@@ -44,51 +44,57 @@ fi
 
 function sshterm_start() {
 	echo "Starting the openQRM sshterm-plugin"
-    local CURRENTDIR=`pwd`
+	local CURRENTDIR=`pwd`
 	sshterm_stop 1>/dev/null 2>&1
-    if ! which screen 1>/dev/null; then
-    	export FORCE_INSTALL=true
-    	openqrm_install_os_dependency screen
-    fi
-    if ! which openssl 1>/dev/null; then
-    	export FORCE_INSTALL=true
-    	openqrm_install_os_dependency openssl
-    fi
-    if [ -x /usr/bin/screen.real ]; then
-        RUNSCREEN="/usr/bin/screen.real"
-    else
-        RUNSCREEN=`which screen`
-    fi
-    if [ -f /etc/debian_version ]; then
-    	export FORCE_INSTALL=true
-    	openqrm_install_os_dependency python-openssl
-    elif [ -f /etc/redhat-release ]; then
-    	export FORCE_INSTALL=true
-    	openqrm_install_os_dependency pyOpenSSL
-    elif [ -f /etc/SuSE-release ]; then
-    	export FORCE_INSTALL=true
-    	openqrm_install_os_dependency python-openssl
-    fi
-    # generate cert
-    cd $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/sshterm/webshell/
-    if [ ! -f /root/.webshell/webshell.pem ]; then
-        umask 077
-        mkdir -p /root/.webshell/
-        openssl req  -config "make_certificate.cfg" -keyout "/root/.webshell/webshell.pem" -newkey rsa:1024 -nodes -x509 -days 365 -out "/root/.webshell/webshell.pem"
-    fi
+	if ! which screen 1>/dev/null; then
+		export FORCE_INSTALL=true
+		openqrm_install_os_dependency screen
+	fi
+	if ! which openssl 1>/dev/null; then
+		export FORCE_INSTALL=true
+		openqrm_install_os_dependency openssl
+	fi
+	if [ -x /usr/bin/screen.real ]; then
+		RUNSCREEN="/usr/bin/screen.real"
+	else
+		RUNSCREEN=`which screen`
+	fi
+	if [ -f /etc/debian_version ]; then
+		if ! dpkg-query -s python-openssl 1>/dev/null 2>&1; then
+			export FORCE_INSTALL=true
+			openqrm_install_os_dependency python-openssl
+		fi
+	elif [ -f /etc/redhat-release ]; then
+		if ! rpm -q pyOpenSSL 1>/dev/null 2>&1; then
+			export FORCE_INSTALL=true
+			openqrm_install_os_dependency pyOpenSSL
+		fi
+	elif [ -f /etc/SuSE-release ]; then
+		if ! rpm -q python-openssl 1>/dev/null 2>&1; then
+			export FORCE_INSTALL=true
+			openqrm_install_os_dependency python-openssl
+		fi
+	fi
+	# generate cert
+	cd $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/sshterm/webshell/
+	if [ ! -f /root/.webshell/webshell.pem ]; then
+		umask 077
+		mkdir -p /root/.webshell/
+		openssl req  -config "make_certificate.cfg" -keyout "/root/.webshell/webshell.pem" -newkey rsa:1024 -nodes -x509 -days 365 -out "/root/.webshell/webshell.pem"
+	fi
 	SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
 	$RUNSCREEN -dmS $SCREEN_NAME ./webshell.py --ssl-cert=/root/.webshell/webshell.pem
-    cd $CURRENTDIR
+	cd $CURRENTDIR
 	return 0
 }
 
 
 function sshterm_stop() {
 	echo "Stopping the openQRM sshterm-plugin"
-    WEBSHELL_PID=`ps ax | grep webshell.py | grep -v grep | awk {' print $1 '}`
-    for PID in $WEBSHELL_PID; do
-        kill $PID
-    done
+	WEBSHELL_PID=`ps ax | grep webshell.py | grep -v grep | awk {' print $1 '}`
+	for PID in $WEBSHELL_PID; do
+		kill $PID
+	done
 }
 
 

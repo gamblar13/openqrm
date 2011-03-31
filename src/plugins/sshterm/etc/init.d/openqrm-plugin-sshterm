@@ -30,38 +30,38 @@ resource_id=0
 resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
 # which screen binary to use
 if [ -x /usr/bin/screen.real ]; then
-    RUNSCREEN="/usr/bin/screen.real"
+	RUNSCREEN="/usr/bin/screen.real"
 else
-    RUNSCREEN=`which screen`
+	RUNSCREEN=`which screen`
 fi
 
 
 function openqrm_plugin_sshterm_start() {
 	echo "Starting the openQRM sshterm-plugin"
-    local CURRENTDIR=`pwd`
+	local CURRENTDIR=`pwd`
 	openqrm_plugin_sshterm_stop 1>/dev/null 2>&1
-    # generate cert
-    cd $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/sshterm/webshell/
+	# generate cert
+	cd $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/sshterm/webshell/
 
-    if [ ! -f /root/.webshell/webshell.pem ]; then
-        umask 077
-        mkdir -p /root/.webshell/
-        openssl req  -config "make_certificate.cfg" -keyout "/root/.webshell/webshell.pem" -newkey rsa:1024 -nodes -x509 -days 365 -out "/root/.webshell/webshell.pem"
-    fi
-    # start the webshell
+	if [ ! -f /root/.webshell/webshell.pem ]; then
+		umask 077
+		mkdir -p /root/.webshell/
+		openssl req  -config "make_certificate.cfg" -keyout "/root/.webshell/webshell.pem" -newkey rsa:1024 -nodes -x509 -days 365 -out "/root/.webshell/webshell.pem"
+	fi
+	# start the webshell
 	SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
 	$RUNSCREEN -dmS $SCREEN_NAME ./webshell.py --ssl-cert=/root/.webshell/webshell.pem
-    cd $CURRENTDIR
+	cd $CURRENTDIR
 	touch $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/sshterm/.running
 	return 0
 }
 
 function openqrm_plugin_sshterm_stop() {
 	echo "Stopping the openQRM sshterm-plugin"
-    WEBSHELL_PID=`ps ax | grep webshell.py | grep -v grep | awk {' print $1 '}`
-    for PID in $WEBSHELL_PID; do
-        kill $PID
-    done
+	WEBSHELL_PID=`ps ax | grep webshell.py | grep -v grep | awk {' print $1 '}`
+	for PID in $WEBSHELL_PID; do
+		kill $PID
+	done
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/sshterm/.running
 	return 0
 }
@@ -80,9 +80,9 @@ function openqrm_plugin_sshterm_init() {
 function openqrm_plugin_sshterm_uninstall() {
 	echo "Uninstalling the openQRM sshterm-plugin"
 	openqrm_plugin_sshterm_stop
-    # remove bootservice
+	# remove bootservice
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-sshterm.tgz
-    # unlinking the web dir
+	# unlinking the web dir
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/sshterm
 }
 
