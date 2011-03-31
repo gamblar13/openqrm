@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
 	<title>LXC manager</title>
-    <link rel="stylesheet" type="text/css" href="../../css/htmlobject.css" />
-    <link rel="stylesheet" type="text/css" href="lxc-storage.css" />
-    <link type="text/css" href="/openqrm/base/js/jquery/development-bundle/themes/smoothness/ui.all.css" rel="stylesheet" />
-    <script type="text/javascript" src="/openqrm/base/js/jquery/js/jquery-1.3.2.min.js"></script>
-    <script type="text/javascript" src="/openqrm/base/js/jquery/js/jquery-ui-1.7.1.custom.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="../../css/htmlobject.css" />
+	<link rel="stylesheet" type="text/css" href="lxc-storage.css" />
+	<link type="text/css" href="/openqrm/base/js/jquery/development-bundle/themes/smoothness/ui.all.css" rel="stylesheet" />
+	<script type="text/javascript" src="/openqrm/base/js/jquery/js/jquery-1.3.2.min.js"></script>
+	<script type="text/javascript" src="/openqrm/base/js/jquery/js/jquery-ui-1.7.1.custom.min.js"></script>
 <style type="text/css">
 .ui-progressbar-value {
-    background-image: url(/openqrm/base/img/progress.gif);
+	background-image: url(/openqrm/base/img/progress.gif);
 }
 #progressbar {
-    position: absolute;
-    left: 150px;
-    top: 250px;
-    width: 400px;
-    height: 20px;
+	position: absolute;
+	left: 150px;
+	top: 250px;
+	width: 400px;
+	height: 20px;
 }
 </style>
 </head>
@@ -28,19 +28,19 @@
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
 */
 
 
@@ -78,8 +78,8 @@ global $OPENQRM_SERVER_BASE_DIR;
 
 function redirect($strMsg, $currenttab = 'tab0', $url = '') {
 	global $thisfile;
-    global $lxc_server_id;
-    if($url == '') {
+	global $lxc_server_id;
+	if($url == '') {
 		$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab.'&lxc_server_id='.$lxc_server_id;
 	}
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
@@ -87,243 +87,246 @@ function redirect($strMsg, $currenttab = 'tab0', $url = '') {
 }
 
 function wait_for_statfile($sfile) {
-    global $refresh_delay;
-    global $refresh_loop_max;
-    $refresh_loop=0;
-    while (!file_exists($sfile)) {
-        sleep($refresh_delay);
-        $refresh_loop++;
-        flush();
-        if ($refresh_loop > $refresh_loop_max)  {
-            return false;
-        }
-    }
-    return true;
+	global $refresh_delay;
+	global $refresh_loop_max;
+	$refresh_loop=0;
+	while (!file_exists($sfile)) {
+		sleep($refresh_delay);
+		$refresh_loop++;
+		flush();
+		if ($refresh_loop > $refresh_loop_max)  {
+			return false;
+		}
+	}
+	return true;
 }
 
 function show_progressbar() {
 ?>
-    <script type="text/javascript">
-        $("#progressbar").progressbar({
+	<script type="text/javascript">
+		$("#progressbar").progressbar({
 			value: 100
 		});
-        var options = {};
-        $("#progressbar").effect("shake",options,2000,null);
+		var options = {};
+		$("#progressbar").effect("shake",options,2000,null);
 	</script>
 <?php
-        flush();
+		flush();
 }
 
 
 // check if we got some actions to do
+$strMsg = '';
 if(htmlobject_request('action') != '') {
-	switch (htmlobject_request('action')) {
-		case 'select':
-			if (isset($_REQUEST['identifier'])) {
-				foreach($_REQUEST['identifier'] as $lxc_server_id) {
-                    show_progressbar();
-                    $lxc_appliance = new appliance();
-                    $lxc_appliance->get_instance_by_id($lxc_server_id);
-                    $lxc_server = new resource();
-                    $lxc_server->get_instance_by_id($lxc_appliance->resources);
-                    $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm post_vm_list -u $OPENQRM_USER->name -p $OPENQRM_USER->password";
-                    // remove current stat file
-                    $lxc_server_resource_id = $lxc_server->id;
-                    $statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
-                    if (file_exists($statfile)) {
-                        unlink($statfile);
-                    }
-                    // send command
-                    $lxc_server->send_command($lxc_server->ip, $resource_command);
-                    // and wait for the resulting statfile
-                    if (!wait_for_statfile($statfile)) {
-                        $strMsg .= "Error during refreshing vm list ! Please check the Event-Log<br>";
-                    } else {
-                        $strMsg .="Refreshing vm list<br>";
-                    }
-                    $rurl = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab.'&identifier[]='.$lxc_server_id;
-                    redirect($strMsg, "tab0");
-                    exit(0);
-                }
-            }
-            break;
+	if ($OPENQRM_USER->role == "administrator") {
 
-		case 'reload':
-            show_progressbar();
-            $lxc_appliance = new appliance();
-            $lxc_appliance->get_instance_by_id($lxc_server_id);
-            $lxc_server = new resource();
-            $lxc_server->get_instance_by_id($lxc_appliance->resources);
-            $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm post_vm_list -u $OPENQRM_USER->name -p $OPENQRM_USER->password";
-            // remove current stat file
-            $lxc_server_resource_id = $lxc_server->id;
-            $statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
-            if (file_exists($statfile)) {
-                unlink($statfile);
-            }
-            // send command
-            $lxc_server->send_command($lxc_server->ip, $resource_command);
-            // and wait for the resulting statfile
-            if (!wait_for_statfile($statfile)) {
-                $strMsg .= "Error during refreshing vm list ! Please check the Event-Log<br>";
-            } else {
-                $strMsg .="Refreshing vm list<br>";
-            }
-            redirect($strMsg, "tab0");
-            break;
+		switch (htmlobject_request('action')) {
+			case 'select':
+				if (isset($_REQUEST['identifier'])) {
+					foreach($_REQUEST['identifier'] as $lxc_server_id) {
+						show_progressbar();
+						$lxc_appliance = new appliance();
+						$lxc_appliance->get_instance_by_id($lxc_server_id);
+						$lxc_server = new resource();
+						$lxc_server->get_instance_by_id($lxc_appliance->resources);
+						$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm post_vm_list -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
+						// remove current stat file
+						$lxc_server_resource_id = $lxc_server->id;
+						$statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
+						if (file_exists($statfile)) {
+							unlink($statfile);
+						}
+						// send command
+						$lxc_server->send_command($lxc_server->ip, $resource_command);
+						// and wait for the resulting statfile
+						if (!wait_for_statfile($statfile)) {
+							$strMsg .= "Error during refreshing vm list ! Please check the Event-Log<br>";
+						} else {
+							$strMsg .="Refreshing vm list<br>";
+						}
+						redirect($strMsg, "tab0");
+						exit(0);
+					}
+				}
+				break;
 
-
-        case 'start':
-			if (isset($_REQUEST['identifier'])) {
-				foreach($_REQUEST['identifier'] as $lxc_server_name) {
-                    show_progressbar();
-                    $lxc_appliance = new appliance();
-                    $lxc_appliance->get_instance_by_id($lxc_server_id);
-                    $lxc_server = new resource();
-                    $lxc_server->get_instance_by_id($lxc_appliance->resources);
-                    $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm start -n $lxc_server_name -u $OPENQRM_USER->name -p $OPENQRM_USER->password";
-                    // remove current stat file
-                    $lxc_server_resource_id = $lxc_server->id;
-                    $statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
-                    if (file_exists($statfile)) {
-                        unlink($statfile);
-                    }
-                    // send command
-                    $lxc_server->send_command($lxc_server->ip, $resource_command);
-                    // and wait for the resulting statfile
-                    if (!wait_for_statfile($statfile)) {
-                        $strMsg .= "Error during starting $lxc_server_name ! Please check the Event-Log<br>";
-                    } else {
-    					$strMsg .="Starting $lxc_server_name <br>";
-                    }
+			case 'reload':
+				show_progressbar();
+				$lxc_appliance = new appliance();
+				$lxc_appliance->get_instance_by_id($lxc_server_id);
+				$lxc_server = new resource();
+				$lxc_server->get_instance_by_id($lxc_appliance->resources);
+				$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm post_vm_list -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
+				// remove current stat file
+				$lxc_server_resource_id = $lxc_server->id;
+				$statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
+				if (file_exists($statfile)) {
+					unlink($statfile);
+				}
+				// send command
+				$lxc_server->send_command($lxc_server->ip, $resource_command);
+				// and wait for the resulting statfile
+				if (!wait_for_statfile($statfile)) {
+					$strMsg .= "Error during refreshing vm list ! Please check the Event-Log<br>";
+				} else {
+					$strMsg .="Refreshing vm list<br>";
 				}
 				redirect($strMsg, "tab0");
-            } else {
-                $strMsg ="No virtual machine selected<br>";
-				redirect($strMsg, "tab0");
-            }
-            break;
+				break;
 
 
-		case 'stop':
-			if (isset($_REQUEST['identifier'])) {
-				foreach($_REQUEST['identifier'] as $lxc_server_name) {
-                    show_progressbar();
-                    $lxc_appliance = new appliance();
-                    $lxc_appliance->get_instance_by_id($lxc_server_id);
-                    $lxc_server = new resource();
-                    $lxc_server->get_instance_by_id($lxc_appliance->resources);
-                    $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm stop -n $lxc_server_name -u $OPENQRM_USER->name -p $OPENQRM_USER->password";
-                    // remove current stat file
-                    $lxc_server_resource_id = $lxc_server->id;
-                    $statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
-                    if (file_exists($statfile)) {
-                        unlink($statfile);
-                    }
-                    // send command
-                    $lxc_server->send_command($lxc_server->ip, $resource_command);
-                    // and wait for the resulting statfile
-                    if (!wait_for_statfile($statfile)) {
-                        $strMsg .= "Error during stopping $lxc_server_name ! Please check the Event-Log<br>";
-                    } else {
-    					$strMsg .="Stopping $lxc_server_name <br>";
-                    }
+			case 'start':
+				if (isset($_REQUEST['identifier'])) {
+					foreach($_REQUEST['identifier'] as $lxc_server_name) {
+						show_progressbar();
+						$lxc_appliance = new appliance();
+						$lxc_appliance->get_instance_by_id($lxc_server_id);
+						$lxc_server = new resource();
+						$lxc_server->get_instance_by_id($lxc_appliance->resources);
+						$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm start -n $lxc_server_name -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
+						// remove current stat file
+						$lxc_server_resource_id = $lxc_server->id;
+						$statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
+						if (file_exists($statfile)) {
+							unlink($statfile);
+						}
+						// send command
+						$lxc_server->send_command($lxc_server->ip, $resource_command);
+						// and wait for the resulting statfile
+						if (!wait_for_statfile($statfile)) {
+							$strMsg .= "Error during starting $lxc_server_name ! Please check the Event-Log<br>";
+						} else {
+							$strMsg .="Starting $lxc_server_name <br>";
+						}
+					}
+					redirect($strMsg, "tab0");
+				} else {
+					$strMsg ="No virtual machine selected<br>";
+					redirect($strMsg, "tab0");
 				}
-				redirect($strMsg, "tab0");
-            } else {
-                $strMsg ="No virtual machine selected<br>";
-				redirect($strMsg, "tab0");
-            }
-            break;
+				break;
 
-		case 'restart':
-			if (isset($_REQUEST['identifier'])) {
-				foreach($_REQUEST['identifier'] as $lxc_server_name) {
-                    show_progressbar();
-                    $lxc_appliance = new appliance();
-                    $lxc_appliance->get_instance_by_id($lxc_server_id);
-                    $lxc_server = new resource();
-                    $lxc_server->get_instance_by_id($lxc_appliance->resources);
-                    $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm reboot -n $lxc_server_name -u $OPENQRM_USER->name -p $OPENQRM_USER->password";
-                    // remove current stat file
-                    $lxc_server_resource_id = $lxc_server->id;
-                    $statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
-                    if (file_exists($statfile)) {
-                        unlink($statfile);
-                    }
-                    // send command
-                    $lxc_server->send_command($lxc_server->ip, $resource_command);
-                    // and wait for the resulting statfile
-                    if (!wait_for_statfile($statfile)) {
-                        $strMsg .= "Error during restarting $lxc_server_name ! Please check the Event-Log<br>";
-                    } else {
-    					$strMsg .="Restarting $lxc_server_name <br>";
-                    }
+
+			case 'stop':
+				if (isset($_REQUEST['identifier'])) {
+					foreach($_REQUEST['identifier'] as $lxc_server_name) {
+						show_progressbar();
+						$lxc_appliance = new appliance();
+						$lxc_appliance->get_instance_by_id($lxc_server_id);
+						$lxc_server = new resource();
+						$lxc_server->get_instance_by_id($lxc_appliance->resources);
+						$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm stop -n $lxc_server_name -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
+						// remove current stat file
+						$lxc_server_resource_id = $lxc_server->id;
+						$statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
+						if (file_exists($statfile)) {
+							unlink($statfile);
+						}
+						// send command
+						$lxc_server->send_command($lxc_server->ip, $resource_command);
+						// and wait for the resulting statfile
+						if (!wait_for_statfile($statfile)) {
+							$strMsg .= "Error during stopping $lxc_server_name ! Please check the Event-Log<br>";
+						} else {
+							$strMsg .="Stopping $lxc_server_name <br>";
+						}
+					}
+					redirect($strMsg, "tab0");
+				} else {
+					$strMsg ="No virtual machine selected<br>";
+					redirect($strMsg, "tab0");
 				}
-				redirect($strMsg, "tab0");
-            } else {
-                $strMsg ="No virtual machine selected<br>";
-				redirect($strMsg, "tab0");
-            }
-			break;
+				break;
 
-		case 'delete':
-			if (isset($_REQUEST['identifier'])) {
-				foreach($_REQUEST['identifier'] as $lxc_server_name) {
-                    show_progressbar();
-                    // check if the resource still belongs to an appliance, if yes we do not remove it
-                    $lxc_vm_mac = $lxc_vm_mac_ar[$lxc_server_name];
-                    $lxc_resource = new resource();
-                    $lxc_resource->get_instance_by_mac($lxc_vm_mac);
-                    $lxc_vm_id=$lxc_resource->id;
-                    $resource_is_used_by_appliance = "";
-                    $remove_error = 0;
-                    $appliance = new appliance();
-                    $appliance_id_list = $appliance->get_all_ids();
-                    foreach($appliance_id_list as $appliance_list) {
-                        $appliance_id = $appliance_list['appliance_id'];
-                        $app_resource_remove_check = new appliance();
-                        $app_resource_remove_check->get_instance_by_id($appliance_id);
-                        if ($app_resource_remove_check->resources == $lxc_vm_id) {
-                            $resource_is_used_by_appliance .= $appliance_id." ";
-                            $remove_error = 1;
-                        }
-                    }
-                    if ($remove_error == 1) {
-                        $strMsg .= "VM Resource id ".$lxc_vm_id." is used by appliance(s): ".$resource_is_used_by_appliance." <br>";
-                        $strMsg .= "Not removing VM resource id ".$lxc_vm_id." !<br>";
-        				continue;
-                    }
-                    // remove vm
-                    $lxc_appliance = new appliance();
-                    $lxc_appliance->get_instance_by_id($lxc_server_id);
-                    $lxc_server = new resource();
-                    $lxc_server->get_instance_by_id($lxc_appliance->resources);
-                    $resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm delete -n $lxc_server_name -u $OPENQRM_USER->name -p $OPENQRM_USER->password";
-                    // remove current stat file
-                    $lxc_server_resource_id = $lxc_server->id;
-                    $statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
-                    if (file_exists($statfile)) {
-                        unlink($statfile);
-                    }
-                    // send command
-                    $lxc_server->send_command($lxc_server->ip, $resource_command);
-                    $lxc_resource->remove($lxc_vm_id, $lxc_vm_mac);
-                    // and wait for the resulting statfile
-                    if (!wait_for_statfile($statfile)) {
-                        $strMsg .= "Error during removing $lxc_server_name ! Please check the Event-Log<br>";
-                    } else {
-    					$strMsg .="Removed $lxc_server_name and its resource $lxc_vm_id<br>";
-                    }
+			case 'restart':
+				if (isset($_REQUEST['identifier'])) {
+					foreach($_REQUEST['identifier'] as $lxc_server_name) {
+						show_progressbar();
+						$lxc_appliance = new appliance();
+						$lxc_appliance->get_instance_by_id($lxc_server_id);
+						$lxc_server = new resource();
+						$lxc_server->get_instance_by_id($lxc_appliance->resources);
+						$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm reboot -n $lxc_server_name -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
+						// remove current stat file
+						$lxc_server_resource_id = $lxc_server->id;
+						$statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
+						if (file_exists($statfile)) {
+							unlink($statfile);
+						}
+						// send command
+						$lxc_server->send_command($lxc_server->ip, $resource_command);
+						// and wait for the resulting statfile
+						if (!wait_for_statfile($statfile)) {
+							$strMsg .= "Error during restarting $lxc_server_name ! Please check the Event-Log<br>";
+						} else {
+							$strMsg .="Restarting $lxc_server_name <br>";
+						}
+					}
+					redirect($strMsg, "tab0");
+				} else {
+					$strMsg ="No virtual machine selected<br>";
+					redirect($strMsg, "tab0");
 				}
-				redirect($strMsg, "tab0");
-            } else {
-                $strMsg ="No virtual machine selected<br>";
-				redirect($strMsg, "tab0");
-            }
-			break;
+				break;
+
+			case 'delete':
+				if (isset($_REQUEST['identifier'])) {
+					foreach($_REQUEST['identifier'] as $lxc_server_name) {
+						show_progressbar();
+						// check if the resource still belongs to an appliance, if yes we do not remove it
+						$lxc_vm_mac = $lxc_vm_mac_ar[$lxc_server_name];
+						$lxc_resource = new resource();
+						$lxc_resource->get_instance_by_mac($lxc_vm_mac);
+						$lxc_vm_id=$lxc_resource->id;
+						$resource_is_used_by_appliance = "";
+						$remove_error = 0;
+						$appliance = new appliance();
+						$appliance_id_list = $appliance->get_all_ids();
+						foreach($appliance_id_list as $appliance_list) {
+							$appliance_id = $appliance_list['appliance_id'];
+							$app_resource_remove_check = new appliance();
+							$app_resource_remove_check->get_instance_by_id($appliance_id);
+							if ($app_resource_remove_check->resources == $lxc_vm_id) {
+								$resource_is_used_by_appliance .= $appliance_id." ";
+								$remove_error = 1;
+							}
+						}
+						if ($remove_error == 1) {
+							$strMsg .= "VM Resource id ".$lxc_vm_id." is used by appliance(s): ".$resource_is_used_by_appliance." <br>";
+							$strMsg .= "Not removing VM resource id ".$lxc_vm_id." !<br>";
+							continue;
+						}
+						// remove vm
+						$lxc_appliance = new appliance();
+						$lxc_appliance->get_instance_by_id($lxc_server_id);
+						$lxc_server = new resource();
+						$lxc_server->get_instance_by_id($lxc_appliance->resources);
+						$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm delete -n $lxc_server_name -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
+						// remove current stat file
+						$lxc_server_resource_id = $lxc_server->id;
+						$statfile="lxc-stat/".$lxc_server_resource_id.".vm_list";
+						if (file_exists($statfile)) {
+							unlink($statfile);
+						}
+						// send command
+						$lxc_server->send_command($lxc_server->ip, $resource_command);
+						$lxc_resource->remove($lxc_vm_id, $lxc_vm_mac);
+						// and wait for the resulting statfile
+						if (!wait_for_statfile($statfile)) {
+							$strMsg .= "Error during removing $lxc_server_name ! Please check the Event-Log<br>";
+						} else {
+							$strMsg .="Removed $lxc_server_name and its resource $lxc_vm_id<br>";
+						}
+					}
+					redirect($strMsg, "tab0");
+				} else {
+					$strMsg ="No virtual machine selected<br>";
+					redirect($strMsg, "tab0");
+				}
+				break;
 
 
+		}
 	}
 }
 
@@ -335,7 +338,7 @@ function lxc_server_select() {
 
 	global $OPENQRM_USER;
 	global $thisfile;
-    $table = new htmlobject_table_builder('appliance_id', '', '', '', 'select');
+	$table = new htmlobject_table_builder('appliance_id', '', '', '', 'select');
 
 	$arHead = array();
 	$arHead['appliance_state'] = array();
@@ -365,33 +368,33 @@ function lxc_server_select() {
 
 	$lxc_server_count=0;
 	$arBody = array();
-    $virtualization = new virtualization();
-    $virtualization->get_instance_by_type("lxc-storage");
+	$virtualization = new virtualization();
+	$virtualization->get_instance_by_type("lxc-storage");
 	$lxc_server_tmp = new appliance();
 	$lxc_server_array = $lxc_server_tmp->display_overview_per_virtualization($virtualization->id, $table->offset, $table->limit, $table->sort, $table->order);
 	foreach ($lxc_server_array as $index => $lxc_server_db) {
-        $lxc_server_resource = new resource();
-        $lxc_server_resource->get_instance_by_id($lxc_server_db["appliance_resources"]);
-        $resource_icon_default="/openqrm/base/img/resource.png";
-        $lxc_server_icon="/openqrm/base/plugins/lxc-storage/img/plugin.png";
-        $state_icon="/openqrm/base/img/$lxc_server_resource->state.png";
-        if (!file_exists($_SERVER["DOCUMENT_ROOT"]."/".$state_icon)) {
-            $state_icon="/openqrm/base/img/unknown.png";
-        }
-        if (file_exists($_SERVER["DOCUMENT_ROOT"]."/".$lxc_server_icon)) {
-            $resource_icon_default=$lxc_server_icon;
-        }
-        $arBody[] = array(
-            'appliance_state' => "<img src=$state_icon>",
-            'appliance_icon' => "<img width=24 height=24 src=$resource_icon_default>",
-            'appliance_id' => $lxc_server_db["appliance_id"],
-            'appliance_name' => $lxc_server_db["appliance_name"],
-            'appliance_resource_id' => $lxc_server_resource->id,
-            'appliance_resource_ip' => $lxc_server_resource->ip,
-            'appliance_comment' => $lxc_server_db["appliance_comment"],
-        );
-        $lxc_server_count++;
-    }
+		$lxc_server_resource = new resource();
+		$lxc_server_resource->get_instance_by_id($lxc_server_db["appliance_resources"]);
+		$resource_icon_default="/openqrm/base/img/resource.png";
+		$lxc_server_icon="/openqrm/base/plugins/lxc-storage/img/plugin.png";
+		$state_icon="/openqrm/base/img/$lxc_server_resource->state.png";
+		if (!file_exists($_SERVER["DOCUMENT_ROOT"]."/".$state_icon)) {
+			$state_icon="/openqrm/base/img/unknown.png";
+		}
+		if (file_exists($_SERVER["DOCUMENT_ROOT"]."/".$lxc_server_icon)) {
+			$resource_icon_default=$lxc_server_icon;
+		}
+		$arBody[] = array(
+			'appliance_state' => "<img src=$state_icon>",
+			'appliance_icon' => "<img width=24 height=24 src=$resource_icon_default>",
+			'appliance_id' => $lxc_server_db["appliance_id"],
+			'appliance_name' => $lxc_server_db["appliance_name"],
+			'appliance_resource_id' => $lxc_server_resource->id,
+			'appliance_resource_ip' => $lxc_server_resource->ip,
+			'appliance_comment' => $lxc_server_db["appliance_comment"],
+		);
+		$lxc_server_count++;
+	}
 	$table->id = 'Tabelle';
 	$table->css = 'htmlobject_table';
 	$table->border = 1;
@@ -405,14 +408,29 @@ function lxc_server_select() {
 		$table->bottom = array('select');
 		$table->identifier = 'appliance_id';
 	}
-    $table->max = $lxc_server_tmp->get_count_per_virtualization($virtualization->id);
-    // set template
+	$table->max = $lxc_server_tmp->get_count_per_virtualization($virtualization->id);
+
+	// are there any host appliances yet ?
+	if(count($arBody) > 0) {
+		$disp = $table->get_string();
+	} else {
+		$box = new htmlobject_box();
+		$box->id = 'htmlobject_box_add_host';
+		$box->css = 'htmlobject_box';
+		$box->label = '<br><nobr><b>No host appliances configured yet!</b></nobr>';
+		$box_content = '<br><br><br><br>Please create a '.$virtualization->name.' appliance first!<br>';
+		$box_content .= '<a href="/openqrm/base/server/appliance/appliance-new.php?currenttab=tab1"><b>New appliance</b></a><br>';
+		$box->content = $box_content;
+		$disp = $box->get_string();
+	}
+
+	// set template
 	$t = new Template_PHPLIB();
 	$t->debug = false;
 	$t->setFile('tplfile', './tpl/' . 'lxc-storage-lxc-select.tpl.php');
 	$t->setVar(array(
 		'formaction' => $thisfile,
-        'lxc_server_table' => $table->get_string(),
+		'lxc_server_table' => $disp,
 	));
 	$disp =  $t->parse('out', 'tplfile');
 	return $disp;
@@ -494,15 +512,15 @@ function lxc_server_display($appliance_id) {
 	$table->body = $arBody;
 	$table->max = $lxc_server_count;
 
-    // table 1
-    $table1 = new htmlobject_table_builder('lxc_vm_res', '', '', '', 'vms');
+	// table 1
+	$table1 = new htmlobject_table_builder('lxc_vm_id', '', '', '', 'vms');
 	$arHead1 = array();
 	$arHead1['lxc_vm_state'] = array();
 	$arHead1['lxc_vm_state']['title'] ='State';
 	$arHead1['lxc_vm_state']['sortable'] = false;
 
-	$arHead1['lxc_vm_res'] = array();
-	$arHead1['lxc_vm_res']['title'] ='Res.';
+	$arHead1['lxc_vm_id'] = array();
+	$arHead1['lxc_vm_id']['title'] ='Res.';
 
 	$arHead1['lxc_vm_name'] = array();
 	$arHead1['lxc_vm_name']['title'] ='Name';
@@ -516,77 +534,77 @@ function lxc_server_display($appliance_id) {
 	$arHead1['lxc_vm_actions'] = array();
 	$arHead1['lxc_vm_actions']['title'] ='Actions';
 	$arHead1['lxc_vm_actions']['sortable'] = false;
-    $arBody1 = array();
+	$arBody1 = array();
 
-    $lxc_server_vm_list_file="lxc-stat/$lxc_server_resource->id.vm_list";
+	$lxc_server_vm_list_file="lxc-stat/$lxc_server_resource->id.vm_list";
 	$lxc_vm_registered=array();
-    $lxc_vm_count=0;
+	$lxc_vm_count=0;
 	if (file_exists($lxc_server_vm_list_file)) {
 		$lxc_server_vm_list_content=file($lxc_server_vm_list_file);
 		foreach ($lxc_server_vm_list_content as $index => $lxc_vm) {
 			// find the vms
 			if (!strstr($lxc_vm, "#")) {
 
-                $first_at_pos = strpos($lxc_vm, "@");
-                $first_at_pos++;
-                $lxc_name_first_at_removed = substr($lxc_vm, $first_at_pos, strlen($lxc_vm)-$first_at_pos);
-                $second_at_pos = strpos($lxc_name_first_at_removed, "@");
-                $second_at_pos++;
-                $lxc_name_second_at_removed = substr($lxc_name_first_at_removed, $second_at_pos, strlen($lxc_name_first_at_removed)-$second_at_pos);
-                $third_at_pos = strpos($lxc_name_second_at_removed, "@");
-                $third_at_pos++;
-                $lxc_name_third_at_removed = substr($lxc_name_second_at_removed, $third_at_pos, strlen($lxc_name_second_at_removed)-$third_at_pos);
-                $fourth_at_pos = strpos($lxc_name_third_at_removed, "@");
-                $fourth_at_pos++;
-                $lxc_name_fourth_at_removed = substr($lxc_name_third_at_removed, $fourth_at_pos, strlen($lxc_name_third_at_removed)-$fourth_at_pos);
-                $fivth_at_pos = strpos($lxc_name_fourth_at_removed, "@");
-                $fivth_at_pos++;
-                $lxc_name_fivth_at_removed = substr($lxc_name_fourth_at_removed, $fivth_at_pos, strlen($lxc_name_fourth_at_removed)-$fivth_at_pos);
-                $sixth_at_pos = strpos($lxc_name_fivth_at_removed, "@");
-                $sixth_at_pos++;
-                $lxc_name_sixth_at_removed = substr($lxc_name_fivth_at_removed, $sixth_at_pos, strlen($lxc_name_fivth_at_removed)-$sixth_at_pos);
-                $seventh_at_pos = strpos($lxc_name_sixth_at_removed, "@");
-                $seventh_at_pos++;
+				$first_at_pos = strpos($lxc_vm, "@");
+				$first_at_pos++;
+				$lxc_name_first_at_removed = substr($lxc_vm, $first_at_pos, strlen($lxc_vm)-$first_at_pos);
+				$second_at_pos = strpos($lxc_name_first_at_removed, "@");
+				$second_at_pos++;
+				$lxc_name_second_at_removed = substr($lxc_name_first_at_removed, $second_at_pos, strlen($lxc_name_first_at_removed)-$second_at_pos);
+				$third_at_pos = strpos($lxc_name_second_at_removed, "@");
+				$third_at_pos++;
+				$lxc_name_third_at_removed = substr($lxc_name_second_at_removed, $third_at_pos, strlen($lxc_name_second_at_removed)-$third_at_pos);
+				$fourth_at_pos = strpos($lxc_name_third_at_removed, "@");
+				$fourth_at_pos++;
+				$lxc_name_fourth_at_removed = substr($lxc_name_third_at_removed, $fourth_at_pos, strlen($lxc_name_third_at_removed)-$fourth_at_pos);
+				$fivth_at_pos = strpos($lxc_name_fourth_at_removed, "@");
+				$fivth_at_pos++;
+				$lxc_name_fivth_at_removed = substr($lxc_name_fourth_at_removed, $fivth_at_pos, strlen($lxc_name_fourth_at_removed)-$fivth_at_pos);
+				$sixth_at_pos = strpos($lxc_name_fivth_at_removed, "@");
+				$sixth_at_pos++;
+				$lxc_name_sixth_at_removed = substr($lxc_name_fivth_at_removed, $sixth_at_pos, strlen($lxc_name_fivth_at_removed)-$sixth_at_pos);
+				$seventh_at_pos = strpos($lxc_name_sixth_at_removed, "@");
+				$seventh_at_pos++;
 
-                $lxc_short_name = trim(substr($lxc_vm, 0, $first_at_pos-1));
-                $lxc_vm_state = trim(substr($lxc_name_first_at_removed, 0, $second_at_pos-1));
-                $lxc_vm_mac = trim(substr($lxc_name_second_at_removed, 0, $third_at_pos-1));
-                // get ip
-                $lxc_resource = new resource();
-                $lxc_resource->get_instance_by_mac($lxc_vm_mac);
-                $lxc_vm_ip = $lxc_resource->ip;
-                $lxc_vm_id = $lxc_resource->id;
+				$lxc_short_name = trim(substr($lxc_vm, 0, $first_at_pos-1));
+				$lxc_vm_state = trim(substr($lxc_name_first_at_removed, 0, $second_at_pos-1));
+				$lxc_vm_mac = trim(substr($lxc_name_second_at_removed, 0, $third_at_pos-1));
+				// get ip
+				$lxc_resource = new resource();
+				$lxc_resource->get_instance_by_mac($lxc_vm_mac);
+				$lxc_vm_ip = $lxc_resource->ip;
+				$lxc_vm_id = $lxc_resource->id;
 
-                // fill the actions and set state icon
-                $vm_actions = "";
-                if (!strcmp($lxc_vm_state, "RUNNING")) {
-                    $state_icon="/openqrm/base/img/active.png";
-                    $vm_actions = "<nobr><a href=\"$thisfile?identifier[]=$lxc_short_name&action=stop&lxc_server_id=$lxc_server_tmp->id\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/stop.png\" border=\"0\"> Stop</a>&nbsp;&nbsp;&nbsp;&nbsp;";
-                    $vm_actions .= "<a href=\"$thisfile?identifier[]=$lxc_short_name&action=restart&lxc_server_id=$lxc_server_tmp->id\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/img/active.png\" border=\"0\"> Restart</a></nobr>";
-    				$vm_actions .= "<a href=\"lxc-storage-vm-config.php?lxc_server_name=$lxc_short_name&lxc_server_id=$lxc_server_tmp->id\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/plugins/aa_plugins/img/plugin.png\" border=\"0\"> Change</a>&nbsp;&nbsp;&nbsp;&nbsp;";
-                } else {
-                    $state_icon="/openqrm/base/img/off.png";
-    				$vm_actions = "<nobr><a href=\"$thisfile?identifier[]=$lxc_short_name&action=start&lxc_server_id=$lxc_server_tmp->id\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/start.png\" border=\"0\"> Start</a>&nbsp;&nbsp;&nbsp;&nbsp;";
-    				$vm_actions .= "<a href=\"lxc-storage-vm-net-config.php?lxc_server_name=$lxc_short_name&lxc_server_id=$lxc_server_tmp->id\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/plugins/aa_plugins/img/plugin.png\" border=\"0\"> Config</a>&nbsp;&nbsp;&nbsp;&nbsp;";
-    				$vm_actions .= "<a href=\"$thisfile?identifier[]=$lxc_short_name&action=delete&lxc_server_id=$lxc_server_tmp->id&lxc_vm_mac_ar[$lxc_short_name]=$lxc_vm_mac\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/disable.png\" border=\"0\"> Delete</a></nobr>";
-                }
+				// fill the actions and set state icon
+				$vm_actions = "";
+				if (!strcmp($lxc_vm_state, "RUNNING")) {
+					$state_icon="/openqrm/base/img/active.png";
+					$vm_actions = "<nobr><a href=\"$thisfile?identifier[]=$lxc_short_name&action=stop&lxc_server_id=$lxc_server_tmp->id\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/stop.png\" border=\"0\"> Stop</a>&nbsp;&nbsp;";
+					$vm_actions .= "<a href=\"$thisfile?identifier[]=$lxc_short_name&action=restart&lxc_server_id=$lxc_server_tmp->id\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/img/active.png\" border=\"0\"> Restart</a>&nbsp;&nbsp;";
+					$vm_actions .= "<a href=\"lxc-storage-vm-config.php?lxc_server_name=$lxc_short_name&lxc_server_id=$lxc_server_tmp->id\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/plugins/aa_plugins/img/plugin.png\" border=\"0\"> Change</a></nobr>";
+				} else {
+					$state_icon="/openqrm/base/img/off.png";
+					$vm_actions = "<nobr><a href=\"$thisfile?identifier[]=$lxc_short_name&action=start&lxc_server_id=$lxc_server_tmp->id\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/start.png\" border=\"0\"> Start</a>&nbsp;&nbsp;";
+					$vm_actions .= "<a href=\"lxc-storage-vm-net-config.php?lxc_server_name=$lxc_short_name&lxc_server_id=$lxc_server_tmp->id\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/plugins/aa_plugins/img/plugin.png\" border=\"0\"> Config</a>&nbsp;&nbsp;";
+					$vm_actions .= "<a href=\"$thisfile?identifier[]=$lxc_short_name&action=delete&lxc_server_id=$lxc_server_tmp->id&lxc_vm_mac_ar[$lxc_short_name]=$lxc_vm_mac\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/disable.png\" border=\"0\"> Delete</a></nobr>";
+				}
 
 				$lxc_vm_registered[] = $lxc_short_name;
-                $lxc_vm_count++;
+				$lxc_vm_count++;
 
-                $arBody1[] = array(
-                    'lxc_vm_state' => "<img src=$state_icon><input type='hidden' name='lxc_vm_mac_ar[$lxc_short_name]' value=$lxc_vm_mac>",
-                    'lxc_vm_id' => $lxc_vm_id,
-                    'lxc_vm_name' => $lxc_short_name,
-                    'lxc_vm_ip' => $lxc_vm_ip,
-                    'lxc_vm_mac' => $lxc_vm_mac,
-                    'lxc_vm_actions' => $vm_actions,
-                );
+				$arBody1[] = array(
+					'lxc_vm_state' => "<img src=$state_icon><input type='hidden' name='lxc_vm_mac_ar[$lxc_short_name]' value=$lxc_vm_mac>",
+					'lxc_vm_id' => $lxc_vm_id,
+					'lxc_vm_name' => $lxc_short_name,
+					'lxc_vm_ip' => $lxc_vm_ip,
+					'lxc_vm_mac' => $lxc_vm_mac,
+					'lxc_vm_actions' => $vm_actions,
+				);
 
 			}
 		}
 	}
-    $table1->add_headrow("<input type='hidden' name='lxc_server_id' value=$appliance_id>");
+	$table1->add_headrow("<input type='hidden' name='lxc_server_id' value=$appliance_id>");
 	$table1->id = 'Tabelle';
 	$table1->css = 'htmlobject_table';
 	$table1->border = 1;
@@ -603,16 +621,16 @@ function lxc_server_display($appliance_id) {
 	}
 	$table1->max = $lxc_vm_count;
 
-    // set template
+	// set template
 	$t = new Template_PHPLIB();
 	$t->debug = false;
 	$t->setFile('tplfile', './tpl/' . 'lxc-storage-vms.tpl.php');
 	$t->setVar(array(
 		'formaction' => $thisfile,
-        'lxc_server_table' => $table->get_string(),
-        'lxc_server_id' => $lxc_server_resource->id,
-        'lxc_server_name' => $lxc_server_resource->hostname,
-        'lxc_vm_table' => $table1->get_string(),
+		'lxc_server_table' => $table->get_string(),
+		'lxc_server_id' => $lxc_server_resource->id,
+		'lxc_server_name' => $lxc_server_resource->hostname,
+		'lxc_vm_table' => $table1->get_string(),
 	));
 	$disp =  $t->parse('out', 'tplfile');
 	return $disp;
@@ -622,24 +640,23 @@ function lxc_server_display($appliance_id) {
 
 
 $output = array();
-$lxc_server_id = $_REQUEST["lxc_server_id"];
 if(htmlobject_request('action') != '') {
-    if (isset($_REQUEST['identifier'])) {
-        switch (htmlobject_request('action')) {
-            case 'select':
-                foreach($_REQUEST['identifier'] as $id) {
-                    $output[] = array('label' => 'LXC Storage VM Manager', 'value' => lxc_server_display($id));
-                }
-                break;
-            case 'reload':
-                foreach($_REQUEST['identifier'] as $id) {
-                    $output[] = array('label' => 'LXC Storage VM Manager', 'value' => lxc_server_display($id));
-                }
-                break;
-        }
-    } else {
-    	$output[] = array('label' => 'LXC Storage VM Manager', 'value' => lxc_server_select());
-    }
+	if (isset($_REQUEST['identifier'])) {
+		switch (htmlobject_request('action')) {
+			case 'select':
+				foreach($_REQUEST['identifier'] as $id) {
+					$output[] = array('label' => 'LXC Storage VM Manager', 'value' => lxc_server_display($id));
+				}
+				break;
+			case 'reload':
+				foreach($_REQUEST['identifier'] as $id) {
+					$output[] = array('label' => 'LXC Storage VM Manager', 'value' => lxc_server_display($id));
+				}
+				break;
+		}
+	} else {
+		$output[] = array('label' => 'LXC Storage VM Manager', 'value' => lxc_server_select());
+	}
 } else if (strlen($lxc_server_id)) {
 	$output[] = array('label' => 'LXC Storage VM Manager', 'value' => lxc_server_display($lxc_server_id));
 } else  {
@@ -649,7 +666,7 @@ if(htmlobject_request('action') != '') {
 
 ?>
 <script type="text/javascript">
-    $("#progressbar").remove();
+	$("#progressbar").remove();
 </script>
 <?php
 

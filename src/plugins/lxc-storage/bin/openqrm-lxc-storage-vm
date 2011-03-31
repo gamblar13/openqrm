@@ -25,39 +25,39 @@ OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PW
 if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
 	. $OPENQRM_RESOURCE_PARAMETER_FILE
 	OPENQRM_SERVER_IP=$resource_openqrmserver
-    OPENQRM_DEFAULT_INITRD_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-initrd-default.tgz"
-    OPENQRM_DEFAULT_LINUXRC_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-lxc-linuxrc"
-    OPENQRM_DEFAULT_OPENQRM_CLIENT="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-client.tgz"
-    # network params if not given by commandline
-    OPENQRM_LXC_SUBNET=$resource_subnet
-    if [ "$OPENQRM_LXC_SUBNET" == "" ]; then
-        # assume class c
-        OPENQRM_LXC_SUBNET="255.255.255.0"
-    fi
-    OPENQRM_LXC_NETWORK=$resource_network
-    if [ "$OPENQRM_LXC_NETWORK" == "" ]; then
-        # assume class c
-        OPENQRM_LXC_NETWORK=`echo $OPENQRM_SERVER_IP | cut -d'.' -f1-3`
-        OPENQRM_LXC_NETWORK="$OPENQRM_LXC_SUBNET.0"
-    fi
-    OPENQRM_LXC_DEFAULT_GATEWAY=`route -n | grep ^0.0.0.0 | head -n1 | awk {' print $2 '}`
+	OPENQRM_DEFAULT_INITRD_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-initrd-default.tgz"
+	OPENQRM_DEFAULT_LINUXRC_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-lxc-linuxrc"
+	OPENQRM_DEFAULT_OPENQRM_CLIENT="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-client.tgz"
+	# network params if not given by commandline
+	OPENQRM_LXC_SUBNET=$resource_subnet
+	if [ "$OPENQRM_LXC_SUBNET" == "" ]; then
+		# assume class c
+		OPENQRM_LXC_SUBNET="255.255.255.0"
+	fi
+	OPENQRM_LXC_NETWORK=$resource_network
+	if [ "$OPENQRM_LXC_NETWORK" == "" ]; then
+		# assume class c
+		OPENQRM_LXC_NETWORK=`echo $OPENQRM_SERVER_IP | cut -d'.' -f1-3`
+		OPENQRM_LXC_NETWORK="$OPENQRM_LXC_NETWORK.0"
+	fi
+	OPENQRM_LXC_DEFAULT_GATEWAY=`route -n | grep ^0.0.0.0 | head -n1 | awk {' print $2 '}`
 
 elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
 	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
 	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
 	openqrm_server_get_config
 	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
-    OPENQRM_LXC_SUBNET=$OPENQRM_SERVER_SUBNET_MASK
-    # assume class c
-    OPENQRM_LXC_NETWORK=`echo $OPENQRM_SERVER_IP | cut -d'.' -f1-3`
-    OPENQRM_LXC_NETWORK="$OPENQRM_LXC_SUBNET.0"
-    OPENQRM_LXC_DEFAULT_GATEWAY=$OPENQRM_SERVER_DEFAULT_GATEWAY
+	OPENQRM_LXC_SUBNET=$OPENQRM_SERVER_SUBNET_MASK
+	# assume class c
+	OPENQRM_LXC_NETWORK=`echo $OPENQRM_SERVER_IP | cut -d'.' -f1-3`
+	OPENQRM_LXC_NETWORK="$OPENQRM_LXC_NETWORK.0"
+	OPENQRM_LXC_DEFAULT_GATEWAY=$OPENQRM_SERVER_DEFAULT_GATEWAY
 	resource_id=0
 	resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
-    openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
-    OPENQRM_DEFAULT_INITRD_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz"
-    OPENQRM_DEFAULT_LINUXRC_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-lxc-linuxrc"
-    OPENQRM_DEFAULT_OPENQRM_CLIENT="$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/openqrm-client.tgz"
+	openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+	OPENQRM_DEFAULT_INITRD_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz"
+	OPENQRM_DEFAULT_LINUXRC_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-lxc-linuxrc"
+	OPENQRM_DEFAULT_OPENQRM_CLIENT="$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/openqrm-client.tgz"
 fi
 OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
 OPENQRM_LXC_VM_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/etc/templates/openqrm-lxc-storage-vm"
@@ -66,9 +66,9 @@ OPENQRM_VM_START_DELAY=15
 export LANG=C
 # define wget to use with https or http
 if [ "$openqrm_web_protocol" == "https" ]; then
-    export WGET="wget --no-check-certificate --random-file=/dev/random"
+	export WGET="wget --no-check-certificate --random-file=/dev/random"
 else
-    export WGET="wget"
+	export WGET="wget"
 fi
 
 # let only root run this script
@@ -78,18 +78,18 @@ if [ "$WHOAMI" != "root" ]; then
 	exit 6
 fi
 if [ -x /usr/bin/screen.real ]; then
-    RUNSCREEN="/usr/bin/screen.real"
+	RUNSCREEN="/usr/bin/screen.real"
 else
-    RUNSCREEN=`which screen`
+	RUNSCREEN=`which screen`
 fi
 
 # make sure cgroups are mounted
 if ! grep cgroup /proc/mounts 1>/dev/null; then
-    mkdir -p /dev/cgroup
-    if ! mount -t cgroup none /dev/cgroup; then
-        echo "ERROR: Could not mount cgroups! Maybe you need a newer kernel ?"
-        exit 1
-    fi
+	mkdir -p /dev/cgroup
+	if ! mount -t cgroup none /dev/cgroup; then
+		echo "ERROR: Could not mount cgroups! Maybe you need a newer kernel ?"
+		exit 1
+	fi
 fi
 
 function lxc_usage() {
@@ -105,14 +105,14 @@ function lxc_usage() {
 
 
 function get_lxc_vm_name_by_mac() {
-    VMMAC=$1
-    VMCONFIG=`grep -i -rH $VMMAC $OPENQRM_VM_DIR/*/config | cut -d':' -f1`
-    if [ ! -f "$VMCONFIG" ]; then
-        return
-    fi
-    VMNAME=`dirname $VMCONFIG`
-    VMNAME=`basename $VMNAME`
-    echo $VMNAME
+	VMMAC=$1
+	VMCONFIG=`grep -i -rH $VMMAC $OPENQRM_VM_DIR/*/config | cut -d':' -f1`
+	if [ ! -f "$VMCONFIG" ]; then
+		return
+	fi
+	VMNAME=`dirname $VMCONFIG`
+	VMNAME=`basename $VMNAME`
+	echo $VMNAME
 }
 
 
@@ -231,58 +231,58 @@ case "$LXC_COMMAND" in
 		if [ "$LXC_VM_MAC" == "" ]; then
 			lxc_usage
 		fi
-        if [ "$LXC_VM_SUBNET" == "" ]; then
-            LXC_VM_SUBNET=$OPENQRM_LXC_SUBNET
-        fi
-        if [ "$LXC_VM_NETWORK" == "" ]; then
-            LXC_VM_NETWORK=$OPENQRM_LXC_NETWORK
-        fi
-        if [ "$LXC_VM_DEFAULT_GATEWAY" == "" ]; then
-            LXC_VM_DEFAULT_GATEWAY=$OPENQRM_LXC_DEFAULT_GATEWAY
-        fi
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/config" ]; then
-            openqrm_post_event 0 "create" 5 "openqrm-lxc-storage" "LXC vm $LXC_VM_NAME already exists"
-            exit 0
-        fi
+		if [ "$LXC_VM_SUBNET" == "" ]; then
+			LXC_VM_SUBNET=$OPENQRM_LXC_SUBNET
+		fi
+		if [ "$LXC_VM_NETWORK" == "" ]; then
+			LXC_VM_NETWORK=$OPENQRM_LXC_NETWORK
+		fi
+		if [ "$LXC_VM_DEFAULT_GATEWAY" == "" ]; then
+			LXC_VM_DEFAULT_GATEWAY=$OPENQRM_LXC_DEFAULT_GATEWAY
+		fi
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/config" ]; then
+			openqrm_post_event 0 "create" 5 "openqrm-lxc-storage" "LXC vm $LXC_VM_NAME already exists"
+			exit 0
+		fi
 
-        CURRENT_DIR=`pwd`
+		CURRENT_DIR=`pwd`
 		lxc_storage_lock aquire
-        openqrm_post_event 0 "create" 5 "openqrm-lxc-storage" "Creating LXC vm $LXC_VM_NAME -> $OPENQRM_VM_DIR/$LXC_VM_NAME/config"
-        LXC_VM_TTY=5
+		openqrm_post_event 0 "create" 5 "openqrm-lxc-storage" "Creating LXC vm $LXC_VM_NAME -> $OPENQRM_VM_DIR/$LXC_VM_NAME/config"
+		LXC_VM_TTY=5
 
 		# creating the lxc config file
 		mkdir -p $OPENQRM_VM_DIR/$LXC_VM_NAME/root
 		mkdir -p $OPENQRM_VM_DIR/$LXC_VM_NAME/idle
 		cat $OPENQRM_LXC_VM_TEMPLATE    | \
-            sed -e "s#@@LXC_VM_NAME@@#$LXC_VM_NAME#g"    | \
-            sed -e "s#@@LXC_VM_TTY@@#$LXC_VM_TTY#g"    | \
-            sed -e "s#@@OPENQRM_PLUGIN_LXC_BRIDGE@@#$OPENQRM_PLUGIN_LXC_BRIDGE#g"    | \
-            sed -e "s#@@LXC_VM_MAC@@#$LXC_VM_MAC#g" > $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base
+			sed -e "s#@@LXC_VM_NAME@@#$LXC_VM_NAME#g"    | \
+			sed -e "s#@@LXC_VM_TTY@@#$LXC_VM_TTY#g"    | \
+			sed -e "s#@@OPENQRM_PLUGIN_LXC_BRIDGE@@#$OPENQRM_PLUGIN_LXC_BRIDGE#g"    | \
+			sed -e "s#@@LXC_VM_MAC@@#$LXC_VM_MAC#g" > $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base
 
-        # creating the idle root fs
-        if ! tar -C $OPENQRM_VM_DIR/$LXC_VM_NAME/idle -xzf $OPENQRM_DEFAULT_INITRD_TEMPLATE; then
-            openqrm_post_event 0 "create" 2 "openqrm-lxc-storage" "Could not create LXC vm $LXC_VM_NAME. Unpacking the idle template failed!"
-            exit 1
-        fi
-        # fill /dev
-        cp -aR /dev/* $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/dev/ 2>/dev/null
+		# creating the idle root fs
+		if ! tar -C $OPENQRM_VM_DIR/$LXC_VM_NAME/idle -xzf $OPENQRM_DEFAULT_INITRD_TEMPLATE; then
+			openqrm_post_event 0 "create" 2 "openqrm-lxc-storage" "Could not create LXC vm $LXC_VM_NAME. Unpacking the idle template failed!"
+			exit 1
+		fi
+		# fill /dev
+		cp -aR /dev/* $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/dev/ 2>/dev/null
 
-        # copy the openqrm-client in place
-        if ! tar -C $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/ -xzf $OPENQRM_DEFAULT_OPENQRM_CLIENT; then
-            openqrm_post_event 0 "create" 2 "openqrm-lxc-storage" "Could not create LXC vm $LXC_VM_NAME. Unpacking the openQRM-client failed!"
-            exit 1
-        fi
-        # create init for idle
-        rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc
-        # adapt the linuxrc -> set vm values which are not in /proc/cmdline
-        # first part
-        grep -B 100000 "LXC_CONFIG_MARKER" $OPENQRM_DEFAULT_LINUXRC_TEMPLATE > $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc
-        # edit part
+		# copy the openqrm-client in place
+		if ! tar -C $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/ -xzf $OPENQRM_DEFAULT_OPENQRM_CLIENT; then
+			openqrm_post_event 0 "create" 2 "openqrm-lxc-storage" "Could not create LXC vm $LXC_VM_NAME. Unpacking the openQRM-client failed!"
+			exit 1
+		fi
+		# create init for idle
+		rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc
+		# adapt the linuxrc -> set vm values which are not in /proc/cmdline
+		# first part
+		grep -B 100000 "LXC_CONFIG_MARKER" $OPENQRM_DEFAULT_LINUXRC_TEMPLATE > $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc
+		# edit part
 
-        if [ "$LXC_VM_IP" == "0.0.0.0" ]; then
-            # dhcpd
-            unset LXC_VM_IP
-            cat >> $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc << EOF
+		if [ "$LXC_VM_IP" == "0.0.0.0" ]; then
+			# dhcpd
+			unset LXC_VM_IP
+			cat >> $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc << EOF
 echo "sending dhcp request ..."
 BOOTIF="$LXC_VM_MAC"
 OPENQRM_SERVER_IP_ADDRESS="$OPENQRM_SERVER_IP"
@@ -296,9 +296,9 @@ LXC_NETWORK=\`ipcalc -n $LXC_IP $LXC_SUBNET\`
 ip="\$LXC_IP:\$OPENQRM_SERVER_IP_ADDRESS:\$LXC_ROUTE:\$LXC_SUBNET"
 
 EOF
-        else
-            # adapt idle init
-            cat >> $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc << EOF
+		else
+			# adapt idle init
+			cat >> $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc << EOF
 echo "setup networking ..."
 BOOTIF="$LXC_VM_MAC"
 OPENQRM_SERVER_IP_ADDRESS="$OPENQRM_SERVER_IP"
@@ -307,120 +307,120 @@ ip="$LXC_VM_IP:$OPENQRM_SERVER_IP:$LXC_VM_DEFAULT_GATEWAY:$LXC_VM_SUBNET"
 
 EOF
 
-        fi
-        # second part
-        grep -A 100000 "LXC_CONFIG_MARKER" $OPENQRM_DEFAULT_LINUXRC_TEMPLATE | grep -v "collecting some infos from /proc/cmdline" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc
-        chmod +x $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc
-        # adjust links
-        cd $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/sbin
-        rm -f init
-        ln -s ../linuxrc init
-        cd $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/
-        rm -f init
-        ln -s linuxrc init
-        cd $CURRENT_DIR
+		fi
+		# second part
+		grep -A 100000 "LXC_CONFIG_MARKER" $OPENQRM_DEFAULT_LINUXRC_TEMPLATE | grep -v "collecting some infos from /proc/cmdline" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc
+		chmod +x $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/linuxrc
+		# adjust links
+		cd $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/sbin
+		rm -f init
+		ln -s ../linuxrc init
+		cd $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/
+		rm -f init
+		ln -s linuxrc init
+		cd $CURRENT_DIR
 
-        # create additional network cards
-        if [ "$LXC_VM_MAC2" != "" ]; then
-            echo "lxc.network.type = veth" > $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
-            echo "lxc.network.flags = up" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
-            echo "lxc.network.link = $OPENQRM_PLUGIN_LXC_BRIDGE_NET1" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
-            echo "lxc.network.name = eth1" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
-            echo "lxc.network.ipv4 = 0.0.0.0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
-            echo "lxc.network.veth.pair = "$LXC_VM_NAME"_1" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
-            echo "lxc.network.hwaddr = $LXC_VM_MAC2" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
-        fi
-        if [ "$LXC_VM_MAC3" != "" ]; then
-            echo "lxc.network.type = veth" > $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
-            echo "lxc.network.flags = up" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
-            echo "lxc.network.link = $OPENQRM_PLUGIN_LXC_BRIDGE_NET2" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
-            echo "lxc.network.name = eth2" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
-            echo "lxc.network.ipv4 = 0.0.0.0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
-            echo "lxc.network.veth.pair = "$LXC_VM_NAME"_2" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
-            echo "lxc.network.hwaddr = $LXC_VM_MAC3" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
-        fi
-        if [ "$LXC_VM_MAC4" != "" ]; then
-            echo "lxc.network.type = veth" > $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
-            echo "lxc.network.flags = up" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
-            echo "lxc.network.link = $OPENQRM_PLUGIN_LXC_BRIDGE_NET3" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
-            echo "lxc.network.name = eth3" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
-            echo "lxc.network.ipv4 = 0.0.0.0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
-            echo "lxc.network.veth.pair = "$LXC_VM_NAME"_3" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
-            echo "lxc.network.hwaddr = $LXC_VM_MAC4" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
-        fi
-        if [ "$LXC_VM_MAC5" != "" ]; then
-            echo "lxc.network.type = veth" > $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
-            echo "lxc.network.flags = up" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
-            echo "lxc.network.link = $OPENQRM_PLUGIN_LXC_BRIDGE_NET4" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
-            echo "lxc.network.name = eth4" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
-            echo "lxc.network.ipv4 = 0.0.0.0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
-            echo "lxc.network.veth.pair = "$LXC_VM_NAME"_4" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
-            echo "lxc.network.hwaddr = $LXC_VM_MAC1" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
-        fi
-        # put config together
-        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base > $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net1" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net2" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net3" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net4" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
-        # store network config
-        echo "LXC_VM_IP=\"$LXC_VM_IP\"" > $OPENQRM_VM_DIR/$LXC_VM_NAME/network
-        echo "LXC_VM_SUBNET=\"$LXC_VM_SUBNET\"" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/network
-        echo "LXC_VM_NETWORK=\"$LXC_VM_NETWORK\"" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/network
-        echo "LXC_VM_DEFAULT_GATEWAY=\"$LXC_VM_DEFAULT_GATEWAY\"" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/network
+		# create additional network cards
+		if [ "$LXC_VM_MAC2" != "" ]; then
+			echo "lxc.network.type = veth" > $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
+			echo "lxc.network.flags = up" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
+			echo "lxc.network.link = $OPENQRM_PLUGIN_LXC_BRIDGE_NET1" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
+			echo "lxc.network.name = eth1" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
+			echo "lxc.network.ipv4 = 0.0.0.0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
+			echo "lxc.network.veth.pair = "$LXC_VM_NAME"_1" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
+			echo "lxc.network.hwaddr = $LXC_VM_MAC2" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net1
+		fi
+		if [ "$LXC_VM_MAC3" != "" ]; then
+			echo "lxc.network.type = veth" > $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
+			echo "lxc.network.flags = up" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
+			echo "lxc.network.link = $OPENQRM_PLUGIN_LXC_BRIDGE_NET2" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
+			echo "lxc.network.name = eth2" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
+			echo "lxc.network.ipv4 = 0.0.0.0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
+			echo "lxc.network.veth.pair = "$LXC_VM_NAME"_2" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
+			echo "lxc.network.hwaddr = $LXC_VM_MAC3" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net2
+		fi
+		if [ "$LXC_VM_MAC4" != "" ]; then
+			echo "lxc.network.type = veth" > $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
+			echo "lxc.network.flags = up" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
+			echo "lxc.network.link = $OPENQRM_PLUGIN_LXC_BRIDGE_NET3" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
+			echo "lxc.network.name = eth3" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
+			echo "lxc.network.ipv4 = 0.0.0.0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
+			echo "lxc.network.veth.pair = "$LXC_VM_NAME"_3" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
+			echo "lxc.network.hwaddr = $LXC_VM_MAC4" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net3
+		fi
+		if [ "$LXC_VM_MAC5" != "" ]; then
+			echo "lxc.network.type = veth" > $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
+			echo "lxc.network.flags = up" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
+			echo "lxc.network.link = $OPENQRM_PLUGIN_LXC_BRIDGE_NET4" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
+			echo "lxc.network.name = eth4" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
+			echo "lxc.network.ipv4 = 0.0.0.0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
+			echo "lxc.network.veth.pair = "$LXC_VM_NAME"_4" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
+			echo "lxc.network.hwaddr = $LXC_VM_MAC1" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net4
+		fi
+		# put config together
+		cat $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base > $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net1" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net2" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net3" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net4" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
+		# store network config
+		echo "LXC_VM_IP=\"$LXC_VM_IP\"" > $OPENQRM_VM_DIR/$LXC_VM_NAME/network
+		echo "LXC_VM_SUBNET=\"$LXC_VM_SUBNET\"" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/network
+		echo "LXC_VM_NETWORK=\"$LXC_VM_NETWORK\"" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/network
+		echo "LXC_VM_DEFAULT_GATEWAY=\"$LXC_VM_DEFAULT_GATEWAY\"" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/network
 
-        touch $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart
+		touch $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart.$resource_id
 		#echo "Starting Lxc vm $LXC_VM_NAME"
-        $RUNSCREEN -dmS $LXC_VM_NAME lxc-start -n $LXC_VM_NAME -f $OPENQRM_VM_DIR/$LXC_VM_NAME/config -o $OPENQRM_VM_DIR/$LXC_VM_NAME/$LXC_VM_NAME.log -l DEBUG
+		$RUNSCREEN -dmS $LXC_VM_NAME lxc-start -n $LXC_VM_NAME -f $OPENQRM_VM_DIR/$LXC_VM_NAME/config -o $OPENQRM_VM_DIR/$LXC_VM_NAME/$LXC_VM_NAME.log -l DEBUG
 		# in case we have a username + password post the updated list to the openQRM-server
 		if [ "$LXC_OPENQRM_USERNAME" != "" ] && [ "$LXC_OPENQRM_PASSWORD" != "" ]; then
-            sleep $OPENQRM_VM_START_DELAY
+			sleep $OPENQRM_VM_START_DELAY
 			$0 post_vm_list -u $LXC_OPENQRM_USERNAME -p $LXC_OPENQRM_PASSWORD
 		fi
 		lxc_storage_lock release
 		;;
 	start)
 		lxc_storage_lock aquire
-        openqrm_post_event 0 "start" 5 "openqrm-lxc-storage" "Starting Lxc vm $LXC_VM_NAME"
-        $RUNSCREEN -dmS $LXC_VM_NAME lxc-start -n $LXC_VM_NAME -f $OPENQRM_VM_DIR/$LXC_VM_NAME/config -o $OPENQRM_VM_DIR/$LXC_VM_NAME/$LXC_VM_NAME.log -l DEBUG
-        touch $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart
+		openqrm_post_event 0 "start" 5 "openqrm-lxc-storage" "Starting Lxc vm $LXC_VM_NAME"
+		$RUNSCREEN -dmS $LXC_VM_NAME lxc-start -n $LXC_VM_NAME -f $OPENQRM_VM_DIR/$LXC_VM_NAME/config -o $OPENQRM_VM_DIR/$LXC_VM_NAME/$LXC_VM_NAME.log -l DEBUG
+		touch $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart.$resource_id
 		# in case we have a username + password post the updated list to the openQRM-server
 		if [ "$LXC_OPENQRM_USERNAME" != "" ] && [ "$LXC_OPENQRM_PASSWORD" != "" ]; then
-            sleep $OPENQRM_VM_START_DELAY
+			sleep $OPENQRM_VM_START_DELAY
 			$0 post_vm_list -u $LXC_OPENQRM_USERNAME -p $LXC_OPENQRM_PASSWORD
 		fi
 		lxc_storage_lock release
 		;;
 	start_by_mac)
 		lxc_storage_lock aquire
-        LXC_VM_NAME=`get_lxc_vm_name_by_mac $LXC_VM_MAC`
-        if [ "$LXC_VM_NAME" == "" ]; then
-            openqrm_post_event 0 "start_by_mac" 2 "openqrm-lxc-storage" "Lxc vm $LXC_VM_MAC not existing on this Host"
-            exit 1
-        fi
-        openqrm_post_event 0 "start_by_mac" 5 "openqrm-lxc-storage" "Starting Lxc vm $LXC_VM_NAME"
-        $RUNSCREEN -dmS $LXC_VM_NAME lxc-start -n $LXC_VM_NAME -f $OPENQRM_VM_DIR/$LXC_VM_NAME/config -o $OPENQRM_VM_DIR/$LXC_VM_NAME/$LXC_VM_NAME.log -l DEBUG
-        touch $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart
+		LXC_VM_NAME=`get_lxc_vm_name_by_mac $LXC_VM_MAC`
+		if [ "$LXC_VM_NAME" == "" ]; then
+			openqrm_post_event 0 "start_by_mac" 2 "openqrm-lxc-storage" "Lxc vm $LXC_VM_MAC not existing on this Host"
+			exit 1
+		fi
+		openqrm_post_event 0 "start_by_mac" 5 "openqrm-lxc-storage" "Starting Lxc vm $LXC_VM_NAME"
+		$RUNSCREEN -dmS $LXC_VM_NAME lxc-start -n $LXC_VM_NAME -f $OPENQRM_VM_DIR/$LXC_VM_NAME/config -o $OPENQRM_VM_DIR/$LXC_VM_NAME/$LXC_VM_NAME.log -l DEBUG
+		touch $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart.$resource_id
 		# in case we have a username + password post the updated list to the openQRM-server
 		if [ "$LXC_OPENQRM_USERNAME" != "" ] && [ "$LXC_OPENQRM_PASSWORD" != "" ]; then
-            sleep $OPENQRM_VM_START_DELAY
+			sleep $OPENQRM_VM_START_DELAY
 			$0 post_vm_list -u $LXC_OPENQRM_USERNAME -p $LXC_OPENQRM_PASSWORD
 		fi
 		lxc_storage_lock release
 		;;
 	stop)
 		lxc_storage_lock aquire
-        lxc-stop -n $LXC_VM_NAME
-        openqrm_post_event 0 "stop" 5 "openqrm-lxc-storage" "Stopped Lxc vm $LXC_VM_NAME"
-        rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart
+		lxc-stop -n $LXC_VM_NAME
+		openqrm_post_event 0 "stop" 5 "openqrm-lxc-storage" "Stopped Lxc vm $LXC_VM_NAME"
+		rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart.$resource_id
 		# in case we have a username + password post the updated list to the openQRM-server
 		if [ "$LXC_OPENQRM_USERNAME" != "" ] && [ "$LXC_OPENQRM_PASSWORD" != "" ]; then
 			$0 post_vm_list -u $LXC_OPENQRM_USERNAME -p $LXC_OPENQRM_PASSWORD
@@ -430,14 +430,14 @@ EOF
 
 	stop_by_mac)
 		lxc_storage_lock aquire
-        LXC_VM_NAME=`get_lxc_vm_name_by_mac $LXC_VM_MAC`
-        if [ "$LXC_VM_NAME" == "" ]; then
-            openqrm_post_event 0 "stop_by_mac" 2 "openqrm-lxc-storage" "Lxc vm $LXC_VM_MAC not existing on this Host"
-            exit 1
-        fi
-        lxc-stop -n $LXC_VM_NAME
-        openqrm_post_event 0 "stop_by_mac" 5 "openqrm-lxc-storage" "Stopped Lxc vm $LXC_VM_NAME"
-        rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart
+		LXC_VM_NAME=`get_lxc_vm_name_by_mac $LXC_VM_MAC`
+		if [ "$LXC_VM_NAME" == "" ]; then
+			openqrm_post_event 0 "stop_by_mac" 2 "openqrm-lxc-storage" "Lxc vm $LXC_VM_MAC not existing on this Host"
+			exit 1
+		fi
+		lxc-stop -n $LXC_VM_NAME
+		openqrm_post_event 0 "stop_by_mac" 5 "openqrm-lxc-storage" "Stopped Lxc vm $LXC_VM_NAME"
+		rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart.$resource_id
 		# in case we have a username + password post the updated list to the openQRM-server
 		if [ "$LXC_OPENQRM_USERNAME" != "" ] && [ "$LXC_OPENQRM_PASSWORD" != "" ]; then
 			$0 post_vm_list -u $LXC_OPENQRM_USERNAME -p $LXC_OPENQRM_PASSWORD
@@ -446,228 +446,228 @@ EOF
 		;;
 
 	restart_by_mac)
-        # this is the main point of assignment to an appliance !
-        # the disk paramter decides on how the vm is restarted
-        #   idle - umount disk, start idle template
-        #   noop - just restart, do not mount/umount
-        #   empty - just restart, do not mount/umount
-        #   dev-name - make sure root is umounted, mount dev-name + start
-        if [ "$LXC_VM_DEFAULT_GATEWAY" == "" ]; then
-            LXC_VM_DEFAULT_GATEWAY=$OPENQRM_LXC_DEFAULT_GATEWAY
-        fi
-        CURRENT_DIR=`pwd`
+		# this is the main point of assignment to an appliance !
+		# the disk paramter decides on how the vm is restarted
+		#   idle - umount disk, start idle template
+		#   noop - just restart, do not mount/umount
+		#   empty - just restart, do not mount/umount
+		#   dev-name - make sure root is umounted, mount dev-name + start
+		if [ "$LXC_VM_DEFAULT_GATEWAY" == "" ]; then
+			LXC_VM_DEFAULT_GATEWAY=$OPENQRM_LXC_DEFAULT_GATEWAY
+		fi
+		CURRENT_DIR=`pwd`
 		lxc_storage_lock aquire
-        LXC_VM_NAME=`get_lxc_vm_name_by_mac $LXC_VM_MAC`
-        if [ "$LXC_VM_NAME" == "" ]; then
-            openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Lxc vm $LXC_VM_MAC not existing on this Host"
-    		lxc_storage_lock release
-            exit 1
-        fi
-        openqrm_post_event 0 "restart_by_mac" 5 "openqrm-lxc-storage" "Restarting Lxc vm $LXC_VM_NAME"
-        lxc-stop -n $LXC_VM_NAME
-        if [ "$LXC_VM_DISK" != "" ]; then
-            if [ "$LXC_VM_DISK" != "noop" ]; then
-                if [ "$LXC_VM_DISK" == "idle" ]; then
-                    # deassignment, umount root (image dev-name)
-                    sync
-                    if grep /$LXC_VM_NAME/root /proc/mounts 1>/dev/null; then
-                        # get lvm dev name + deactivate
-                        LXC_ASSIGNED_VOLUME=`cat /proc/mounts | grep /$LXC_VM_NAME/root | grep ^/dev | awk {' print $1 '}`
-                        # first umount then deactivate
-                        if ! umount $OPENQRM_VM_DIR/$LXC_VM_NAME/root; then
-                            openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Could not umount lxc vms root device $LXC_VM_DISK"
-                            umount -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root 1>/dev/null 2>&1
-                        fi
-                        # deactivate lvol
-                        #if [ "$LXC_ASSIGNED_VOLUME" != "" ] && [ -e "$LXC_ASSIGNED_VOLUME" ]; then
-                        #    if ! lvchange -an $LXC_ASSIGNED_VOLUME; then
-                        #        openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "ERROR while deactivating $LXC_ASSIGNED_VOLUME of root device $LXC_VM_DISK"
-                        #    fi
-                        #fi
-                    fi
-                    # put config together
-                    cat $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base > $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net1" ]; then
-                        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    fi
-                    if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net2" ]; then
-                        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    fi
-                    if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net3" ]; then
-                        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    fi
-                    if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net4" ]; then
-                        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    fi
-                    # deassing volume
-                    sed -i -e "s#^lxc.rootfs.*#lxc.rootfs = $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/#g" $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    sleep $OPENQRM_VM_START_DELAY
-                else
+		LXC_VM_NAME=`get_lxc_vm_name_by_mac $LXC_VM_MAC`
+		if [ "$LXC_VM_NAME" == "" ]; then
+			openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Lxc vm $LXC_VM_MAC not existing on this Host"
+			lxc_storage_lock release
+			exit 1
+		fi
+		openqrm_post_event 0 "restart_by_mac" 5 "openqrm-lxc-storage" "Restarting Lxc vm $LXC_VM_NAME"
+		lxc-stop -n $LXC_VM_NAME
+		if [ "$LXC_VM_DISK" != "" ]; then
+			if [ "$LXC_VM_DISK" != "noop" ]; then
+				if [ "$LXC_VM_DISK" == "idle" ]; then
+					# deassignment, umount root (image dev-name)
+					sync
+					if grep /$LXC_VM_NAME/root /proc/mounts 1>/dev/null; then
+						# get lvm dev name + deactivate
+						LXC_ASSIGNED_VOLUME=`cat /proc/mounts | grep /$LXC_VM_NAME/root | grep ^/dev | awk {' print $1 '}`
+						# first umount then deactivate
+						if ! umount $OPENQRM_VM_DIR/$LXC_VM_NAME/root; then
+							openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Could not umount lxc vms root device $LXC_VM_DISK"
+							umount -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root 1>/dev/null 2>&1
+						fi
+						# deactivate lvol
+						#if [ "$LXC_ASSIGNED_VOLUME" != "" ] && [ -e "$LXC_ASSIGNED_VOLUME" ]; then
+						#    if ! lvchange -an $LXC_ASSIGNED_VOLUME; then
+						#        openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "ERROR while deactivating $LXC_ASSIGNED_VOLUME of root device $LXC_VM_DISK"
+						#    fi
+						#fi
+					fi
+					# put config together
+					cat $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base > $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net1" ]; then
+						cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					fi
+					if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net2" ]; then
+						cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					fi
+					if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net3" ]; then
+						cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					fi
+					if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net4" ]; then
+						cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					fi
+					# deassing volume
+					sed -i -e "s#^lxc.rootfs.*#lxc.rootfs = $OPENQRM_VM_DIR/$LXC_VM_NAME/idle/#g" $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					sleep $OPENQRM_VM_START_DELAY
+				else
 
-                    # cmdline ip config
-                    if [ "$LXC_VM_IP" != "" ]; then
-                        LXC_VM_IP_CMD_LINE=$LXC_VM_IP
-                        . $OPENQRM_VM_DIR/$LXC_VM_NAME/network
-                        LXC_VM_IP=$LXC_VM_IP_CMD_LINE
-                    else
-                        # no ip config per cmdline
-                        . $OPENQRM_VM_DIR/$LXC_VM_NAME/network
-                    fi
-                    # if this ip is empty or 0.0.0.0 we need to gather the idle resource mgmt-ip !
-                    if [ "$LXC_VM_IP" == "" ] || [ "$LXC_VM_IP" == "0.0.0.0" ]; then
-                        openqrm_post_event 0 "restart_by_mac" 5 "openqrm-lxc-storage" "Have an empty mgmt-ip for lxc vm $LXC_VM_NAME!"
-                        LXC_REQUEST_LOOP=0
-                        mkdir -p $OPENQRM_VM_DIR/$LXC_VM_NAME/openqrm
-                        my_resource_ip=$resource_ip
-                        unset resource_ip
-                        while (true); do
-                            $WGET -q -O $OPENQRM_VM_DIR/$LXC_VM_NAME/openqrm/openqrm-resource.conf "$openqrm_web_protocol://$OPENQRM_SERVER_IP_ADDRESS/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$LXC_VM_MAC"
-                            . $OPENQRM_VM_DIR/$LXC_VM_NAME/openqrm/openqrm-resource.conf
-                            if [ "$resource_ip" != "" ] && [ "$resource_ip" != "0.0.0.0" ]; then
-                                openqrm_post_event 0 "create" 5 "openqrm-lxc-storage" "VM $LXC_VM_NAME found mgmt ip $resource_ip in parameters"
-                                LXC_VM_IP=$resource_ip
-                                export LXC_VM_IP
-                                break
-                            fi
-                            sleep 3
-                            LXC_REQUEST_LOOP=$(( LXC_REQUEST_LOOP + 1 ))
-                            if [ "$LXC_REQUEST_LOOP" == "10" ]; then
-                                openqrm_post_event 0 "create" 2 "openqrm-lxc-storage" "VM $LXC_VM_NAME did not got a mgmt ip in parameters"
-                                lxc_storage_lock release
-                                exit 0
-                            fi
-                        done
-                        resource_ip=$my_resource_ip
-                    fi
-                    # adjust in network config
-                    sed -i -e "s/LXC_VM_IP=.*/LXC_VM_IP=\"$LXC_VM_IP\"/g" $OPENQRM_VM_DIR/$LXC_VM_NAME/network
-                    # we have a real dev-name, mount it on top of root
-                    umount -f $LXC_VM_DISK $OPENQRM_VM_DIR/$LXC_VM_NAME/root 1>/dev/null 2>&1
-                    # rescan all lvols
-                    lvscan
-                    # activate the lvol
-                    lvchange -ay $LXC_VM_DISK
-                    # mount
-                    if ! mount $LXC_VM_DISK $OPENQRM_VM_DIR/$LXC_VM_NAME/root; then
-                        openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Could not mount lxc vms root device $LXC_VM_DISK"
-                		lxc_storage_lock release
-                        exit 1
-                    fi
-                    # really make sure the idle sys is stopped
-                    lxc-stop -n $LXC_VM_NAME
-                    sleep 5
-                    kill `ps ax  | grep lx-start | grep "/var/lib/lxc/$LXC_VM_NAME/config" | grep -v grep | awk {' print $1 '}` 1>/dev/null 2>&1
-                    kill -9 `ps ax  | grep lx-start | grep "/var/lib/lxc/$LXC_VM_NAME/config" | grep -v grep | awk {' print $1 '}` 1>/dev/null 2>&1
-                    lxc-stop -n $LXC_VM_NAME
-                    # put config together
-                    cat $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base > $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net1" ]; then
-                        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    fi
-                    if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net2" ]; then
-                        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    fi
-                    if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net3" ]; then
-                        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    fi
-                    if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net4" ]; then
-                        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    fi
-                    # assing volume
-                    sed -i -e "s#^lxc.rootfs.*#lxc.rootfs = $OPENQRM_VM_DIR/$LXC_VM_NAME/root/#g" $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-                    sync
-                    # !! here we asume that the disti arch is equal the host arch !!
-                    KERNEL_ARCH=`uname -m`
-                    if echo $KERNEL_ARCH | grep i.*86 1>/dev/null; then
-                        # i386
-                        OPENQRM_CLIENT_ARCH=i386
-                    else
-                        OPENQRM_CLIENT_ARCH=$KERNEL_ARCH
-                    fi
-                    # find out the short distri name
-                    if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/debian_version ]; then
-                        # debian or ubuntu, try to find out without lsb-release which may not be installed
-                        if grep -i ubuntu $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/apt/sources.list 1>/dev/null; then
-                            OPENQRM_SHORT_DISTRI_NAME="ubuntu"
-                        else
-                            OPENQRM_SHORT_DISTRI_NAME="debian"
-                        fi
-                    elif [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/redhat-release ]; then
-                        OPENQRM_SHORT_DISTRI_NAME="centos"
-                    else
-                            OPENQRM_SHORT_DISTRI_NAME="centos"
-                    fi
-                    
-                    #echo "Getting openqrm-client package $OPENQRM_SHORT_DISTRI_NAME/$OPENQRM_CLIENT_ARCH"
-                    if ! $WGET -q -O $OPENQRM_VM_DIR/$LXC_VM_NAME/root/openqrm-client.tgz "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/boot-service/openqrm-client.$OPENQRM_SHORT_DISTRI_NAME.$OPENQRM_CLIENT_ARCH.tgz"; then
-                        rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/openqrm-client.tgz
-                        openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Failed to get the openqrm-client package arch $OPENQRM_CLIENT_ARCH!"
-                		lxc_storage_lock release
-                        exit 1
-                    else
-                        # use the openQRM client which fits to the distri and arch
-                        rm -rf $OPENQRM_VM_DIR/$LXC_VM_NAME/root/$OPENQRM_SERVER_BASE_DIR/openqrm
-                        cd $OPENQRM_VM_DIR/$LXC_VM_NAME/root/
-                        tar -xzf openqrm-client.tgz
-                        rm -f openqrm-client.tgz
-                        # enable start at init
-                        chroot $OPENQRM_VM_DIR/$LXC_VM_NAME/root/ ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/etc/init.d/openqrm-client /etc/init.d/openqrm-client
-                        echo "#!/bin/bash -x" > $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
-                        echo "OPENQRM_SERVER_BASE_DIR=$OPENQRM_SERVER_BASE_DIR" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
-                        echo ". $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
-                        echo "openqrm_chkconfig add openqrm-client" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
-                        chmod +x $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
-                        chroot $OPENQRM_VM_DIR/$LXC_VM_NAME/root /tmp/openqrm-client.enable
-                        rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
-                        # get the openQRM resource parameters for this active appliance
-                        mkdir -p `dirname $OPENQRM_VM_DIR/$LXC_VM_NAME/root/$OPENQRM_RESOURCE_PARAMETER_FILE`
-                        if ! $WGET -q -O $OPENQRM_VM_DIR/$LXC_VM_NAME/root/$OPENQRM_RESOURCE_PARAMETER_FILE "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$LXC_VM_MAC"; then
-                            openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Failed to get lxc vm $LXC_VM_NAME resource parameters!"
-                            lxc_storage_lock release
-                            exit 1
-                        fi
-                        # set password from outside
-                        . $OPENQRM_VM_DIR/$LXC_VM_NAME/root/$OPENQRM_RESOURCE_PARAMETER_FILE
-                        if $WGET -q -O $OPENQRM_VM_DIR/$LXC_VM_NAME/image_pass.$image_id "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/action/image-auth/iauth.$image_id" 2>/dev/null; then
-                            cryptedpassword=`cat $OPENQRM_VM_DIR/$LXC_VM_NAME/image_pass.$image_id`
-                            rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/image_pass.$image_id
-                            sed -i "s#^root:[^:]*#root:$cryptedpassword#" $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/shadow
-                        fi
-                        if [ -f "$OPENQRM_RESOURCE_PARAMETER_FILE" ]; then
-                            . $OPENQRM_RESOURCE_PARAMETER_FILE
-                        fi
-                        # adjust network config of the image
-                        # setup static ip-config in the image
-                        # debian / ubuntu
-                        if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/debian_version ]; then
-                            echo "# configured by openQRM" > $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
-                            echo "auto lo" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
-                            echo "  iface lo inet loopback" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
-                            echo "auto eth0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
-                            echo "  iface eth0 inet static" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
-                            echo "  address $LXC_VM_IP" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
-                            echo "  netmask $LXC_VM_SUBNET" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
-                            echo "  gateway $LXC_VM_DEFAULT_GATEWAY" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
-                        elif [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/redhat-release ]; then
-                            echo "# configured by openQRM " > $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
-                            echo "DEVICE=eth0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
-                            echo "BOOTPROTO=none" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
-                            echo "ONBOOT=yes" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
-                            echo "NETWORK=$LXC_VM_NETWORK" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
-                            echo "NETMASK=$LXC_VM_SUBNET" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
-                            echo "IPADDR=$LXC_VM_IP" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
-                            echo "USERCTL=no" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
-                        else
-                            openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Do not know how to configure static network conifig for the image distribution!"
-                        fi
-                        cd $CURRENT_DIR
-                    fi
-                fi
-            fi
-        fi
-        # start
-        $RUNSCREEN -dmS $LXC_VM_NAME lxc-start -n $LXC_VM_NAME -f $OPENQRM_VM_DIR/$LXC_VM_NAME/config -o $OPENQRM_VM_DIR/$LXC_VM_NAME/$LXC_VM_NAME.log -l DEBUG
-        touch $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart
+					# cmdline ip config
+					if [ "$LXC_VM_IP" != "" ]; then
+						LXC_VM_IP_CMD_LINE=$LXC_VM_IP
+						. $OPENQRM_VM_DIR/$LXC_VM_NAME/network
+						LXC_VM_IP=$LXC_VM_IP_CMD_LINE
+					else
+						# no ip config per cmdline
+						. $OPENQRM_VM_DIR/$LXC_VM_NAME/network
+					fi
+					# if this ip is empty or 0.0.0.0 we need to gather the idle resource mgmt-ip !
+					if [ "$LXC_VM_IP" == "" ] || [ "$LXC_VM_IP" == "0.0.0.0" ]; then
+						openqrm_post_event 0 "restart_by_mac" 5 "openqrm-lxc-storage" "Have an empty mgmt-ip for lxc vm $LXC_VM_NAME!"
+						LXC_REQUEST_LOOP=0
+						mkdir -p $OPENQRM_VM_DIR/$LXC_VM_NAME/openqrm
+						my_resource_ip=$resource_ip
+						unset resource_ip
+						while (true); do
+							$WGET -q -O $OPENQRM_VM_DIR/$LXC_VM_NAME/openqrm/openqrm-resource.conf "$openqrm_web_protocol://$OPENQRM_SERVER_IP_ADDRESS/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$LXC_VM_MAC"
+							. $OPENQRM_VM_DIR/$LXC_VM_NAME/openqrm/openqrm-resource.conf
+							if [ "$resource_ip" != "" ] && [ "$resource_ip" != "0.0.0.0" ]; then
+								openqrm_post_event 0 "create" 5 "openqrm-lxc-storage" "VM $LXC_VM_NAME found mgmt ip $resource_ip in parameters"
+								LXC_VM_IP=$resource_ip
+								export LXC_VM_IP
+								break
+							fi
+							sleep 3
+							LXC_REQUEST_LOOP=$(( LXC_REQUEST_LOOP + 1 ))
+							if [ "$LXC_REQUEST_LOOP" == "10" ]; then
+								openqrm_post_event 0 "create" 2 "openqrm-lxc-storage" "VM $LXC_VM_NAME did not got a mgmt ip in parameters"
+								lxc_storage_lock release
+								exit 0
+							fi
+						done
+						resource_ip=$my_resource_ip
+					fi
+					# adjust in network config
+					sed -i -e "s/LXC_VM_IP=.*/LXC_VM_IP=\"$LXC_VM_IP\"/g" $OPENQRM_VM_DIR/$LXC_VM_NAME/network
+					# we have a real dev-name, mount it on top of root
+					umount -f $LXC_VM_DISK $OPENQRM_VM_DIR/$LXC_VM_NAME/root 1>/dev/null 2>&1
+					# rescan all lvols
+					lvscan >/dev/null
+					# activate the lvol
+					lvchange -ay $LXC_VM_DISK
+					# mount
+					if ! mount $LXC_VM_DISK $OPENQRM_VM_DIR/$LXC_VM_NAME/root; then
+						openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Could not mount lxc vms root device $LXC_VM_DISK"
+						lxc_storage_lock release
+						exit 1
+					fi
+					# really make sure the idle sys is stopped
+					lxc-stop -n $LXC_VM_NAME
+					sleep 5
+					kill `ps ax  | grep lx-start | grep "/var/lib/lxc/$LXC_VM_NAME/config" | grep -v grep | awk {' print $1 '}` 1>/dev/null 2>&1
+					kill -9 `ps ax  | grep lx-start | grep "/var/lib/lxc/$LXC_VM_NAME/config" | grep -v grep | awk {' print $1 '}` 1>/dev/null 2>&1
+					lxc-stop -n $LXC_VM_NAME
+					# put config together
+					cat $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base > $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net1" ]; then
+						cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					fi
+					if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net2" ]; then
+						cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					fi
+					if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net3" ]; then
+						cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					fi
+					if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net4" ]; then
+						cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					fi
+					# assing volume
+					sed -i -e "s#^lxc.rootfs.*#lxc.rootfs = $OPENQRM_VM_DIR/$LXC_VM_NAME/root/#g" $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+					sync
+					# !! here we asume that the disti arch is equal the host arch !!
+					KERNEL_ARCH=`uname -m`
+					if echo $KERNEL_ARCH | grep i.*86 1>/dev/null; then
+						# i386
+						OPENQRM_CLIENT_ARCH=i386
+					else
+						OPENQRM_CLIENT_ARCH=$KERNEL_ARCH
+					fi
+					# find out the short distri name
+					if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/debian_version ]; then
+						# debian or ubuntu, try to find out without lsb-release which may not be installed
+						if grep -i ubuntu $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/apt/sources.list 1>/dev/null; then
+							OPENQRM_SHORT_DISTRI_NAME="ubuntu"
+						else
+							OPENQRM_SHORT_DISTRI_NAME="debian"
+						fi
+					elif [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/redhat-release ]; then
+						OPENQRM_SHORT_DISTRI_NAME="centos"
+					else
+							OPENQRM_SHORT_DISTRI_NAME="centos"
+					fi
+
+					#echo "Getting openqrm-client package $OPENQRM_SHORT_DISTRI_NAME/$OPENQRM_CLIENT_ARCH"
+					if ! $WGET -q -O $OPENQRM_VM_DIR/$LXC_VM_NAME/root/openqrm-client.tgz "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/boot-service/openqrm-client.$OPENQRM_SHORT_DISTRI_NAME.$OPENQRM_CLIENT_ARCH.tgz"; then
+						rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/openqrm-client.tgz
+						openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Failed to get the openqrm-client package arch $OPENQRM_CLIENT_ARCH!"
+						lxc_storage_lock release
+						exit 1
+					else
+						# use the openQRM client which fits to the distri and arch
+						rm -rf $OPENQRM_VM_DIR/$LXC_VM_NAME/root/$OPENQRM_SERVER_BASE_DIR/openqrm
+						cd $OPENQRM_VM_DIR/$LXC_VM_NAME/root/
+						tar -xzf openqrm-client.tgz
+						rm -f openqrm-client.tgz
+						# enable start at init
+						chroot $OPENQRM_VM_DIR/$LXC_VM_NAME/root/ ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/etc/init.d/openqrm-client /etc/init.d/openqrm-client
+						echo "#!/bin/bash -x" > $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
+						echo "OPENQRM_SERVER_BASE_DIR=$OPENQRM_SERVER_BASE_DIR" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
+						echo ". $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
+						echo "openqrm_chkconfig add openqrm-client" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
+						chmod +x $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
+						chroot $OPENQRM_VM_DIR/$LXC_VM_NAME/root /tmp/openqrm-client.enable
+						rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/tmp/openqrm-client.enable
+						# get the openQRM resource parameters for this active appliance
+						mkdir -p `dirname $OPENQRM_VM_DIR/$LXC_VM_NAME/root/$OPENQRM_RESOURCE_PARAMETER_FILE`
+						if ! $WGET -q -O $OPENQRM_VM_DIR/$LXC_VM_NAME/root/$OPENQRM_RESOURCE_PARAMETER_FILE "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$LXC_VM_MAC"; then
+							openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Failed to get lxc vm $LXC_VM_NAME resource parameters!"
+							lxc_storage_lock release
+							exit 1
+						fi
+						# set password from outside
+						. $OPENQRM_VM_DIR/$LXC_VM_NAME/root/$OPENQRM_RESOURCE_PARAMETER_FILE
+						if $WGET -q -O $OPENQRM_VM_DIR/$LXC_VM_NAME/image_pass.$image_id "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/action/image-auth/iauth.$image_id" 2>/dev/null; then
+							cryptedpassword=`cat $OPENQRM_VM_DIR/$LXC_VM_NAME/image_pass.$image_id`
+							rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/image_pass.$image_id
+							sed -i "s#^root:[^:]*#root:$cryptedpassword#" $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/shadow
+						fi
+						if [ -f "$OPENQRM_RESOURCE_PARAMETER_FILE" ]; then
+							. $OPENQRM_RESOURCE_PARAMETER_FILE
+						fi
+						# adjust network config of the image
+						# setup static ip-config in the image
+						# debian / ubuntu
+						if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/debian_version ]; then
+							echo "# configured by openQRM" > $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
+							echo "auto lo" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
+							echo "  iface lo inet loopback" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
+							echo "auto eth0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
+							echo "  iface eth0 inet static" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
+							echo "  address $LXC_VM_IP" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
+							echo "  netmask $LXC_VM_SUBNET" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
+							echo "  gateway $LXC_VM_DEFAULT_GATEWAY" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/network/interfaces
+						elif [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/redhat-release ]; then
+							echo "# configured by openQRM " > $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
+							echo "DEVICE=eth0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
+							echo "BOOTPROTO=none" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
+							echo "ONBOOT=yes" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
+							echo "NETWORK=$LXC_VM_NETWORK" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
+							echo "NETMASK=$LXC_VM_SUBNET" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
+							echo "IPADDR=$LXC_VM_IP" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
+							echo "USERCTL=no" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/root/etc/sysconfig/network-scripts/ifcfg-eth0
+						else
+							openqrm_post_event 0 "restart_by_mac" 2 "openqrm-lxc-storage" "Do not know how to configure static network conifig for the image distribution!"
+						fi
+						cd $CURRENT_DIR
+					fi
+				fi
+			fi
+		fi
+		# start
+		$RUNSCREEN -dmS $LXC_VM_NAME lxc-start -n $LXC_VM_NAME -f $OPENQRM_VM_DIR/$LXC_VM_NAME/config -o $OPENQRM_VM_DIR/$LXC_VM_NAME/$LXC_VM_NAME.log -l DEBUG
+		touch $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart.$resource_id
 
 		# in case we have a username + password post the updated list to the openQRM-server
 		if [ "$LXC_OPENQRM_USERNAME" != "" ] && [ "$LXC_OPENQRM_PASSWORD" != "" ]; then
@@ -677,14 +677,14 @@ EOF
 		;;
 	reboot)
 		lxc_storage_lock aquire
-        openqrm_post_event 0 "reboot" 5 "openqrm-lxc-storage" "Rebooting Lxc vm $LXC_VM_NAME"
-        lxc-stop -n $LXC_VM_NAME
-        sleep $OPENQRM_VM_START_DELAY
-        $RUNSCREEN -dmS $LXC_VM_NAME lxc-start -n $LXC_VM_NAME -f $OPENQRM_VM_DIR/$LXC_VM_NAME/config -o $OPENQRM_VM_DIR/$LXC_VM_NAME/$LXC_VM_NAME.log -l DEBUG
-        touch $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart
+		openqrm_post_event 0 "reboot" 5 "openqrm-lxc-storage" "Rebooting Lxc vm $LXC_VM_NAME"
+		lxc-stop -n $LXC_VM_NAME
+		sleep $OPENQRM_VM_START_DELAY
+		$RUNSCREEN -dmS $LXC_VM_NAME lxc-start -n $LXC_VM_NAME -f $OPENQRM_VM_DIR/$LXC_VM_NAME/config -o $OPENQRM_VM_DIR/$LXC_VM_NAME/$LXC_VM_NAME.log -l DEBUG
+		touch $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart.$resource_id
 		# in case we have a username + password post the updated list to the openQRM-server
 		if [ "$LXC_OPENQRM_USERNAME" != "" ] && [ "$LXC_OPENQRM_PASSWORD" != "" ]; then
-            sleep $OPENQRM_VM_START_DELAY
+			sleep $OPENQRM_VM_START_DELAY
 			$0 post_vm_list -u $LXC_OPENQRM_USERNAME -p $LXC_OPENQRM_PASSWORD
 		fi
 		lxc_storage_lock release
@@ -692,13 +692,13 @@ EOF
 	delete)
 		lxc_storage_lock aquire
 		# be sure it is stopped
-        lxc-stop -n $LXC_VM_NAME
-        if [ -d "$OPENQRM_VM_DIR/$LXC_VM_NAME" ]; then
-            rm -rf $OPENQRM_VM_DIR/$LXC_VM_NAME
-            openqrm_post_event 0 "delete" 5 "openqrm-lxc-storage" "Removed Lxc vm $LXC_VM_NAME"
-        else
-            openqrm_post_event 0 "delete" 2 "openqrm-lxc-storage" "Not Removing Lxc vm $LXC_VM_NAME. It does not exist."
-        fi
+		lxc-stop -n $LXC_VM_NAME
+		if [ -d "$OPENQRM_VM_DIR/$LXC_VM_NAME" ]; then
+			rm -rf $OPENQRM_VM_DIR/$LXC_VM_NAME
+			openqrm_post_event 0 "delete" 5 "openqrm-lxc-storage" "Removed Lxc vm $LXC_VM_NAME"
+		else
+			openqrm_post_event 0 "delete" 2 "openqrm-lxc-storage" "Not Removing Lxc vm $LXC_VM_NAME. It does not exist."
+		fi
 		# in case we have a username + password post the updated list to the openQRM-server
 		if [ "$LXC_OPENQRM_USERNAME" != "" ] && [ "$LXC_OPENQRM_PASSWORD" != "" ]; then
 			$0 post_vm_list -u $LXC_OPENQRM_USERNAME -p $LXC_OPENQRM_PASSWORD
@@ -712,18 +712,18 @@ EOF
 	post_vm_list)
 		#echo "Posting vm list to the openQRM-server"
 		VM_LIST_TMP=$resource_id.vm_list
-        > $VM_LIST_TMP
-        if [ ! -d $OPENQRM_VM_DIR ]; then
-            mkdir -p $OPENQRM_VM_DIR
-        fi
+		> $VM_LIST_TMP
+		if [ ! -d $OPENQRM_VM_DIR ]; then
+			mkdir -p $OPENQRM_VM_DIR
+		fi
 		for lxcvm in `ls $OPENQRM_VM_DIR/`; do
-            LXC_VM_STATUS=`lxc-info -n $lxcvm | sed -e "s/'//g" | awk {' print $3 '}`
-            LXC_VM_MAC=`grep lxc.network.hwaddr $OPENQRM_VM_DIR/$lxcvm/config | awk {' print $3 '} | head -n1`
-            echo "$lxcvm""@""$LXC_VM_STATUS""@""$LXC_VM_MAC""@""" >> $VM_LIST_TMP
-        done
+			LXC_VM_STATUS=`lxc-info -n $lxcvm | sed -e "s/'//g" | awk {' print $3 '}`
+			LXC_VM_MAC=`grep lxc.network.hwaddr $OPENQRM_VM_DIR/$lxcvm/config | awk {' print $3 '} | head -n1`
+			echo "$lxcvm""@""$LXC_VM_STATUS""@""$LXC_VM_MAC""@""" >> $VM_LIST_TMP
+		done
 		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LXC_OPENQRM_USERNAME --http-password=$LXC_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_LIST_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lxc_server_command=get_lxc_server; then
-            openqrm_post_event 0 "post_vm_list" 2 "openqrm-lxc-storage" "Could not post vm list to the openQRM-server at $OPENQRM_SERVER_IP!"
-            lxc_storage_log post_lv "ERROR: Could not post vm list to the openQRM-server at $OPENQRM_SERVER_IP!"
+			openqrm_post_event 0 "post_vm_list" 2 "openqrm-lxc-storage" "Could not post vm list to the openQRM-server at $OPENQRM_SERVER_IP!"
+			lxc_storage_log post_lv "ERROR: Could not post vm list to the openQRM-server at $OPENQRM_SERVER_IP!"
 		fi
 		rm -f $VM_LIST_TMP
 		rm -f $VM_LIST_TMP.post
@@ -732,72 +732,72 @@ EOF
 	post_vm_config)
 		#echo "Posting vm list to the openQRM-server"
 		VM_CONFIG_TMP=$resource_id.$LXC_VM_NAME.vm_config
-        > $VM_CONFIG_TMP
-        # find cgroup mount, take the first one as lxc does too
-        CGROUPMOUNT=`mount | grep "type cgroup" | awk {' print $3 '}`
+		> $VM_CONFIG_TMP
+		# find cgroup mount, take the first one as lxc does too
+		CGROUPMOUNT=`mount | grep "type cgroup" | awk {' print $3 '}`
 		for LXC_CGROUP_FILE in `ls $CGROUPMOUNT/$LXC_VM_NAME/`; do
-            echo "##$LXC_CGROUP_FILE" >> $VM_CONFIG_TMP
-            cat $CGROUPMOUNT/$LXC_VM_NAME/$LXC_CGROUP_FILE >> $VM_CONFIG_TMP
-        done
+			echo "##$LXC_CGROUP_FILE" >> $VM_CONFIG_TMP
+			cat $CGROUPMOUNT/$LXC_VM_NAME/$LXC_CGROUP_FILE >> $VM_CONFIG_TMP
+		done
 		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LXC_OPENQRM_USERNAME --http-password=$LXC_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_CONFIG_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lxc_server_command=get_lxc_config; then
-            openqrm_post_event 0 "post_vm_config" 2 "openqrm-lxc-storage" "Could not post vm config for Lxc vm $LXC_VM_NAME!"
-            lxc_storage_log post_lv "ERROR: Could not post vm config for Lxc vm $LXC_VM_NAME!"
+			openqrm_post_event 0 "post_vm_config" 2 "openqrm-lxc-storage" "Could not post vm config for Lxc vm $LXC_VM_NAME!"
+			lxc_storage_log post_lv "ERROR: Could not post vm config for Lxc vm $LXC_VM_NAME!"
 		fi
 		rm -f $VM_CONFIG_TMP
 		rm -f $VM_CONFIG_TMP.post
 		;;
 
 	set_vm_config)
-        lxc-cgroup -n $LXC_VM_NAME $LXC_VM_CONFIG_PARAMETER $LXC_VM_CONFIG_VALUE
-        lxc_storage_log set_vm_config "NOTICE: Set $LXC_VM_CONFIG_PARAMETER to $LXC_VM_CONFIG_VALUE for Lxc vm $LXC_VM_NAME!"
+		lxc-cgroup -n $LXC_VM_NAME $LXC_VM_CONFIG_PARAMETER $LXC_VM_CONFIG_VALUE
+		lxc_storage_log set_vm_config "NOTICE: Set $LXC_VM_CONFIG_PARAMETER to $LXC_VM_CONFIG_VALUE for Lxc vm $LXC_VM_NAME!"
 		;;
 
 
 	post_vm_net_config)
 		#echo "Posting vm list to the openQRM-server"
 		VM_CONFIG_TMP=$resource_id.$LXC_VM_NAME.vm_net_config
-        > $VM_CONFIG_TMP
-        # first nic is in the config
-        LXC_STORAGE_VM_MAC_0=`grep network.hwaddr $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base | awk {' print $3 '}`
-        LXC_STORAGE_VM_NIC0_BRIDGE=`grep network.link $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base | awk {' print $3 '}`
-        echo "OPENQRM_LXC_STORAGE_VM_MAC_0=\"$LXC_STORAGE_VM_MAC_0\"" >> $VM_CONFIG_TMP
-        echo "OPENQRM_LXC_STORAGE_VM_BRIDGE_0=\"$LXC_STORAGE_VM_NIC0_BRIDGE\"" >> $VM_CONFIG_TMP
-        # additional nics
-        if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 ]; then
-            LXC_STORAGE_VM_MAC_1=`grep network.hwaddr $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 | awk {' print $3 '}`
-            LXC_STORAGE_VM_NIC1_BRIDGE=`grep network.link $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 | awk {' print $3 '}`
-            echo "OPENQRM_LXC_STORAGE_VM_MAC_1=\"$LXC_STORAGE_VM_MAC_1\"" >> $VM_CONFIG_TMP
-            echo "OPENQRM_LXC_STORAGE_VM_BRIDGE_1=\"$LXC_STORAGE_VM_NIC1_BRIDGE\"" >> $VM_CONFIG_TMP
-        fi
-        if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 ]; then
-            LXC_STORAGE_VM_MAC_2=`grep network.hwaddr $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 | awk {' print $3 '}`
-            LXC_STORAGE_VM_NIC2_BRIDGE=`grep network.link $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 | awk {' print $3 '}`
-            echo "OPENQRM_LXC_STORAGE_VM_MAC_2=\"$LXC_STORAGE_VM_MAC_2\"" >> $VM_CONFIG_TMP
-            echo "OPENQRM_LXC_STORAGE_VM_BRIDGE_2=\"$LXC_STORAGE_VM_NIC2_BRIDGE\"" >> $VM_CONFIG_TMP
-        fi
-        if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 ]; then
-            LXC_STORAGE_VM_MAC_3=`grep network.hwaddr $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 | awk {' print $3 '}`
-            LXC_STORAGE_VM_NIC3_BRIDGE=`grep network.link $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 | awk {' print $3 '}`
-            echo "OPENQRM_LXC_STORAGE_VM_MAC_3=\"$LXC_STORAGE_VM_MAC_3\"" >> $VM_CONFIG_TMP
-            echo "OPENQRM_LXC_STORAGE_VM_BRIDGE_3=\"$LXC_STORAGE_VM_NIC3_BRIDGE\"" >> $VM_CONFIG_TMP
-        fi
-        if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 ]; then
-            LXC_STORAGE_VM_MAC_4=`grep network.hwaddr $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 | awk {' print $3 '}`
-            LXC_STORAGE_VM_NIC4_BRIDGE=`grep network.link $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 | awk {' print $3 '}`
-            echo "OPENQRM_LXC_STORAGE_VM_MAC_4=\"$LXC_STORAGE_VM_MAC_4\"" >> $VM_CONFIG_TMP
-            echo "OPENQRM_LXC_STORAGE_VM_BRIDGE_4=\"$LXC_STORAGE_VM_NIC4_BRIDGE\"" >> $VM_CONFIG_TMP
-        fi
+		> $VM_CONFIG_TMP
+		# first nic is in the config
+		LXC_STORAGE_VM_MAC_0=`grep network.hwaddr $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base | awk {' print $3 '}`
+		LXC_STORAGE_VM_NIC0_BRIDGE=`grep network.link $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base | awk {' print $3 '}`
+		echo "OPENQRM_LXC_STORAGE_VM_MAC_0=\"$LXC_STORAGE_VM_MAC_0\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_LXC_STORAGE_VM_BRIDGE_0=\"$LXC_STORAGE_VM_NIC0_BRIDGE\"" >> $VM_CONFIG_TMP
+		# additional nics
+		if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 ]; then
+			LXC_STORAGE_VM_MAC_1=`grep network.hwaddr $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 | awk {' print $3 '}`
+			LXC_STORAGE_VM_NIC1_BRIDGE=`grep network.link $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 | awk {' print $3 '}`
+			echo "OPENQRM_LXC_STORAGE_VM_MAC_1=\"$LXC_STORAGE_VM_MAC_1\"" >> $VM_CONFIG_TMP
+			echo "OPENQRM_LXC_STORAGE_VM_BRIDGE_1=\"$LXC_STORAGE_VM_NIC1_BRIDGE\"" >> $VM_CONFIG_TMP
+		fi
+		if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 ]; then
+			LXC_STORAGE_VM_MAC_2=`grep network.hwaddr $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 | awk {' print $3 '}`
+			LXC_STORAGE_VM_NIC2_BRIDGE=`grep network.link $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 | awk {' print $3 '}`
+			echo "OPENQRM_LXC_STORAGE_VM_MAC_2=\"$LXC_STORAGE_VM_MAC_2\"" >> $VM_CONFIG_TMP
+			echo "OPENQRM_LXC_STORAGE_VM_BRIDGE_2=\"$LXC_STORAGE_VM_NIC2_BRIDGE\"" >> $VM_CONFIG_TMP
+		fi
+		if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 ]; then
+			LXC_STORAGE_VM_MAC_3=`grep network.hwaddr $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 | awk {' print $3 '}`
+			LXC_STORAGE_VM_NIC3_BRIDGE=`grep network.link $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 | awk {' print $3 '}`
+			echo "OPENQRM_LXC_STORAGE_VM_MAC_3=\"$LXC_STORAGE_VM_MAC_3\"" >> $VM_CONFIG_TMP
+			echo "OPENQRM_LXC_STORAGE_VM_BRIDGE_3=\"$LXC_STORAGE_VM_NIC3_BRIDGE\"" >> $VM_CONFIG_TMP
+		fi
+		if [ -f $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 ]; then
+			LXC_STORAGE_VM_MAC_4=`grep network.hwaddr $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 | awk {' print $3 '}`
+			LXC_STORAGE_VM_NIC4_BRIDGE=`grep network.link $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 | awk {' print $3 '}`
+			echo "OPENQRM_LXC_STORAGE_VM_MAC_4=\"$LXC_STORAGE_VM_MAC_4\"" >> $VM_CONFIG_TMP
+			echo "OPENQRM_LXC_STORAGE_VM_BRIDGE_4=\"$LXC_STORAGE_VM_NIC4_BRIDGE\"" >> $VM_CONFIG_TMP
+		fi
 
-        # and the bridge config
-        echo "OPENQRM_LXC_STORAGE_MGMT_BRIDGE=\"$OPENQRM_PLUGIN_LXC_BRIDGE\"" >> $VM_CONFIG_TMP
-        echo "OPENQRM_LXC_STORAGE_BRIDGE_NET1=\"$OPENQRM_PLUGIN_LXC_BRIDGE_NET1\"" >> $VM_CONFIG_TMP
-        echo "OPENQRM_LXC_STORAGE_BRIDGE_NET2=\"$OPENQRM_PLUGIN_LXC_BRIDGE_NET2\"" >> $VM_CONFIG_TMP
-        echo "OPENQRM_LXC_STORAGE_BRIDGE_NET3=\"$OPENQRM_PLUGIN_LXC_BRIDGE_NET3\"" >> $VM_CONFIG_TMP
-        echo "OPENQRM_LXC_STORAGE_BRIDGE_NET4=\"$OPENQRM_PLUGIN_LXC_BRIDGE_NET4\"" >> $VM_CONFIG_TMP
+		# and the bridge config
+		echo "OPENQRM_LXC_STORAGE_MGMT_BRIDGE=\"$OPENQRM_PLUGIN_LXC_BRIDGE\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_LXC_STORAGE_BRIDGE_NET1=\"$OPENQRM_PLUGIN_LXC_BRIDGE_NET1\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_LXC_STORAGE_BRIDGE_NET2=\"$OPENQRM_PLUGIN_LXC_BRIDGE_NET2\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_LXC_STORAGE_BRIDGE_NET3=\"$OPENQRM_PLUGIN_LXC_BRIDGE_NET3\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_LXC_STORAGE_BRIDGE_NET4=\"$OPENQRM_PLUGIN_LXC_BRIDGE_NET4\"" >> $VM_CONFIG_TMP
 
 		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LXC_OPENQRM_USERNAME --http-password=$LXC_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_CONFIG_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lxc_server_command=get_lxc_net_config; then
-            openqrm_post_event 0 "post_vm_net_config" 2 "openqrm-lxc-storage" "Could not post vm network config for Lxc vm $LXC_VM_NAME!"
-            lxc_storage_log post_lv "ERROR: Could not post vm network config for Lxc vm $LXC_VM_NAME!"
+			openqrm_post_event 0 "post_vm_net_config" 2 "openqrm-lxc-storage" "Could not post vm network config for Lxc vm $LXC_VM_NAME!"
+			lxc_storage_log post_lv "ERROR: Could not post vm network config for Lxc vm $LXC_VM_NAME!"
 		fi
 		rm -f $VM_CONFIG_TMP
 		rm -f $VM_CONFIG_TMP.post
@@ -806,70 +806,70 @@ EOF
 
 
 	addnic)
-        if [ "$LXC_VM_MAC2" != "" ]; then
-            NEW_LXC_VM_MAC=$LXC_VM_MAC2
-            NEW_LXC_VM_NIC_NUMBER=1
-            if [ "$LXC_VM_BRIDGE" != "" ]; then
-                NEW_LXC_VM_BRIDGE=$LXC_VM_BRIDGE
-            else
-                NEW_LXC_VM_BRIDGE=$OPENQRM_PLUGIN_LXC_BRIDGE_NET1
-            fi
-        fi
-        if [ "$LXC_VM_MAC3" != "" ]; then
-            NEW_LXC_VM_MAC=$LXC_VM_MAC3
-            NEW_LXC_VM_NIC_NUMBER=2
-            if [ "$LXC_VM_BRIDGE" != "" ]; then
-                NEW_LXC_VM_BRIDGE=$LXC_VM_BRIDGE
-            else
-                NEW_LXC_VM_BRIDGE=$OPENQRM_PLUGIN_LXC_BRIDGE_NET2
-            fi
-        fi
-        if [ "$LXC_VM_MAC4" != "" ]; then
-            NEW_LXC_VM_MAC=$LXC_VM_MAC4
-            NEW_LXC_VM_NIC_NUMBER=3
-            if [ "$LXC_VM_BRIDGE" != "" ]; then
-                NEW_LXC_VM_BRIDGE=$LXC_VM_BRIDGE
-            else
-                NEW_LXC_VM_BRIDGE=$OPENQRM_PLUGIN_LXC_BRIDGE_NET3
-            fi
-        fi
-        if [ "$LXC_VM_MAC5" != "" ]; then
-            NEW_LXC_VM_MAC=$LXC_VM_MAC5
-            NEW_LXC_VM_NIC_NUMBER=4
-            if [ "$LXC_VM_BRIDGE" != "" ]; then
-                NEW_LXC_VM_BRIDGE=$LXC_VM_BRIDGE
-            else
-                NEW_LXC_VM_BRIDGE=$OPENQRM_PLUGIN_LXC_BRIDGE_NET4
-            fi
-        fi
-        if [ "$NEW_LXC_VM_MAC" == "" ]; then
-            lxc_usage
-        fi
-        openqrm_post_event 0 "addnic" 5 "openqrm-lxc-storage" "Adding nic eth$NEW_LXC_VM_NIC_NUMBER / $NEW_LXC_VM_MAC to Lxc vm $LXC_VM_NAME"
+		if [ "$LXC_VM_MAC2" != "" ]; then
+			NEW_LXC_VM_MAC=$LXC_VM_MAC2
+			NEW_LXC_VM_NIC_NUMBER=1
+			if [ "$LXC_VM_BRIDGE" != "" ]; then
+				NEW_LXC_VM_BRIDGE=$LXC_VM_BRIDGE
+			else
+				NEW_LXC_VM_BRIDGE=$OPENQRM_PLUGIN_LXC_BRIDGE_NET1
+			fi
+		fi
+		if [ "$LXC_VM_MAC3" != "" ]; then
+			NEW_LXC_VM_MAC=$LXC_VM_MAC3
+			NEW_LXC_VM_NIC_NUMBER=2
+			if [ "$LXC_VM_BRIDGE" != "" ]; then
+				NEW_LXC_VM_BRIDGE=$LXC_VM_BRIDGE
+			else
+				NEW_LXC_VM_BRIDGE=$OPENQRM_PLUGIN_LXC_BRIDGE_NET2
+			fi
+		fi
+		if [ "$LXC_VM_MAC4" != "" ]; then
+			NEW_LXC_VM_MAC=$LXC_VM_MAC4
+			NEW_LXC_VM_NIC_NUMBER=3
+			if [ "$LXC_VM_BRIDGE" != "" ]; then
+				NEW_LXC_VM_BRIDGE=$LXC_VM_BRIDGE
+			else
+				NEW_LXC_VM_BRIDGE=$OPENQRM_PLUGIN_LXC_BRIDGE_NET3
+			fi
+		fi
+		if [ "$LXC_VM_MAC5" != "" ]; then
+			NEW_LXC_VM_MAC=$LXC_VM_MAC5
+			NEW_LXC_VM_NIC_NUMBER=4
+			if [ "$LXC_VM_BRIDGE" != "" ]; then
+				NEW_LXC_VM_BRIDGE=$LXC_VM_BRIDGE
+			else
+				NEW_LXC_VM_BRIDGE=$OPENQRM_PLUGIN_LXC_BRIDGE_NET4
+			fi
+		fi
+		if [ "$NEW_LXC_VM_MAC" == "" ]; then
+			lxc_usage
+		fi
+		openqrm_post_event 0 "addnic" 5 "openqrm-lxc-storage" "Adding nic eth$NEW_LXC_VM_NIC_NUMBER / $NEW_LXC_VM_MAC to Lxc vm $LXC_VM_NAME"
 		lxc_storage_lock aquire
 
-        echo "lxc.network.type = veth" > $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
-        echo "lxc.network.flags = up" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
-        echo "lxc.network.link = $NEW_LXC_VM_BRIDGE" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
-        echo "lxc.network.name = eth$NEW_LXC_VM_NIC_NUMBER" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
-        echo "lxc.network.ipv4 = 0.0.0.0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
-        echo "lxc.network.veth.pair = "$LXC_VM_NAME"_"$NEW_LXC_VM_NIC_NUMBER >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
-        echo "lxc.network.hwaddr = $NEW_LXC_VM_MAC" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
+		echo "lxc.network.type = veth" > $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
+		echo "lxc.network.flags = up" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
+		echo "lxc.network.link = $NEW_LXC_VM_BRIDGE" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
+		echo "lxc.network.name = eth$NEW_LXC_VM_NIC_NUMBER" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
+		echo "lxc.network.ipv4 = 0.0.0.0" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
+		echo "lxc.network.veth.pair = "$LXC_VM_NAME"_"$NEW_LXC_VM_NIC_NUMBER >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
+		echo "lxc.network.hwaddr = $NEW_LXC_VM_MAC" >> $OPENQRM_VM_DIR/$LXC_VM_NAME/net$NEW_LXC_VM_NIC_NUMBER
 
-        # put config together
-        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base > $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net1" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net2" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net3" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net4" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
+		# put config together
+		cat $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base > $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net1" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net2" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net3" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net4" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
 
 		# in case we have a username + password post the updated list to the openQRM-server
 		if [ "$LXC_OPENQRM_USERNAME" != "" ] && [ "$LXC_OPENQRM_PASSWORD" != "" ]; then
@@ -880,28 +880,28 @@ EOF
 
 
 	removenic)
-        LXC_NIC_TO_REMOVE=`ls -r $OPENQRM_VM_DIR/$LXC_VM_NAME/net? | head -n1`
-        if [ ! -f "$LXC_NIC_TO_REMOVE" ]; then
-            openqrm_post_event 0 "removenic" 5 "openqrm-lxc-storage" "Could not find any network cards to remove from Lxc vm $LXC_VM_NAME"
-            exit
-        fi
-        openqrm_post_event 0 "removenic" 5 "openqrm-lxc-storage" "Removing nic from Lxc vm $LXC_VM_NAME"
+		LXC_NIC_TO_REMOVE=`ls -r $OPENQRM_VM_DIR/$LXC_VM_NAME/net? | head -n1`
+		if [ ! -f "$LXC_NIC_TO_REMOVE" ]; then
+			openqrm_post_event 0 "removenic" 5 "openqrm-lxc-storage" "Could not find any network cards to remove from Lxc vm $LXC_VM_NAME"
+			exit
+		fi
+		openqrm_post_event 0 "removenic" 5 "openqrm-lxc-storage" "Removing nic from Lxc vm $LXC_VM_NAME"
 		lxc_storage_lock aquire
-        rm -f $LXC_NIC_TO_REMOVE
-        # put config together
-        cat $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base > $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net1" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net2" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net3" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
-        if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net4" ]; then
-            cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
-        fi
+		rm -f $LXC_NIC_TO_REMOVE
+		# put config together
+		cat $OPENQRM_VM_DIR/$LXC_VM_NAME/config.base > $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net1" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net1 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net2" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net2 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net3" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net3 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
+		if [ -f "$OPENQRM_VM_DIR/$LXC_VM_NAME/net4" ]; then
+			cat $OPENQRM_VM_DIR/$LXC_VM_NAME/net4 >> $OPENQRM_VM_DIR/$LXC_VM_NAME/config
+		fi
 
 		# in case we have a username + password post the updated list to the openQRM-server
 		if [ "$LXC_OPENQRM_USERNAME" != "" ] && [ "$LXC_OPENQRM_PASSWORD" != "" ]; then
@@ -914,21 +914,21 @@ EOF
 
 
 	fence)
-        unset LXC_VM_NAME
+		unset LXC_VM_NAME
 		if [ "$LXC_VM_MAC" == "" ]; then
 			lxc_usage
 		fi
 		lxc_storage_lock aquire
-        # this command is is running from the openQRM engine which does
-        # not know about the lxc-name
-        LXC_VM_NAME=`get_lxc_vm_name_by_mac $LXC_VM_MAC`
-        if [ "$LXC_VM_NAME" == "" ]; then
-            openqrm_post_event 0 "fence" 2 "openqrm-lxc-storage" "Lxc vm $LXC_VM_MAC not existing on this Host"
-            exit 1
-        fi
-        openqrm_post_event 0 "post_vm_list" 5 "openqrm-lxc-storage" "Fencing Lxc vm $LXC_VM_NAME"
-        lxc-stop -n $LXC_VM_NAME
-        rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart
+		# this command is is running from the openQRM engine which does
+		# not know about the lxc-name
+		LXC_VM_NAME=`get_lxc_vm_name_by_mac $LXC_VM_MAC`
+		if [ "$LXC_VM_NAME" == "" ]; then
+			openqrm_post_event 0 "fence" 2 "openqrm-lxc-storage" "Lxc vm $LXC_VM_MAC not existing on this Host"
+			exit 1
+		fi
+		openqrm_post_event 0 "post_vm_list" 5 "openqrm-lxc-storage" "Fencing Lxc vm $LXC_VM_NAME"
+		lxc-stop -n $LXC_VM_NAME
+		rm -f $OPENQRM_VM_DIR/$LXC_VM_NAME/autostart.$resource_id
 		lxc_storage_lock release
 		;;
 

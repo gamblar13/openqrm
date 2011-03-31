@@ -2,19 +2,19 @@
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
 */
 -->
 <style>
@@ -33,14 +33,14 @@
 <form action="{formaction}" method="GET">
 <h3>Add/Remove network card</h3>
 <div id="nic_input">
-    {lxc_new_nic_input}
-    {hidden_lxc_server_id}
-    {hidden_lxc_server_name}
-    {hidden_lxc_nic_number}
-    {lxc_storage_vm_bridge}
+	{lxc_new_nic_input}
+	{hidden_lxc_server_id}
+	{hidden_lxc_server_name}
+	{hidden_lxc_nic_number}
+	{lxc_storage_vm_bridge}
 </div>
 <div id="nic_submit">
-    {submit}   {remove_nic}
+	{submit}   {remove_nic}
 </div>
 </form>
 

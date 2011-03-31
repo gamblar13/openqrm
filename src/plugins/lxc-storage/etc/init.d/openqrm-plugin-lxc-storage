@@ -32,8 +32,12 @@ export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
 export LANG=C
 # define wget to use with https
 if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
-    WGET_NO_CERT_CHECK="--no-check-certificate"
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+	WGET="wget -q --no-check-certificate"
+else
+	WGET="wget -q"
 fi
+
 LINE_IFS='
 '
 
@@ -41,15 +45,53 @@ function openqrm_plugin_lxc_storage_start() {
 	openqrm_plugin_lxc_storage_stop 1>/dev/null 2>&1
 	echo "Starting the openQRM lxc-storage-plugin"
 	touch $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/lxc-storage/.running
-    # start the vm status autostart
-    if [ -d "$OPENQRM_VM_DIR" ]; then
-        for VM_CONFIG in `find $OPENQRM_VM_DIR/* -name autostart 2>/dev/null`; do
-            VM_NAME=`dirname $VM_CONFIG`
-            VM_NAME=`basename $VM_NAME`
-            echo "- auto-starting VM $VM_NAME"
-            $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm start -n $VM_NAME
-        done
-    fi
+	# start the vm status autostart
+	if [ -d "$OPENQRM_VM_DIR" ]; then
+		for VM_CONFIG in `find $OPENQRM_VM_DIR/* -name autostart.0 2>/dev/null`; do
+			VM_NAME=`dirname $VM_CONFIG`
+			VM_NAME=`basename $VM_NAME`
+			# check if not running already
+			if ps ax | grep "lxc-start -n $VM_NAME" | grep -v grep 1>/dev/null; then
+				echo "- VM $VM_NAME is running already, not auto-starting it ..."
+				continue
+			fi
+			echo "- auto-starting VM $VM_NAME"
+			# get mac
+			VM_MAC_ADRESS=`grep lxc.network.hwaddr $OPENQRM_VM_DIR/$VM_NAME/config | cut -d'=' -f2 | awk '{ print $1 }'`
+			if [ "$VM_MAC_ADRESS" != "" ]; then
+				VM_ROOTFS=`grep lxc.rootfs $OPENQRM_VM_DIR/$VM_NAME/config | cut -d'=' -f2 | awk '{ print $1 }'`
+				VM_STATE=`basename $VM_ROOTFS`
+				if [ "$VM_STATE" == "root" ]; then
+					# here we found a VM that should be active, anyway we have to check the openQRM server
+					# get parameters
+					if ! $WGET -O $OPENQRM_VM_DIR/$VM_NAME/openqrm-resource.conf "$OPENQRM_WEB_PROTOCOL://$OPENQRM_SERVER_IP_ADDRESS/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$VM_MAC_ADRESS"; then
+						echo "- Could not get parameters for VM $VM_NAME, not auto-starting it ..."
+						continue
+					fi
+					. $OPENQRM_VM_DIR/$VM_NAME/openqrm-resource.conf
+					# is really active ?
+					if [ "$image_name" == "idle" ]; then
+						# if not deassign rootfs to idle
+						echo "- VM $VM_NAME is not active but idle, adjusting VM config"
+						sed -i -e "s#lxc.rootfs.*#lxc.rootfs = $OPENQRM_VM_DIR/$VM_NAME/idle/#g" $OPENQRM_VM_DIR/$VM_NAME/config
+					else
+						if ! grep -w $OPENQRM_VM_DIR/$VM_NAME/root /proc/mounts 1>/dev/null; then
+							echo "- VM $VM_NAME is active, mounting $image_rootdevice"
+							mount -t $image_rootfstype $image_rootdevice $OPENQRM_VM_DIR/$VM_NAME/root
+						else
+							echo "- VM $VM_NAME is active, root-device $image_rootdevice already mounted"
+						fi
+					fi
+
+				else
+					echo "- VM $VM_NAME is idle"
+				fi
+				# start lxc VM
+				echo "- Starting VM $VM_NAME now ...."
+				$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/bin/openqrm-lxc-storage-vm start -n $VM_NAME
+			fi
+		done
+	fi
 
 }
 
@@ -65,7 +107,7 @@ function openqrm_plugin_lxc_storage_uninstall() {
 	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
 		echo -n "lxc-storage: Please give a username to uninstall the plugin : "
 		read USERNAME
-		echo	
+		echo
 		echo -n "lxc-storage: Please give the password for user $USERNAME : "
 		read PASSWORD
 		echo
@@ -83,8 +125,8 @@ function openqrm_plugin_lxc_storage_uninstall() {
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/lxc-storage
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-lxc-storage.tgz
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.lxc-lvm-deployment.php
-    # remove the default initrd template + linuxrc
-    rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openqrm-initrd-lxc.tgz
+	# remove the default initrd template + linuxrc
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openqrm-initrd-lxc.tgz
 
 }
 
@@ -95,7 +137,7 @@ function openqrm_plugin_lxc_storage_init() {
 	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
 		echo -n "lxc-storage: Please give a username to init the plugin : "
 		read USERNAME
-		echo	
+		echo
 		echo -n "lxc-storage: Please give the password for user $USERNAME : "
 		read PASSWORD
 		echo
@@ -111,21 +153,21 @@ function openqrm_plugin_lxc_storage_init() {
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/boot-service-lxc-storage.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-lxc-storage.tgz
 	# linking the image deployment parameters menu
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/image.lxc-lvm-deployment.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.lxc-lvm-deployment.php
-    # create storage dir for stat files
-    mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/storage
-    chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/storage
-    # create lxc-stat dir
-    mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/lxc-stat
-    chmod -R 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/lxc-stat
-    # cp the default initrd template + linuxrc
-    /bin/cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openqrm-initrd-lxc.tgz
-    chmod 755 $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openqrm-initrd-lxc.tgz
+	# create storage dir for stat files
+	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/storage
+	chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/storage
+	# create lxc-stat dir
+	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/lxc-stat
+	chmod -R 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/lxc-storage/web/lxc-stat
+	# cp the default initrd template + linuxrc
+	/bin/cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openqrm-initrd-lxc.tgz
+	chmod 755 $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openqrm-initrd-lxc.tgz
 	# creating the table
 	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lvm_storage_command=init"; then
 		aws_log init "ERROR: Could not create the lxc-storage-plugin tables in the database!"
 		return 1
 	fi
-	
+
 }
 
 USER=$2
