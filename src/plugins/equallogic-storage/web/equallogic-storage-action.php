@@ -2,19 +2,19 @@
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 
 
@@ -75,7 +75,7 @@ $event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 5, "equallo
 			$db=openqrm_get_db_connection();
 			$recordSet = &$db->Execute($create_equallogic_storage_config);
 			$event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 5, "equallogic-storage-action", "Initialyzed Equallogic-storage Server table", "", "", 0, 0, 0);
-		    $db->Close();
+			$db->Close();
 			break;
 
 		case 'uninstall':
@@ -83,7 +83,7 @@ $event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 5, "equallo
 			$db=openqrm_get_db_connection();
 			$recordSet = &$db->Execute($drop_equallogic_storage_config);
 			$event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 5, "equallogic-storage-action", "Uninstalled Equallogic-storage Server table", "", "", 0, 0, 0);
-		    $db->Close();
+			$db->Close();
 			break;
 
 		case 'get_ident':
@@ -93,27 +93,27 @@ $event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 5, "equallo
 			break;
 
 		case 'clone_finished':
-            if (!file_exists($StorageDir)) {
-                mkdir($StorageDir);
-            }
-            $filename = $StorageDir."/".basename($_POST['filename']);
-            $filedata = base64_decode($_POST['filedata']);
-            echo "<h1>$filename</h1>";
-            $fout = fopen($filename,"wb");
-            fwrite($fout, $filedata);
-            fclose($fout);
-            $event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 3, "equallogic-storage-action", "filename $filename, filedata $filedata", "", "", 0, 0, 0);
-            break;
+			if (!file_exists($StorageDir)) {
+				mkdir($StorageDir);
+			}
+			$filename = $StorageDir."/".basename($_POST['filename']);
+			$filedata = base64_decode($_POST['filedata']);
+			echo "<h1>$filename</h1>";
+			$fout = fopen($filename,"wb");
+			fwrite($fout, $filedata);
+			fclose($fout);
+			$event->log("$equallogic_storage_command", $_SERVER['REQUEST_TIME'], 3, "equallogic-storage-action", "filename $filename, filedata $filedata", "", "", 0, 0, 0);
+			break;
 
-        case 'auth_finished':
-            // remove storage-auth-blocker if existing
-            $authblocker = new authblocker();
-            $authblocker->get_instance_by_image_name($equallogic_storage_image_name);
-            if (strlen($authblocker->id)) {
-                $event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "equallogic-storage-action", "Removing authblocker for image $equallogic_storage_image_name", "", "", 0, 0, 0);
-                $authblocker->remove($authblocker->id);
-            }
-            break;
+		case 'auth_finished':
+			// remove storage-auth-blocker if existing
+			$authblocker = new authblocker();
+			$authblocker->get_instance_by_image_name($equallogic_storage_image_name);
+			if (strlen($authblocker->id)) {
+				$event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "equallogic-storage-action", "Removing authblocker for image $equallogic_storage_image_name", "", "", 0, 0, 0);
+				$authblocker->remove($authblocker->id);
+			}
+			break;
 
 
 		default:
