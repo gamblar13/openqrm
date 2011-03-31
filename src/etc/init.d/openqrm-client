@@ -6,7 +6,7 @@
 
 # support for LSB init scripts
 ### BEGIN INIT INFO
-# Provides:
+# Provides: openqrm-client
 # Required-Start: $all
 # Required-Stop: $all
 # Default-Start:  2 3 4 5
@@ -52,9 +52,9 @@ MAX_START_RETRY=120
 
 # define wget to use with https
 if [ "$openqrm_web_protocol" == "https" ]; then
-    WGET="wget -q --no-check-certificate"
+	WGET="wget -q --no-check-certificate"
 else
-    WGET="wget -q"
+	WGET="wget -q"
 fi
 
 # gets/starts/stops enabled boot-services for the resources
@@ -62,7 +62,7 @@ function openqrm_boot_service() {
 	local BOOT_SERVICE=$1
 	local BOOT_SERVICE_CMD=$2
 	local CURRENT=`pwd`
-	
+
 	# get + install the package during start
 	if [ "$BOOT_SERVICE_CMD" == "start" ]; then
 		echo "Getting boot-service package $BOOT_SERVICE"
@@ -73,7 +73,7 @@ function openqrm_boot_service() {
 			return 1
 		fi
 		tar -xzf boot-service-$BOOT_SERVICE.tgz
-		rm -f boot-service-$BOOT_SERVICE.tgz	
+		rm -f boot-service-$BOOT_SERVICE.tgz
 	fi
 	# run the boot-service cmd
 	BOOT_SERVICE_INIT="$resource_basedir/openqrm/plugins/$BOOT_SERVICE/etc/init.d/$BOOT_SERVICE"
@@ -91,29 +91,29 @@ function openqrm_boot_service() {
 function openqrm_client_start() {
 	echo "Starting openQRM-client"
 	openqrm_client_stop 1>/dev/null 2>&1
-    START_RETRY=0
+	START_RETRY=0
 	# checks
 	umount /initrd/lib/modules 1>/dev/null 2>&1
 	umount /initrd/boot 1>/dev/null 2>&1
 	umount /initrd/ 1>/dev/null 2>&1
 	grep -q "/initrd" /proc/mounts && umount /initrd
-    chmod 666 /dev/null
-    if [ ! -e /dev/tty ]; then
-        cd /dev
-        mknod tty c 5 0
-        cd
-    fi
-    # if not in the initrd try to refresh the resource parameters
-    if [ ! -f /etc/initrd-devices.conf ]; then
-        /bin/cp -f /var/openqrm/openqrm-resource.conf /var/openqrm/openqrm-resource.conf.last
-        if ! $WGET -q -t 1 -T 4 -O /var/openqrm/openqrm-resource.conf "$openqrm_web_protocol://$resource_openqrmserver/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$resource_mac"; then
-            # restore
-            /bin/cp -f /var/openqrm/openqrm-resource.conf.last /var/openqrm/openqrm-resource.conf
-            echo "NOTICE: Could not refresh resource-parameters. Using previous one."
-        else
-            . /var/openqrm/openqrm-resource.conf
-        fi
-    fi
+	chmod 666 /dev/null
+	if [ ! -e /dev/tty ]; then
+		cd /dev
+		mknod tty c 5 0
+		cd
+	fi
+	# if not in the initrd try to refresh the resource parameters
+	if [ ! -f /etc/initrd-devices.conf ]; then
+		/bin/cp -f /var/openqrm/openqrm-resource.conf /var/openqrm/openqrm-resource.conf.last
+		if ! $WGET -q -t 1 -T 4 -O /var/openqrm/openqrm-resource.conf "$openqrm_web_protocol://$resource_openqrmserver/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$resource_mac"; then
+			# restore
+			/bin/cp -f /var/openqrm/openqrm-resource.conf.last /var/openqrm/openqrm-resource.conf
+			echo "NOTICE: Could not refresh resource-parameters. Using previous one."
+		else
+			. /var/openqrm/openqrm-resource.conf
+		fi
+	fi
 
 	case "$openqrm_execution_layer" in
 		dropbear)
@@ -122,18 +122,18 @@ function openqrm_client_start() {
 			mkdir -p $resource_basedir/openqrm/etc/dropbear/
 			$resource_basedir/openqrm/bin/dropbearkey -t rsa -f $resource_basedir/openqrm/etc/dropbear/dropbear_rsa_host_key
 			# get the public key of the openQRM server
-            while (true); do
-                if ! $WGET $openqrm_web_protocol://$resource_openqrmserver/openqrm/boot-service/openqrm-server-public-rsa-key; then
-                    if [ "$START_RETRY" == "$MAX_START_RETRY" ]; then
-                        echo "ERROR: Could not get the public key of the openQRM-server at $resource_openqrmserver ! Please check the certificates !"
-                        return 1
-                    fi
-                    START_RETRY=$(( START_RETRY + 1 ))
-                    sleep 1
-                else
-                    break
-                fi
-            done
+			while (true); do
+				if ! $WGET $openqrm_web_protocol://$resource_openqrmserver/openqrm/boot-service/openqrm-server-public-rsa-key; then
+					if [ "$START_RETRY" == "$MAX_START_RETRY" ]; then
+						echo "ERROR: Could not get the public key of the openQRM-server at $resource_openqrmserver ! Please check the certificates !"
+						return 1
+					fi
+					START_RETRY=$(( START_RETRY + 1 ))
+					sleep 1
+				else
+					break
+				fi
+			done
 			if [ ! -d /root/.ssh ]; then
 				mkdir -p /root/.ssh
 				chmod 700 /root/.ssh
@@ -156,7 +156,7 @@ function openqrm_client_start() {
 				FORCE_INSTALL=true openqrm_install_os_dependency dropbear
 				# on debian and ubuntu, lets make sure it is not started as a service due to our install
 				if test -e /etc/default/dropbear; then
-					if grep '^NO_START=0' /etc/default/dropbear 1>/dev/null|| ! grep 'NO_START' /etc/default/dropbear 1>/dev/null; then 
+					if grep '^NO_START=0' /etc/default/dropbear 1>/dev/null|| ! grep 'NO_START' /etc/default/dropbear 1>/dev/null; then
 						# looks like it has been set to start by default; let's revert that
 						/etc/init.d/dropbear stop
 						sed -i -e "s/^NO_START=0/NO_START=1/g" /etc/default/dropbear
@@ -185,18 +185,22 @@ function openqrm_client_start() {
 	esac
 
 	if [ ! -f /etc/initrd-devices.conf ]; then
-        # upate package manager, the boot-services may want to install additional os-deps
-        openqrm_update_package_manager
+		# upate package manager, the boot-services may want to install additional os-deps
+		openqrm_update_package_manager
 		# start boot-services from enabled plugins
 		for boot_service in $openqrm_boot_services; do
 			openqrm_boot_service $boot_service start
 		done
 	fi
 	# start openqrm-monitord
-    if [ ! -d /tmp ]; then mkdir -p /tmp; fi
-    nohup $resource_basedir/openqrm/sbin/openqrm-monitord 1>/tmp/openqrm-monitord.out 2>&1 &
-    rm -f /tmp/openqrm-monitord.out
+	if [ ! -d /tmp ]; then mkdir -p /tmp; fi
+	nohup $resource_basedir/openqrm/sbin/openqrm-monitord 1>/tmp/openqrm-monitord.out 2>&1 &
+	rm -f /tmp/openqrm-monitord.out
 	openqrm_post_event $resource_id "openqrm-client" 5 openqrm_client_start "Resource $resource_id fully started"
+	# allow to overwrite the resource-configuration e.g. for cluster-resources
+	if [ -f /var/openqrm/openqrm-resource.conf.static ]; then
+		cat /var/openqrm/openqrm-resource.conf.static >> /var/openqrm/openqrm-resource.conf
+	fi
 	touch ${LOCKFILE}
 }
 

@@ -43,7 +43,8 @@ create table kernel_info(
 	kernel_id INTEGER NOT NULL PRIMARY KEY,
 	kernel_name VARCHAR2(50),
 	kernel_version VARCHAR2(50),
-	kernel_capabilities VARCHAR2(255)
+	kernel_capabilities VARCHAR2(255),
+	kernel_comment VARCHAR2(255)
 );
 
 
@@ -121,7 +122,8 @@ create table user_info(
 	user_last_update_time VARCHAR2(50),
 	user_description VARCHAR2(255),
 	user_capabilities VARCHAR2(255),
-	user_state VARCHAR2(20)
+	user_state VARCHAR2(20),
+	user_lang VARCHAR2(5)
 );
 
 

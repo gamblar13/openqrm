@@ -45,6 +45,7 @@ create table kernel_info(				\
 	kernel_name varchar(50),			\
 	kernel_version varchar(50),			\
 	kernel_capabilities varchar(255),		\
+	kernel_comment varchar(255),		\
 	primary key(kernel_id)				\
 )
 
@@ -129,6 +130,7 @@ create table user_info(					\
 	user_description varchar(255),			\
 	user_capabilities varchar(255),			\
 	user_state varchar(20),				\
+	user_lang varchar(5),				\
 	primary key(user_id)				\
 )
 

@@ -222,6 +222,12 @@ function run_sql(){
 function db_update()  {
 
     # this function applies needed updates to the db-shema if needed in an idempotent way
+	if [ -f "$OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/etc/openqrm-server.conf" ]; then
+		# for update we have to source the old configuration
+		. $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/etc/openqrm-server.conf
+	else
+		. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	fi
 
     # from 4.6 to 4.7 the following db changes are needed
     # 1  > ALTER TABLE cloud_users ADD cu_cg_id int(5);
@@ -253,6 +259,9 @@ function db_update()  {
 
     #---------------------------------------------------------------------------
     # from 4.7 to 4.8 the following db changes are needed
+    # 1  > ALTER TABLE kernel_info ADD kernel_comment VARCHAR(255);
+	# 2  > ALTER TABLE user_info ADD user_lang VARCHAR(5);
+
     #---------------------------------------------------------------------------
     # from 4.8 to 4.9 the following db changes are needed
     #---------------------------------------------------------------------------
@@ -412,6 +421,21 @@ function db_update()  {
 
 
     echo "- Database sanity check for version 4.6 to 4.7 finished"
+
+    # 1  > ALTER TABLE kernel_info ADD kernel_comment VARCHAR(255);
+	if ! check_column_in_table_exists kernel_info kernel_comment; then
+		echo " -- db change : ALTER TABLE kernel_info ADD kernel_comment VARCHAR(255)"
+		run_sql "ALTER TABLE kernel_info ADD kernel_comment VARCHAR(255);"
+	fi
+    # 2 > ALTER TABLE user_info ADD user_lang VARCHAR(5);
+    if check_table_exists user_info; then
+        if ! check_column_in_table_exists user_info user_lang; then
+            echo " -- db change : ALTER TABLE user_info ADD user_lang VARCHAR(5);"
+            run_sql "ALTER TABLE user_info ADD user_lang VARCHAR(5);"
+        fi
+    fi
+    echo "- Database sanity check for version 4.7 to 4.8 finished"
+
 
 
 }
