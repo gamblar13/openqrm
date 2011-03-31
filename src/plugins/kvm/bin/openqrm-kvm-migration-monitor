@@ -1,0 +1,47 @@
+#!/usr/bin/expect -f
+# this is an expect script to automatically run commands on a netapp-filer
+#
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+#
+
+if {[llength $argv]<1} {
+		send_user "usage: $argv0 <vm-monitor-port>\n"
+		exit
+}
+
+set MONITOR_PORT [lindex $argv 0]
+
+send_user "Monitoring migration on port $MONITOR_PORT\n"
+
+set force_conservative 0  ;# set to 1 to force conservative mode even if
+			  ;# script wasn't run conservatively originally
+if {$force_conservative} {
+	set send_slow {1 .1}
+	proc send {ignore arg} {
+		sleep .1
+		exp_send -s -- $arg
+	}
+}
+
+set timeout -1
+spawn telnet localhost $MONITOR_PORT
+match_max 100000
+expect "(qemu)"
+send -- "info migrate\r"
+expect "(qemu)"
+exit

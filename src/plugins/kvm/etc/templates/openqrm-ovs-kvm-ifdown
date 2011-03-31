@@ -1,5 +1,5 @@
-# Below the download locations for third-party components are defined
-# kvm-nic-bios provides 2 network-card pxe bios for booting kvm vms via pxe
+#!/bin/bash
+# this is the boot-service init script for the Kvm-server hosts
 #
 # This file is part of openQRM.
 #
@@ -17,6 +17,11 @@
 #
 # Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 #
-OPENQRM_SOURCE_VERSION="1.1"
-OPENQRM_SOURCE_DOWNLOAD="http://openqrm-support.de/openqrm-build/4.8/plugins/kvm/kvm-nic-bios-$OPENQRM_SOURCE_VERSION.tgz"
-OPENQRM_SOURCE_BINARY_RESULT=""
+
+export OPENQRM_SERVER_BASE_DIR=@@OPENQRM_SERVER_BASE_DIR@@
+export OPENVSWITCH=@@OPENQRM_PLUGIN_KVM_BRIDGE@@
+
+# remove the tap dev
+/sbin/ifconfig $1 0.0.0.0 down
+ovs-vsctl del-port ${OPENVSWITCH} $1
+

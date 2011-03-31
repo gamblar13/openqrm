@@ -17,6 +17,12 @@
 # Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 #
 
+KVM_MIGRATION_PORT=$1
+if [ "$KVM_MIGRATION_PORT" == "" ]; then
+	echo "Usage : $0 <migration-port>"
+	exit 1
+fi
+
 KVM=`which kvm`
 if [ "$KVM" == "" ]; then
 	KVM=`which qemu-kvm`
@@ -62,7 +68,5 @@ KVM_VM_DISK="$KVM_VM_DISK_1 $KVM_VM_DISK_2 $KVM_VM_DISK_3 $KVM_VM_DISK_4"
 KVM_VM_NET="$KVM_VM_NET_1 $KVM_VM_NET_2 $KVM_VM_NET_3 $KVM_VM_NET_4 $KVM_VM_NET_5"
 
 echo "KVM vm $VM_NAME starting up ..." | logger
-$RUNSCREEN -dmS $KVM_VM_MAC_1 $KVM $KVM_VM_DISK -m $KVM_VM_RAM -smp $KVM_VM_CPUS $KVM_VM_BOOT $KVM_VM_NET -vnc $KVM_VM_VNC -balloon virtio -monitor unix:/var/run/openqrm/kvm/kvm.$VM_NAME.mon,server,nowait
-
-
+$RUNSCREEN -dmS $KVM_VM_MAC_1 $KVM $KVM_VM_DISK -m $KVM_VM_RAM -smp $KVM_VM_CPUS $KVM_VM_BOOT $KVM_VM_NET -vnc $KVM_VM_VNC -balloon virtio -monitor unix:/var/run/openqrm/kvm/kvm.$VM_NAME.mon,server,nowait -incoming tcp:0:$KVM_MIGRATION_PORT
 

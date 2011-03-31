@@ -2,19 +2,19 @@
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 -->
 <style>
@@ -74,6 +74,19 @@ Use the 'VM Manager' in the Kvm-plugin menu to create a new Kvm-server virtual-m
  The created Kvm-server vm is then booting into openQRM as regular resources
 </li>
 </ul>
+<br>
+<br>
+
+<b>Requirements for VM live-migration:</b>
+<br>
+<ul>
+<li>
+Shared storage between the KVM Hosts for the location of the VM config/swap files (/var/lib/kvm/openqrm)
+</li>
+</ul>
+<br>
+<br>
+<hr>
 <br>
 
 </div>
