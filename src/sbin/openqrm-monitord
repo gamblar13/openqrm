@@ -32,19 +32,19 @@ if [ -f "$OPENQRM_BASE_DIR/include/openqrm-server-functions" ]; then
 	export resource_id=0
 	export resource_senddelay=10
 	export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
-    export SERVER_PROTOCOL=$OPENQRM_WEB_PROTOCOL
+	export SERVER_PROTOCOL=$OPENQRM_WEB_PROTOCOL
 else
 	# we are running on a managed resource
 	export OPENQRM_SERVER_BASE_DIR=$OPENQRM_BASE_DIR
 	. $OPENQRM_BASE_DIR/include/openqrm-functions
 	. $OPENQRM_RESOURCE_PARAMETER_FILE
-    export SERVER_PROTOCOL=$openqrm_web_protocol
+	export SERVER_PROTOCOL=$openqrm_web_protocol
 fi
 # define wget to use with https
 if [ "$SERVER_PROTOCOL" == "https" ]; then
-    WGET="wget --no-check-certificate -q -O /dev/null"
+	WGET="wget --no-check-certificate -q -O /dev/null"
 else
-    export WGET="wget -q -O /dev/null"
+	export WGET="wget -q -O /dev/null"
 fi
 
 
@@ -65,7 +65,7 @@ function send_info() {
 
 # converts bytes to mega-bytes
 function bytes_to_mega() {
-        echo $1 | awk '{printf("%.0f",  $1 /  1024/ 1024)}'
+	echo $1 | awk '{printf("%.0f",  $1 /  1024/ 1024)}'
 }
 
 
@@ -119,7 +119,7 @@ function find_cpu_model() {
 
 # how many nics we have
 function find_nics() {
-    current_nic_count=`ifconfig -a | grep ^eth | awk {' print $5 '} | uniq | wc -l`
+	current_nic_count=`ifconfig -a | grep ^eth | awk {' print $5 '} | uniq | wc -l`
 	if [ -z "$current_nic_count" ]; then
 		current_nic_count=0
 	fi

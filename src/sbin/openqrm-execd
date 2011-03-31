@@ -51,7 +51,7 @@ while (true); do
 		echo "$0: Received openQRM-command from $SENDER_IP_ADDRESS" | logger
 		echo "    Running $OPENQRM_COMMAND" | logger
 		if [ "$SENDER_IP_ADDRESS" != "" ] && [ "$OPENQRM_COMMAND" != "" ]; then
-			if `openqrm_validate_execution`; then 
+			if `openqrm_validate_execution`; then
 				case "$1" in
 					reboot)
 						// make sure openqrm-monitord does not send active again
