@@ -2,19 +2,19 @@
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 
 
@@ -56,48 +56,48 @@ function create_clone_nfs_deployment($cloud_image_id, $image_clone_name, $disk_s
 	global $event;
 	$event->log("create_clone", $_SERVER['REQUEST_TIME'], 5, "nfs-deployment-cloud-hook", "Creating clone of image on storage", "", "", 0, 0, 0);
 
-    // we got the cloudimage id here, get the image out of it
-    $cloudimage = new cloudimage();
-    $cloudimage->get_instance_by_id($cloud_image_id);
-    // get image, this is already the new logical clone
-    // we just need to physical snapshot it and update the rootdevice
-    $image = new image();
-    $image->get_instance_by_id($cloudimage->image_id);
-    $image_id = $image->id;
-    $image_name = $image->name;
-    $image_type = $image->type;
-    $image_version = $image->version;
-    $image_rootdevice = $image->rootdevice;
-    $image_rootfstype = $image->rootfstype;
-    $image_storageid = $image->storageid;
-    $image_isshared = $image->isshared;
-    $image_comment = $image->comment;
-    $image_capabilities = $image->capabilities;
-    $image_deployment_parameter = $image->deployment_parameter;
+	// we got the cloudimage id here, get the image out of it
+	$cloudimage = new cloudimage();
+	$cloudimage->get_instance_by_id($cloud_image_id);
+	// get image, this is already the new logical clone
+	// we just need to physical snapshot it and update the rootdevice
+	$image = new image();
+	$image->get_instance_by_id($cloudimage->image_id);
+	$image_id = $image->id;
+	$image_name = $image->name;
+	$image_type = $image->type;
+	$image_version = $image->version;
+	$image_rootdevice = $image->rootdevice;
+	$image_rootfstype = $image->rootfstype;
+	$image_storageid = $image->storageid;
+	$image_isshared = $image->isshared;
+	$image_comment = $image->comment;
+	$image_capabilities = $image->capabilities;
+	$image_deployment_parameter = $image->deployment_parameter;
 
-    // get image storage
-    $storage = new storage();
-    $storage->get_instance_by_id($image_storageid);
-    $storage_resource_id = $storage->resource_id;
-    // get storage resource
-    $resource = new resource();
-    $resource->get_instance_by_id($storage_resource_id);
-    $resource_id = $resource->id;
-    $resource_ip = $resource->ip;
-    // nfs-storage
-    $export_dir=dirname($image_rootdevice);
-    $image_location_name=basename($image_rootdevice);
-    // update the image rootdevice parameter
-    $image->get_instance_by_id($image_id);
-    $ar_image_update = array(
-        'image_rootdevice' => "$export_dir/$image_clone_name",
-    );
-    $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "nfs-deployment-cloud-hook", "Updating rootdevice of image $image_id / $image_name with $export_dir/$image_clone_name", "", "", 0, 0, 0);
-    $image->update($image_id, $ar_image_update);
-    // send command
-    $image_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/nfs-storage/bin/openqrm-nfs-storage snap -n $image_location_name -s $image_clone_name";
-    $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "nfs-deployment-cloud-hook", "Running : $image_clone_cmd", "", "", 0, 0, 0);
-    $resource->send_command($resource_ip, $image_clone_cmd);
+	// get image storage
+	$storage = new storage();
+	$storage->get_instance_by_id($image_storageid);
+	$storage_resource_id = $storage->resource_id;
+	// get storage resource
+	$resource = new resource();
+	$resource->get_instance_by_id($storage_resource_id);
+	$resource_id = $resource->id;
+	$resource_ip = $resource->ip;
+	// nfs-storage
+	$export_dir=dirname($image_rootdevice);
+	$image_location_name=basename($image_rootdevice);
+	// update the image rootdevice parameter
+	$image->get_instance_by_id($image_id);
+	$ar_image_update = array(
+		'image_rootdevice' => "$export_dir/$image_clone_name",
+	);
+	$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "nfs-deployment-cloud-hook", "Updating rootdevice of image $image_id / $image_name with $export_dir/$image_clone_name", "", "", 0, 0, 0);
+	$image->update($image_id, $ar_image_update);
+	// send command
+	$image_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/nfs-storage/bin/openqrm-nfs-storage snap -n $image_location_name -s $image_clone_name";
+	$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "nfs-deployment-cloud-hook", "Running : $image_clone_cmd", "", "", 0, 0, 0);
+	$resource->send_command($resource_ip, $image_clone_cmd);
 }
 
 
@@ -111,37 +111,37 @@ function remove_nfs_deployment($cloud_image_id) {
 	global $event;
 	$event->log("remove_nfs_deployment", $_SERVER['REQUEST_TIME'], 5, "nfs-deployment-cloud-hook", "Removing image on storage", "", "", 0, 0, 0);
 
-    $cloudimage = new cloudimage();
-    $cloudimage->get_instance_by_id($cloud_image_id);
-    // get image
-    $image = new image();
-    $image->get_instance_by_id($cloudimage->image_id);
-    $image_id = $image->id;
-    $image_name = $image->name;
-    $image_type = $image->type;
-    $image_version = $image->version;
-    $image_rootdevice = $image->rootdevice;
-    $image_rootfstype = $image->rootfstype;
-    $image_storageid = $image->storageid;
-    $image_isshared = $image->isshared;
-    $image_comment = $image->comment;
-    $image_capabilities = $image->capabilities;
-    $image_deployment_parameter = $image->deployment_parameter;
+	$cloudimage = new cloudimage();
+	$cloudimage->get_instance_by_id($cloud_image_id);
+	// get image
+	$image = new image();
+	$image->get_instance_by_id($cloudimage->image_id);
+	$image_id = $image->id;
+	$image_name = $image->name;
+	$image_type = $image->type;
+	$image_version = $image->version;
+	$image_rootdevice = $image->rootdevice;
+	$image_rootfstype = $image->rootfstype;
+	$image_storageid = $image->storageid;
+	$image_isshared = $image->isshared;
+	$image_comment = $image->comment;
+	$image_capabilities = $image->capabilities;
+	$image_deployment_parameter = $image->deployment_parameter;
 
-    // get image storage
-    $storage = new storage();
-    $storage->get_instance_by_id($image_storageid);
-    $storage_resource_id = $storage->resource_id;
-    // get storage resource
-    $resource = new resource();
-    $resource->get_instance_by_id($storage_resource_id);
-    $resource_id = $resource->id;
-    $resource_ip = $resource->ip;
-    // nfs-storage
-    $image_location_name=basename($image_rootdevice);
-    $image_remove_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/nfs-storage/bin/openqrm-nfs-storage remove -n $image_location_name";
-    $event->log("remove_nfs_deployment", $_SERVER['REQUEST_TIME'], 5, "nfs-deployment-cloud-hook", "Running : $image_remove_clone_cmd", "", "", 0, 0, 0);
-    $resource->send_command($resource_ip, $image_remove_clone_cmd);
+	// get image storage
+	$storage = new storage();
+	$storage->get_instance_by_id($image_storageid);
+	$storage_resource_id = $storage->resource_id;
+	// get storage resource
+	$resource = new resource();
+	$resource->get_instance_by_id($storage_resource_id);
+	$resource_id = $resource->id;
+	$resource_ip = $resource->ip;
+	// nfs-storage
+	$image_location_name=basename($image_rootdevice);
+	$image_remove_clone_cmd="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/nfs-storage/bin/openqrm-nfs-storage remove -n $image_location_name";
+	$event->log("remove_nfs_deployment", $_SERVER['REQUEST_TIME'], 5, "nfs-deployment-cloud-hook", "Running : $image_remove_clone_cmd", "", "", 0, 0, 0);
+	$resource->send_command($resource_ip, $image_remove_clone_cmd);
 }
 
 
