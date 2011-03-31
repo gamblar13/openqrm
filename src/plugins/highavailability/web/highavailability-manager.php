@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
 	<title>HA Manager</title>
-    <link rel="stylesheet" type="text/css" href="../../css/htmlobject.css" />
-    <link rel="stylesheet" type="text/css" href="resource.css" />
-    <link type="text/css" href="/openqrm/base/js/jquery/development-bundle/themes/smoothness/ui.all.css" rel="stylesheet" />
-    <script type="text/javascript" src="/openqrm/base/js/jquery/js/jquery-1.3.2.min.js"></script>
-    <script type="text/javascript" src="/openqrm/base/js/jquery/js/jquery-ui-1.7.1.custom.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="../../css/htmlobject.css" />
+	<link rel="stylesheet" type="text/css" href="highavailability.css" />
+	<link type="text/css" href="/openqrm/base/js/jquery/development-bundle/themes/smoothness/ui.all.css" rel="stylesheet" />
+	<script type="text/javascript" src="/openqrm/base/js/jquery/js/jquery-1.3.2.min.js"></script>
+	<script type="text/javascript" src="/openqrm/base/js/jquery/js/jquery-ui-1.7.1.custom.min.js"></script>
 <style type="text/css">
 .ui-progressbar-value {
-    background-image: url(/openqrm/base/img/progress.gif);
+	background-image: url(/openqrm/base/img/progress.gif);
 }
 #progressbar {
-    position: absolute;
-    left: 150px;
-    top: 250px;
-    width: 400px;
-    height: 20px;
+	position: absolute;
+	left: 150px;
+	top: 250px;
+	width: 400px;
+	height: 20px;
 }
 </style>
 </head>
@@ -29,19 +29,19 @@
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 
 
@@ -70,67 +70,67 @@ function redirect($strMsg, $currenttab = 'tab0', $url = '') {
 
 function show_progressbar() {
 ?>
-    <script type="text/javascript">
-        $("#progressbar").progressbar({
+	<script type="text/javascript">
+		$("#progressbar").progressbar({
 			value: 100
 		});
-        var options = {};
-        $("#progressbar").effect("shake",options,2000,null);
+		var options = {};
+		$("#progressbar").effect("shake",options,2000,null);
 	</script>
 <?php
-        flush();
+		flush();
 }
 
 
 if(htmlobject_request('action') != '' && $OPENQRM_USER->role == "administrator") {
-    $strMsg = '';
+	$strMsg = '';
 	if(isset($_REQUEST['identifier'])) {
 		switch (htmlobject_request('action')) {
 			case 'set':
-                show_progressbar();
+				show_progressbar();
 				foreach($_REQUEST['identifier'] as $id) {
 					if($id != 0) {
 						$resource = new resource();
 						$resource->get_instance_by_id($id);
-                        $custom_hat_arr = htmlobject_request("resource_custom_hat");
-                        $custom_hat = $custom_hat_arr[$id];
-                        $strMsg .= "Set custom timeout $custom_hat for resource $id <br>";
-                        $resource->set_resource_capabilities("HAT", $custom_hat);
+						$custom_hat_arr = htmlobject_request("resource_custom_hat");
+						$custom_hat = $custom_hat_arr[$id];
+						$strMsg .= "Set custom timeout $custom_hat for resource $id <br>";
+						$resource->set_resource_capabilities("HAT", $custom_hat);
 					}
 				}
-                sleep(1);
+				sleep(1);
 				redirect($strMsg, "tab1");
 				break;
 
 
 			case 'enable':
-                show_progressbar();
+				show_progressbar();
 				foreach($_REQUEST['identifier'] as $id) {
 					if($id != 0) {
-                        $appliance = new appliance();
-                        $appliance->get_instance_by_id($id);
-                        $appliance_fields = array();
-                        $appliance_fields["appliance_highavailable"]=1;
-                        $appliance->update($id, $appliance_fields);
-                        $strMsg .= "Enabled Highavailability for appliance $id <br>";
-                    }
+						$appliance = new appliance();
+						$appliance->get_instance_by_id($id);
+						$appliance_fields = array();
+						$appliance_fields["appliance_highavailable"]=1;
+						$appliance->update($id, $appliance_fields);
+						$strMsg .= "Enabled Highavailability for appliance $id <br>";
+					}
 				}
-                sleep(1);
+				sleep(1);
 				redirect($strMsg, "tab0");
 				break;
 
 			case 'disable':
 				foreach($_REQUEST['identifier'] as $id) {
 					if($id != 0) {
-                        $appliance = new appliance();
-                        $appliance->get_instance_by_id($id);
-                        $appliance_fields = array();
-                        $appliance_fields["appliance_highavailable"]=0;
-                        $appliance->update($id, $appliance_fields);
-                        $strMsg .= "Disabled Highavailability for appliance $id <br>";
-                    }
-                }
-                sleep(1);
+						$appliance = new appliance();
+						$appliance->get_instance_by_id($id);
+						$appliance_fields = array();
+						$appliance_fields["appliance_highavailable"]=0;
+						$appliance->update($id, $appliance_fields);
+						$strMsg .= "Disabled Highavailability for appliance $id <br>";
+					}
+				}
+				sleep(1);
 				redirect($strMsg, "tab0");
 				break;
 
@@ -148,7 +148,7 @@ function ha_appliance_display() {
 	global $thisfile;
 
 	$appliance_tmp = new appliance();
-    $table = new htmlobject_table_builder('appliance_id', '', '', '', 'select');
+	$table = new htmlobject_table_builder('appliance_id', '', '', '', 'select');
 
 	$arHead = array();
 	$arHead['appliance_state'] = array();
@@ -191,10 +191,10 @@ function ha_appliance_display() {
 		$appliance->get_instance_by_id($appliance_db["appliance_id"]);
 		$resource = new resource();
 		$appliance_resources=$appliance_db["appliance_resources"];
-        // do not show appliances with the openQRM server itself as the resource
-        if ($appliance_resources == 0) {
-            continue;
-        }
+		// do not show appliances with the openQRM server itself as the resource
+		if ($appliance_resources == 0) {
+			continue;
+		}
 
 		if ($appliance_resources >=0) {
 			// an appliance with a pre-selected resource
@@ -258,12 +258,12 @@ function ha_appliance_display() {
 		$table->identifier = 'appliance_id';
 	}
 	$table->max = $appliance_tmp->get_count();
-    // set template
+	// set template
 	$t = new Template_PHPLIB();
 	$t->debug = false;
 	$t->setFile('tplfile', './tpl/' . 'highavailability-select.tpl.php');
 	$t->setVar(array(
-        'ha_table' => $table->get_string(),
+		'ha_table' => $table->get_string(),
 	));
 	$disp =  $t->parse('out', 'tplfile');
 	return $disp;
@@ -314,6 +314,7 @@ function ha_resource_config() {
 
 	$arBody = array();
 	$resource_array = $resource_tmp->display_overview($table->offset, $table->limit, $table->sort, $table->order);
+	array_shift($resource_array);
 
 	foreach ($resource_array as $index => $resource_db) {
 		// prepare the values for the array
@@ -329,33 +330,33 @@ function ha_resource_config() {
 		if ($resource->id == 0) {
 			$resource_icon_default="/openqrm/base/img/logo.png";
 			$resource_type = "openQRM";
-            $resource_mac = "x:x:x:x:x:x";
-            $custom_hat_input = "";
+			$resource_mac = "x:x:x:x:x:x";
+			$custom_hat_input = "";
 		} else {
-            $resource_mac = $resource_db["resource_mac"];
+			$resource_mac = $resource_db["resource_mac"];
 			$resource_icon_default="/openqrm/base/img/resource.png";
 			// the resource_type
 			if ((strlen($resource->vtype)) && (!strstr($resource->vtype, "NULL"))){
 				// find out what should be preselected
-            	$virtualization = new virtualization();
+				$virtualization = new virtualization();
 				$virtualization->get_instance_by_id($resource->vtype);
-                if ($resource->id == $resource->vhostid) {
-                    // physical system
-    				$resource_type = "<nobr>".$virtualization->name."</nobr>";
-                } else {
-                    // vm
-    				$resource_type = "<nobr>".$virtualization->name." on Res. ".$resource->vhostid."</nobr>";
-                }
+				if ($resource->id == $resource->vhostid) {
+					// physical system
+					$resource_type = "<nobr>".$virtualization->name."</nobr>";
+				} else {
+					// vm
+					$resource_type = "<nobr>".$virtualization->name." on Res. ".$resource->vhostid."</nobr>";
+				}
 			} else {
 				$resource_type = "Unknown";
 			}
 
-            // preset ha timeout
-            $custom_hat = $resource->get_resource_capabilities("HAT");
-            if (!strlen($custom_hat)) {
-                $custom_hat = 240;
-            }
-            $custom_hat_input = "<input type=text size=5 name=resource_custom_hat[$res_id] value=$custom_hat>";
+			// preset ha timeout
+			$custom_hat = $resource->get_resource_capabilities("HAT");
+			if (!strlen($custom_hat)) {
+				$custom_hat = 240;
+			}
+			$custom_hat_input = "<input type=text size=5 name=resource_custom_hat[$res_id] value=$custom_hat>";
 
 		}
 		$state_icon="/openqrm/base/img/$resource->state.png";
@@ -396,7 +397,7 @@ function ha_resource_config() {
 		$table->identifier_disabled = array(0);
 	}
 	$table->max = $resource_tmp->get_count('all') + 1; // adding openqrmserver
-    $table->add_headrow("<input type=\"hidden\" name=\"currenttab\" value=\"tab1\">");
+	$table->add_headrow("<input type=\"hidden\" name=\"currenttab\" value=\"tab1\">");
 
   // set template
 	$t = new Template_PHPLIB();
@@ -422,7 +423,7 @@ $output[] = array('label' => 'HA-Configuration', 'value' => ha_resource_config()
 
 ?>
 <script type="text/javascript">
-    $("#progressbar").remove();
+	$("#progressbar").remove();
 </script>
 <?php
 
