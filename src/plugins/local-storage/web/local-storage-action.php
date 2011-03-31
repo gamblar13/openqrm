@@ -17,19 +17,19 @@ $source_tab=$_REQUEST["source_tab"];
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 */
 
 
@@ -78,67 +78,70 @@ foreach ($_REQUEST as $key => $value) {
 
 unset($local_storage_fields["local_storage_command"]);
 
-	$event->log("$local_storage_command", $_SERVER['REQUEST_TIME'], 5, "local-storage-action", "Processing local-storage command $local_storage_command", "", "", 0, 0, 0);
-	switch ($local_storage_command) {
-		case 'get_storage':
-			if (!file_exists($StorageDir)) {
-				mkdir($StorageDir);
-			}
-			$filename = $StorageDir."/".$_POST['filename'];
-			$filedata = base64_decode($_POST['filedata']);
-			echo "<h1>$filename</h1>";
-			$fout = fopen($filename,"wb");
-			fwrite($fout, $filedata);
-			fclose($fout);
-			break;
+	if ($OPENQRM_USER->role == "administrator") {
 
-		case 'get_ident':
-			if (!file_exists($StorageDir)) {
-				mkdir($StorageDir);
-			}
-			$filename = $StorageDir."/".$_POST['filename'];
-			$filedata = base64_decode($_POST['filedata']);
-			echo "<h1>$filename</h1>";
-			$fout = fopen($filename,"wb");
-			fwrite($fout, $filedata);
-			fclose($fout);
-			break;
+		$event->log("$local_storage_command", $_SERVER['REQUEST_TIME'], 5, "local-storage-action", "Processing local-storage command $local_storage_command", "", "", 0, 0, 0);
+		switch ($local_storage_command) {
+			case 'get_storage':
+				if (!file_exists($StorageDir)) {
+					mkdir($StorageDir);
+				}
+				$filename = $StorageDir."/".$_POST['filename'];
+				$filedata = base64_decode($_POST['filedata']);
+				echo "<h1>$filename</h1>";
+				$fout = fopen($filename,"wb");
+				fwrite($fout, $filedata);
+				fclose($fout);
+				break;
 
-        case 'auth_finished':
-            // remove storage-auth-blocker if existing
-            $authblocker = new authblocker();
-            $authblocker->get_instance_by_image_name($local_image_name);
-            if (strlen($authblocker->id)) {
-                $event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "local-storage-action", "Removing authblocker for image $local_image_name", "", "", 0, 0, 0);
-                $authblocker->remove($authblocker->id);
-            }
-            break;
+			case 'get_ident':
+				if (!file_exists($StorageDir)) {
+					mkdir($StorageDir);
+				}
+				$filename = $StorageDir."/".$_POST['filename'];
+				$filedata = base64_decode($_POST['filedata']);
+				echo "<h1>$filename</h1>";
+				$fout = fopen($filename,"wb");
+				fwrite($fout, $filedata);
+				fclose($fout);
+				break;
 
-		case 'init':
-            // create local_storage_state
-            // -> local_storage_state
-            // ls_id INT(5)
-            // ls_appliance_id INT(5)
-            // ls_token VARCHAR(50)
-            // ls_state INT(5)
-            $create_local_storage_state = "create table local_storage_state(ls_id INT(5), ls_appliance_id INT(5), ls_token VARCHAR(50), ls_state INT(5))";
-			$db=openqrm_get_db_connection();
-			$recordSet = &$db->Execute($create_local_storage_state);
-            break;
+			case 'auth_finished':
+				// remove storage-auth-blocker if existing
+				$authblocker = new authblocker();
+				$authblocker->get_instance_by_image_name($local_image_name);
+				if (strlen($authblocker->id)) {
+					$event->log('auth_finished', $_SERVER['REQUEST_TIME'], 5, "local-storage-action", "Removing authblocker for image $local_image_name", "", "", 0, 0, 0);
+					$authblocker->remove($authblocker->id);
+				}
+				break;
 
-		case 'uninstall':
-            // remove local_storage_state
-            $remove_local_storage_state = "drop table local_storage_state;";
-			$db=openqrm_get_db_connection();
-			$recordSet = &$db->Execute($remove_local_storage_state);
-            break;
+			case 'init':
+				// create local_storage_state
+				// -> local_storage_state
+				// ls_id INT(5)
+				// ls_appliance_id INT(5)
+				// ls_token VARCHAR(50)
+				// ls_state INT(5)
+				$create_local_storage_state = "create table local_storage_state(ls_id INT(5), ls_appliance_id INT(5), ls_token VARCHAR(50), ls_state INT(5))";
+				$db=openqrm_get_db_connection();
+				$recordSet = &$db->Execute($create_local_storage_state);
+				break;
 
-
-		default:
-			$event->log("$local_storage_command", $_SERVER['REQUEST_TIME'], 3, "local-storage-action", "No such local-storage command ($local_storage_command)", "", "", 0, 0, 0);
-			break;
+			case 'uninstall':
+				// remove local_storage_state
+				$remove_local_storage_state = "drop table local_storage_state;";
+				$db=openqrm_get_db_connection();
+				$recordSet = &$db->Execute($remove_local_storage_state);
+				break;
 
 
+			default:
+				$event->log("$local_storage_command", $_SERVER['REQUEST_TIME'], 3, "local-storage-action", "No such local-storage command ($local_storage_command)", "", "", 0, 0, 0);
+				break;
+
+
+		}
 	}
 ?>
 
