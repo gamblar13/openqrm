@@ -36,33 +36,35 @@ IP_MGMT_CONFIG_DIR=`dirname $OPENQRM_RESOURCE_PARAMETER_FILE`
 
 # define wget to use with https
 if [ "$openqrm_web_protocol" == "https" ]; then
-    export WGET="wget --no-check-certificate -q"
+	export WGET="wget --no-check-certificate -q"
 else
-    export WGET="wget -q"
+	export WGET="wget -q"
 fi
 
 # only start in the initrd when we have ethtool availalbe
 if [ -f /etc/initrd-devices.conf ]; then
-    if ! which ethtool 1>/ethtool.log; then
-        rm -f /ethtool.log
-        exit 0
-    else
-        rm -f /ethtool.log
-    fi
+	if ! which ethtool 1>/ethtool.log; then
+		rm -f /ethtool.log
+		exit 0
+	else
+		rm -f /ethtool.log
+	fi
 else
-    if ! which ethtool 1>/dev/null; then
-        export FORCE_INSTALL=true
-        openqrm_install_os_dependency ethtool
-    fi
+	if ! which ethtool 1>/dev/null; then
+		export FORCE_INSTALL=true
+		openqrm_install_os_dependency ethtool
+	fi
 fi
 
 
 function wakeuponlan_start() {
 	echo "Starting the openQRM wakeuponlan plugin"
-    OPENQRM_INTERFACE=`ifconfig | grep -i $resource_mac | grep :oq | cut -d':' -f1`
-    ethtool -s $OPENQRM_INTERFACE wol g 2>/ethtool.log
-    rm -f /ethtool.log
-	echo "- enabled Wake-up-on-LAN on interface $OPENQRM_INTERFACE"
+	OPENQRM_INTERFACE=`ifconfig | grep -i $resource_mac | grep :oq | cut -d':' -f1`
+	if [ "$OPENQRM_INTERFACE" != "" ]; then
+		ethtool -s $OPENQRM_INTERFACE wol g 2>/ethtool.log
+		rm -f /ethtool.log
+		echo "- enabled Wake-up-on-LAN on interface $OPENQRM_INTERFACE"
+	fi
 }
 
 

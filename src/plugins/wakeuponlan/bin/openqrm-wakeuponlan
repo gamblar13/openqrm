@@ -81,11 +81,11 @@ fi
 case "$WAKEUPONLAN_COMMAND" in
 
 	wakeup)
-        if [ "$PARAM_WAKEUPONLAN_RESOURCE_MAC" == "" ]; then
-            wakeuponlan_usage
-        fi
-        openqrm_post_event 0 "wakeup" 5 "wakeuponlan" "Waking up $PARAM_WAKEUPONLAN_RESOURCE_MAC."
-        wakeonlan $PARAM_WAKEUPONLAN_RESOURCE_MAC
+		if [ "$PARAM_WAKEUPONLAN_RESOURCE_MAC" == "" ]; then
+			wakeuponlan_usage
+		fi
+		openqrm_post_event 0 "wakeup" 5 "wakeuponlan" "Waking up $PARAM_WAKEUPONLAN_RESOURCE_MAC."
+		wakeonlan $PARAM_WAKEUPONLAN_RESOURCE_MAC
 		;;
 
 

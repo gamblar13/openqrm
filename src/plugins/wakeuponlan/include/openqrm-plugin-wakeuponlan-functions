@@ -37,7 +37,7 @@ function wakeuponlan_log() {
 function wakeuponlan_lock() {
 	local COMMAND=$1
 	local RET=1
-	
+
 	if [ ! -d `dirname $WAKEUPONLAN_LOCK_FILE` ]; then
 		mkdir -p `dirname $WAKEUPONLAN_LOCK_FILE`
 	fi
@@ -57,7 +57,7 @@ function wakeuponlan_lock() {
 		*)
 			wakeuponlan_log wakeuponlan_lock "No such command. Try 'aquire' or 'release'"
 			return 1
-			;;	
+			;;
 	esac
 }
 
