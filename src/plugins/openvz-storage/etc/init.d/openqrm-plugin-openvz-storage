@@ -1,0 +1,216 @@
+#!/bin/bash
+# init script for the openQRM openvz-storage-plugin
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2010, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/include/openqrm-plugin-openvz-storage-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/etc/openqrm-plugin-openvz-storage.conf
+OPENQRM_VM_DIR="/vz"
+export OPENQRM_VM_DIR
+OPENQRM_VM_CONFIG_DIR="/etc/vz"
+export OPENQRM_VM_CONFIG_DIR
+# the template dir on the storage server
+OPENVZ_TEMPLATE_DIR="/vz/template/cache"
+export OPENVZ_TEMPLATE_DIR
+# get the ip config
+openqrm_server_get_config
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+export LANG=C
+# define wget to use with https
+if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+	WGET="wget -q --no-check-certificate"
+else
+	WGET="wget -q"
+fi
+LINE_IFS='
+'
+
+function openqrm_plugin_openvz_storage_start() {
+	openqrm_plugin_openvz_storage_stop 1>/dev/null 2>&1
+	echo "Starting the openQRM openvz-storage-plugin"
+	touch $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/openvz-storage/.running
+	# start the vm status autostart
+	if [ -e "$OPENQRM_VM_CONFIG_DIR/conf" ]; then
+		for VM_CONFIG in `find $OPENQRM_VM_CONFIG_DIR/conf/ -name *.conf 2>/dev/null`; do
+			if grep ONBOOT $VM_CONFIG | grep yes 1>/dev/null; then
+				VM_NAME=`echo $VM_CONFIG | cut -d'.' -f1 | `
+				VM_NAME=`basename $VM_NAME`
+				# already running ?
+				if vzlist | grep -v VEID | awk '{ print $1 }' | grep -w $VM_NAME 1>/dev/null; then
+					echo "- VM $VM_NAME already running"
+					continue
+				fi
+				# ask openQRM what to do, get mac, get parameters
+				. $OPENQRM_VM_CONFIG_DIR/conf/$VM_NAME.conf
+				eval `echo $NETIF | cut -d',' -f2`
+				VM_MAC=$mac
+				mkdir -p /tmp/$VM_NAME/openqrm
+				if ! $WGET -O /tmp/$VM_NAME/openqrm/resource-parameter.conf "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$VM_MAC"; then
+					echo "- Could not get parameters for VM $VM_NAME, not auto-starting it ..."
+					continue
+				fi
+				unset appliance_state
+				unset image_rootdevice
+				. /tmp/$VM_NAME/openqrm/resource-parameter.conf
+				if [ "$appliance_state" == "active" ] && [ "$image_rootdevice" != "ram" ]; then
+					echo "- Activating Rootdevice $image_rootdevice for VM $VM_NAME"
+					lvchange -ay $image_rootdevice
+					sleep 2
+					# make sure the lvm device is active
+					if [ -e "$image_rootdevice" ]; then
+						if grep "$OPENQRM_VM_DIR/private/$VM_NAME " /proc/mounts | grep -v simfs 1>/dev/null; then
+							echo " - $image_rootdevice for VM $VM_NAME already mounted"
+						else
+							if ! mount $image_rootdevice $OPENQRM_VM_DIR/private/$VM_NAME; then
+								echo "- Could not mount VM $VM_NAME rootdevice $image_rootdevice at $OPENQRM_VM_DIR/private/$VM_NAME, not auto-starting it .."
+								continue
+							fi
+						fi
+						echo "- auto-starting active VM $VM_NAME"
+						$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/bin/openqrm-openvz-storage-vm start -n $VM_NAME
+					else
+						echo "- Rootdevice $image_rootdevice for VM $VM_NAME not existing, not autostarting it ..."
+						continue
+					fi
+				else
+					# start idle VM
+					echo "- auto-starting idle VM $VM_NAME"
+					$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/bin/openqrm-openvz-storage-vm start -n $VM_NAME
+				fi
+				rm -rf /tmp/$VM_NAME
+			fi
+		done
+	fi
+
+}
+
+
+function openqrm_plugin_openvz_storage_stop() {
+	echo "Stopping the openQRM openvz-storage-plugin"
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/openvz-storage/.running
+}
+
+function openqrm_plugin_openvz_storage_uninstall() {
+	local USERNAME=$1
+	local PASSWORD=$2
+	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
+		echo -n "openvz-storage: Please give a username to uninstall the plugin : "
+		read USERNAME
+		echo
+		echo -n "openvz-storage: Please give the password for user $USERNAME : "
+		read PASSWORD
+		echo
+	fi
+	echo "Uninstalling the openQRM openvz-storage-plugin"
+	openqrm_plugin_openvz_storage_stop
+	openqrm_server_remove_deployment_type $USERNAME $PASSWORD openvz-deployment
+	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD openvz-storage
+	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD openvz-storage-vm
+	# removing the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?lvm_storage_command=uninstall"; then
+		openvz_log init "ERROR: Could not drop the openvz-storage-plugin tables in the database!"
+		return 1
+	fi
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/openvz-storage
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-openvz-storage.tgz
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.openvz-deployment.php
+	# remove the default initrd template + linuxrc
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openqrm-initrd-openvz.tgz
+	# remove template cache link to boot-services
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openvz-templates
+
+}
+
+
+function openqrm_plugin_openvz_storage_init() {
+	local USERNAME=$1
+	local PASSWORD=$2
+	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
+		echo -n "openvz-storage: Please give a username to init the plugin : "
+		read USERNAME
+		echo
+		echo -n "openvz-storage: Please give the password for user $USERNAME : "
+		read PASSWORD
+		echo
+	fi
+	echo "Initializing the openQRM openvz-storage-plugin"
+	openqrm_server_add_deployment_type $USERNAME $PASSWORD openvz-deployment openvz-deployment "LVM deployment for OpenVZ" openvz-storage "OpenVZ LVM Storage"
+	openqrm_server_add_virtualization_type $USERNAME $PASSWORD openvz-storage "OpenVZ Host"
+	openqrm_server_add_virtualization_type $USERNAME $PASSWORD openvz-storage-vm "OpenVZ VM"
+
+	# linking the web dir
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/web $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/openvz-storage
+	# link the boot-service
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/web/boot-service-openvz-storage.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-openvz-storage.tgz
+	# linking the image deployment parameters menu
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/web/image.openvz-deployment.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.openvz-deployment.php
+	# create storage dir for stat files
+	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/web/storage
+	chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/web/storage
+	# create openvz-stat dir
+	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/web/openvz-stat
+	chmod -R 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/web/openvz-stat
+	# cp the default initrd template + linuxrc
+	/bin/cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openqrm-initrd-openvz.tgz
+	chmod 755 $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openqrm-initrd-openvz.tgz
+	# linking the template cache to the boot-service dir
+	ln -sf $OPENVZ_TEMPLATE_DIR $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/openvz-templates
+	# creating the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?lvm_storage_command=init"; then
+		openvz_log init "ERROR: Could not create the openvz-storage-plugin tables in the database!"
+		return 1
+	fi
+
+}
+
+USER=$2
+PASS=$3
+
+case "$1" in
+	start)
+		openqrm_plugin_openvz_storage_start
+		;;
+	stop)
+		openqrm_plugin_openvz_storage_stop
+		;;
+	restart)
+		openqrm_plugin_openvz_storage_stop
+		sleep 1
+		openqrm_plugin_openvz_storage_start
+		;;
+	init)
+		openqrm_plugin_openvz_storage_init $USER $PASS
+		;;
+	uninstall)
+		openqrm_plugin_openvz_storage_uninstall $USER $PASS
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|init|uninstall}"
+		exit 1
+
+esac
+exit $?
+
+
+
+

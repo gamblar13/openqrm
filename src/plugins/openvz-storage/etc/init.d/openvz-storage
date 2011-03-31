@@ -1,0 +1,169 @@
+#!/bin/bash
+# this is the boot-service init script for the OpenVZ-server hosts
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2010, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
+# for including the package functions
+export OPENQRM_SOURCE_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/"
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-package-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/include/openqrm-plugin-openvz-storage-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/etc/openqrm-plugin-openvz-storage.conf
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	OPENQRM_SERVER_IP=$resource_openqrmserver
+elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+	openqrm_server_get_config
+	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+fi
+OPENQRM_VM_DIR="/vz"
+export OPENQRM_VM_DIR
+OPENQRM_VM_CONFIG_DIR="/etc/vz"
+export OPENQRM_VM_CONFIG_DIR
+
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET="wget -q --no-check-certificate"
+else
+	WGET="wget -q"
+fi
+
+# do not start on the intitrd
+if [ -f /etc/initrd-devices.conf ]; then
+	exit 0
+fi
+
+
+function openvz_start() {
+	echo "Starting the openQRM openvz-storage-plugin"
+	# check if this is a openvz host
+	if ! which vzctl 1>/dev/null; then
+		exit 0
+	fi
+	# be sure we have screen
+	export FORCE_INSTALL=true
+	openqrm_install_os_dependency screen
+
+	# get initrd + linuxrc to create idle vms
+	if ! $WGET -O $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/etc/templates/openqrm-initrd-default.tgz  $openqrm_web_protocol://$resource_openqrmserver/openqrm/boot-service/openqrm-initrd-openvz.tgz; then
+		echo "ERROR: Could not download the openvz-initrd-template from openQRM server at $openqrm_web_protocol://$resource_openqrmserver !"
+		return 1
+	fi
+	if ! $WGET -O $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/etc/templates/openqrm-client.tgz  $openqrm_web_protocol://$resource_openqrmserver/openqrm/boot-service/openqrm-client.tgz; then
+		echo "ERROR: Could not download the openqrm-client.tgz from openQRM server at $openqrm_web_protocol://$resource_openqrmserver !"
+		return 1
+	fi
+	# start the vm status autostart
+	if [ -e "$OPENQRM_VM_CONFIG_DIR/conf" ]; then
+		for VM_CONFIG in `find $OPENQRM_VM_CONFIG_DIR/conf/ -name *.conf`; do
+			if grep ONBOOT $VM_CONFIG | grep yes 1>/dev/null; then
+				VM_NAME=`echo $VM_CONFIG | cut -d'.' -f1`
+				VM_NAME=`basename $VM_NAME`
+				# already running ?
+				if vzlist | grep -v VEID | awk '{ print $1 }' | grep -w $VM_NAME 1>/dev/null; then
+					echo "- VM $VM_NAME already running"
+					continue
+				fi
+				# ask openQRM what to do, get mac, get parameters
+				. $OPENQRM_VM_CONFIG_DIR/conf/$VM_NAME.conf
+				eval `echo $NETIF | cut -d',' -f2`
+				VM_MAC=$mac
+				mkdir -p /tmp/$VM_NAME/openqrm
+				if ! $WGET -O /tmp/$VM_NAME/openqrm/resource-parameter.conf "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$VM_MAC"; then
+					echo "- Could not get parameters for VM $VM_NAME, not auto-starting it ..."
+					continue
+				fi
+				unset appliance_state
+				unset image_rootdevice
+				. /tmp/$VM_NAME/openqrm/resource-parameter.conf
+				if [ "$appliance_state" == "active" ] && [ "$image_rootdevice" != "ram" ]; then
+					echo "- Activating Rootdevice $image_rootdevice for VM $VM_NAME"
+					lvchange -ay $image_rootdevice
+					sleep 2
+					# make sure the lvm device is active
+					if [ -e "$image_rootdevice" ]; then
+						if grep "$OPENQRM_VM_DIR/private/$VM_NAME " /proc/mounts | grep -v simfs 1>/dev/null; then
+							echo " - $image_rootdevice for VM $VM_NAME already mounted"
+						else
+							if ! mount $image_rootdevice $OPENQRM_VM_DIR/private/$VM_NAME; then
+								echo "- Could not mount VM $VM_NAME rootdevice $image_rootdevice at $OPENQRM_VM_DIR/private/$VM_NAME, not auto-starting it .."
+								continue
+							fi
+						fi
+						echo "- auto-starting active VM $VM_NAME"
+						$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/bin/openqrm-openvz-storage-vm start -n $VM_NAME
+					else
+						echo "- Rootdevice $image_rootdevice for VM $VM_NAME not existing, not autostarting it ..."
+						continue
+					fi
+				else
+					# start idle VM
+					echo "- auto-starting idle VM $VM_NAME"
+					$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/bin/openqrm-openvz-storage-vm start -n $VM_NAME
+				fi
+				rm -rf /tmp/$VM_NAME
+			fi
+		done
+	fi
+
+}
+
+
+function openvz_stop() {
+	echo "Stopping the openQRM openvz-storage-plugin"
+
+}
+
+
+
+
+
+case "$1" in
+	start)
+		openvz_start
+		;;
+	stop)
+		openvz_stop
+		;;
+	restart)
+		openvz_stop
+		sleep 1
+		openvz_start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+
+esac
+exit $?
+
+
+
+
+
+
+
+
+
+
+
+
+

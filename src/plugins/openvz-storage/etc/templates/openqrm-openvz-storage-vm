@@ -1,0 +1,48 @@
+ONBOOT="yes"
+
+# UBC parameters (in form of barrier:limit)
+# Primary parameters
+AVNUMPROC="unlimited"
+NUMPROC="unlimited"
+NUMTCPSOCK="419430"
+NUMOTHERSOCK="419430"
+VMGUARPAGES="unlimited"
+# Secondary parameters
+KMEMSIZE="unlimited"
+#TCPSNDBUF="2147483647:2147483647"
+TCPSNDBUF="1073741823:2147483647"
+TCPRCVBUF="1073741823:2147483647"
+OTHERSOCKBUF="1073741823:2147483647"
+DGRAMRCVBUF="unlimited"
+OOMGUARPAGES="unlimited"
+# Auxiliary parameters
+LOCKEDPAGES="unlimited"
+SHMPAGES="unlimited"
+PRIVVMPAGES="unlimited"
+NUMFILE="unlimited"
+NUMFLOCK="unlimited"
+NUMPTY="unlimited"
+NUMSIGINFO="unlimited"
+DCACHESIZE="unlimited"
+
+PHYSPAGES="0:unlimited"
+NUMIPTENT="unlimited"
+
+# Disk quota parameters (in form of softlimit:hardlimit)
+DISK_QUOTA="no"
+
+# CPU fair sheduler parameter
+CPUUNITS="500000"
+CPUS="@@OPENVZ_VM_CPU@@"
+CPULIMIT="@@OPENVZ_VM_CPU@@"
+
+VE_ROOT="/vz/root/@@OPENVZ_VM_NAME@@"
+VE_PRIVATE="/vz/private/@@OPENVZ_VM_NAME@@"
+OSTEMPLATE="centos-5-i386-default.tar.gz"
+ORIGIN_SAMPLE="vps.basic"
+HOSTNAME="@@OPENVZ_VM_HOSTNAME@@"
+
+NETIF="ifname=eth0,mac=@@OPENVZ_VM_MAC@@,host_ifname=veth@@OPENVZ_VM_NAME@@.0,host_mac=@@OPENVZ_VM_HOST_MAC@@"
+
+
+

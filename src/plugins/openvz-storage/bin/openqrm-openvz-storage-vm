@@ -1,0 +1,1114 @@
+#!/bin/bash
+# this script automatically manages openvz
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2010, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/include/openqrm-plugin-openvz-storage-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/etc/openqrm-plugin-openvz-storage.conf
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	OPENQRM_SERVER_IP=$resource_openqrmserver
+	OPENQRM_DEFAULT_INITRD_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/etc/templates/openqrm-initrd-default.tgz"
+	OPENQRM_DEFAULT_LINUXRC_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/etc/templates/openqrm-openvz-linuxrc"
+	OPENQRM_DEFAULT_OPENQRM_CLIENT="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/etc/templates/openqrm-client.tgz"
+	# network params if not given by commandline
+	OPENQRM_OPENVZ_SUBNET=$resource_subnet
+	if [ "$OPENQRM_OPENVZ_SUBNET" == "" ]; then
+		# assume class c
+		OPENQRM_OPENVZ_SUBNET="255.255.255.0"
+	fi
+	OPENQRM_OPENVZ_NETWORK=$resource_network
+	if [ "$OPENQRM_OPENVZ_NETWORK" == "" ]; then
+		# assume class c
+		OPENQRM_OPENVZ_NETWORK=`echo $OPENQRM_SERVER_IP | cut -d'.' -f1-3`
+		OPENQRM_OPENVZ_NETWORK="$OPENQRM_OPENVZ_SUBNET.0"
+	fi
+	OPENQRM_OPENVZ_DEFAULT_GATEWAY=`route -n | grep ^0.0.0.0 | head -n1 | awk {' print $2 '}`
+
+elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+	openqrm_server_get_config
+	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+	OPENQRM_OPENVZ_SUBNET=$OPENQRM_SERVER_SUBNET_MASK
+	# assume class c
+	OPENQRM_OPENVZ_NETWORK=`echo $OPENQRM_SERVER_IP | cut -d'.' -f1-3`
+	OPENQRM_OPENVZ_NETWORK="$OPENQRM_OPENVZ_SUBNET.0"
+	OPENQRM_OPENVZ_DEFAULT_GATEWAY=$OPENQRM_SERVER_DEFAULT_GATEWAY
+	resource_id=0
+	resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+	openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+	OPENQRM_DEFAULT_INITRD_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz"
+	OPENQRM_DEFAULT_LINUXRC_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/etc/templates/openqrm-openvz-linuxrc"
+	OPENQRM_DEFAULT_OPENQRM_CLIENT="$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/openqrm-client.tgz"
+fi
+OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
+OPENQRM_OPENVZ_VM_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/etc/templates/openqrm-openvz-storage-vm"
+OPENQRM_VM_DIR="/vz"
+OPENQRM_VM_CONFIG_DIR="/etc/vz"
+OPENQRM_VM_START_DELAY=1
+export LANG=C
+
+# ssh/scp options
+SSH_OPTIONS=""
+SCP_OPTIONS=""
+SSH="ssh $SSH_OPTIONS"
+SCP="scp $SCP_OPTIONS"
+VZCTL=vzctl
+VZ_DUMP_DIR="/vz/dump"
+
+
+# define wget to use with https or http
+if [ "$openqrm_web_protocol" == "https" ]; then
+	export WGET="wget --no-check-certificate --random-file=/dev/random"
+else
+	export WGET="wget"
+fi
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+if [ -x /usr/bin/screen.real ]; then
+	RUNSCREEN="/usr/bin/screen.real"
+else
+	RUNSCREEN=`which screen`
+fi
+
+
+function openvz_usage() {
+	echo "Usage : $0 start/stop/reboot/delete/list <-n vm-name>"
+	echo "        $0 restart_by_mac/start_by_mac <-m vm-mac>"
+	echo "        $0 create <-n vm-name> <-m mac-address> [-i <ip-address>] [-s <subnet-mask>] [-t <network>] [-g <default-gateway>] [-c <cpu-config>] [-w <vm-hostname>]"
+	echo "        $0 post_vm_list <-u username> <-p password>"
+	echo "        $0 post_vm_config <-n vm-name> <-u username> <-p password>"
+	echo "        $0 set_vm_config <-n vm-name> <-v parameter> <-x value>"
+	echo "        $0 fence <-m mac-address>"
+	echo "        $0 migrate <-n vm-name> <-i <ip-address>>"
+	exit 1
+}
+
+
+function get_openvz_vm_name_by_mac() {
+	VMMAC=$1
+	VMCONFIG=`grep -i -rH $VMMAC $OPENQRM_VM_CONFIG_DIR/conf/*.conf | cut -d':' -f1`
+	if [ ! -f "$VMCONFIG" ]; then
+		return
+	fi
+	VMNAME=`basename $VMCONFIG | sed -e "s/.conf//g"`
+	echo $VMNAME
+}
+
+
+function stop_container() {
+	OPENVZ_VEID=$1
+	vzctl stop $OPENVZ_VEID --fast
+	vzctl umount $OPENVZ_VEID
+}
+
+
+function add_container_nics_to_bridge() {
+	OPENVZ_VEID=$1
+	. $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VEID.conf
+	OPENVZ_INTERFACE_0=`echo "$NETIF;" | cut -d';' -f1`
+	OPENVZ_INTERFACE_1=`echo "$NETIF;" | cut -d';' -f2`
+	OPENVZ_INTERFACE_2=`echo "$NETIF;" | cut -d';' -f3`
+	OPENVZ_INTERFACE_3=`echo "$NETIF;" | cut -d';' -f4`
+	OPENVZ_INTERFACE_4=`echo "$NETIF;" | cut -d';' -f5`
+
+	# regular bridging
+	if [ "$OPENQRM_PLUGIN_OPENVZ_STORAGE_BRIDGE_TYPE" == "bridge" ]; then
+		# eth0, management/openQRM network
+		brctl addif $OPENQRM_PLUGIN_OPENVZ_BRIDGE veth$OPENVZ_VEID.0
+		# eth1 - 4
+		if [ "$OPENVZ_INTERFACE_1" != "" ]; then
+			brctl addif $OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET1 veth$OPENVZ_VEID.1
+		fi
+		if [ "$OPENVZ_INTERFACE_2" != "" ]; then
+			brctl addif $OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET2 veth$OPENVZ_VEID.2
+		fi
+		if [ "$OPENVZ_INTERFACE_3" != "" ]; then
+			brctl addif $OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET3 veth$OPENVZ_VEID.3
+		fi
+		if [ "$OPENVZ_INTERFACE_4" != "" ]; then
+			brctl addif $OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET4 veth$OPENVZ_VEID.4
+		fi
+	fi
+
+	# openvswitch
+	if [ "$OPENQRM_PLUGIN_OPENVZ_STORAGE_BRIDGE_TYPE" == "openvswitch" ]; then
+
+		TMP_BASE_DIR=/tmp/$OPENVZ_VEID
+		mkdir -p $TMP_BASE_DIR
+		# get mac
+		OPENVZ_VM_MAC=`echo $OPENVZ_INTERFACE_0 | cut -d',' -f2 | cut -d'=' -f2`
+
+		# get vms resource parameters
+		if ! $WGET -q -t 1 -T 4 -O $TMP_BASE_DIR/openqrm-resource.conf "$openqrm_web_protocol://${OPENQRM_SERVER_IP}/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$OPENVZ_VM_MAC"; then
+			echo "ERROR: Could not get VMs resource-parameters!" | logger
+			return 1
+		fi
+		. $TMP_BASE_DIR/openqrm-resource.conf
+		# get ip config
+		eval $appliance_capabilities
+		if [ "$IPT" == "" ]; then
+			echo "NOTICE: No ip-configuration for VM available. Continuing..." | logger
+		else
+			IP_TOKEN=`echo $IPT | cut -d'=' -f1`
+			for APP_NIC in `seq 0 4`; do
+				echo "- getting network configuration for token $IP_TOKEN nic $APP_NIC" | logger
+				if ! $WGET -O $TMP_BASE_DIR/openqrm-network.$APP_NIC.conf "$openqrm_web_protocol://${OPENQRM_SERVER_IP}/openqrm/boot-service/ip-mgmt-appliance-config.php?ip_mgmt_command=get_config&appliance_id=$appliance_id&ip_mgmt_nic_id=$APP_NIC&ip_mgmt_token=$IP_TOKEN"; then
+					echo "ERROR: Could not get ip-configuration for nic $APP_NIC from openQRM-server at ${OPENQRM_SERVER_IP}!" | logger
+				fi
+			done
+
+			unset VLAN_ID
+			. $TMP_BASE_DIR/openqrm-network.0.conf
+			if [ "$VLAN_ID" != "" ]; then
+				VLAN_TAG_PARAMETER_0="tag=$VLAN_ID"
+			fi
+			unset VLAN_ID
+			. $TMP_BASE_DIR/openqrm-network.1.conf
+			if [ "$VLAN_ID" != "" ]; then
+				VLAN_TAG_PARAMETER_1="tag=$VLAN_ID"
+			fi
+			unset VLAN_ID
+			. $TMP_BASE_DIR/openqrm-network.2.conf
+			if [ "$VLAN_ID" != "" ]; then
+				VLAN_TAG_PARAMETER_2="tag=$VLAN_ID"
+			fi
+			unset VLAN_ID
+			. $TMP_BASE_DIR/openqrm-network.3.conf
+			if [ "$VLAN_ID" != "" ]; then
+				VLAN_TAG_PARAMETER_3="tag=$VLAN_ID"
+			fi
+			unset VLAN_ID
+			. $TMP_BASE_DIR/openqrm-network.4.conf
+			if [ "$VLAN_ID" != "" ]; then
+				VLAN_TAG_PARAMETER_4="tag=$VLAN_ID"
+			fi
+			rm -f $TMP_BASE_DIR/openqrm-*
+			rmdir $TMP_BASE_DIR
+		fi
+
+		# eth0, management/openQRM network
+		ovs-vsctl del-port ${OPENQRM_PLUGIN_OPENVZ_BRIDGE} veth$OPENVZ_VEID.0
+		ovs-vsctl add-port ${OPENQRM_PLUGIN_OPENVZ_BRIDGE} veth$OPENVZ_VEID.0 $VLAN_TAG_PARAMETER_0
+		# eth1 - 4
+		if [ "$OPENVZ_INTERFACE_1" != "" ]; then
+			ovs-vsctl del-port ${OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET1} veth$OPENVZ_VEID.1
+			ovs-vsctl add-port ${OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET1} veth$OPENVZ_VEID.1 $VLAN_TAG_PARAMETER_1
+		fi
+		if [ "$OPENVZ_INTERFACE_2" != "" ]; then
+			ovs-vsctl del-port ${OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET2} veth$OPENVZ_VEID.2
+			ovs-vsctl add-port ${OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET2} veth$OPENVZ_VEID.2 $VLAN_TAG_PARAMETER_2
+		fi
+		if [ "$OPENVZ_INTERFACE_3" != "" ]; then
+			ovs-vsctl del-port ${OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET3} veth$OPENVZ_VEID.3
+			ovs-vsctl add-port ${OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET3} veth$OPENVZ_VEID.3 $VLAN_TAG_PARAMETER_3
+		fi
+		if [ "$OPENVZ_INTERFACE_4" != "" ]; then
+			ovs-vsctl del-port ${OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET4} veth$OPENVZ_VEID.4
+			ovs-vsctl add-port ${OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET4} veth$OPENVZ_VEID.4 $VLAN_TAG_PARAMETER_4
+		fi
+	fi
+
+}
+
+
+
+
+
+
+OPENVZ_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			OPENVZ_VM_NAME=$2
+			OPENVZ_VM_REALNAME=$OPENVZ_VM_NAME
+			OPENVZ_VM_NAME=`echo $OPENVZ_VM_NAME | sed -e "s/[a-z]//g" | sed -e "s/-//g"`
+			shift
+			;;
+		-m)
+			OPENVZ_VM_MAC=$2
+			shift
+			;;
+		-m2)
+			OPENVZ_VM_MAC2=$2
+			shift
+			;;
+		-m3)
+			OPENVZ_VM_MAC3=$2
+			shift
+			;;
+		-m4)
+			OPENVZ_VM_MAC4=$2
+			shift
+			;;
+		-m5)
+			OPENVZ_VM_MAC5=$2
+			shift
+			;;
+		-b)
+			OPENVZ_VM_BRIDGE=$2
+			shift
+			;;
+		-i)
+			OPENVZ_VM_IP=$2
+			shift
+			;;
+		-s)
+			OPENVZ_VM_SUBNET=$2
+			shift
+			;;
+		-t)
+			OPENVZ_VM_NETWORK=$2
+			shift
+			;;
+		-g)
+			OPENVZ_VM_DEFAULT_GATEWAY=$2
+			shift
+			;;
+		-d)
+			OPENVZ_VM_DISK=$2
+			shift
+			;;
+		-c)
+			OPENVZ_VM_CPU=$2
+			shift
+			;;
+		-v)
+			OPENVZ_VM_CONFIG_PARAMETER=$2
+			shift
+			;;
+		-x)
+			OPENVZ_VM_CONFIG_VALUE=$2
+			shift
+			;;
+		-u)
+			OPENVZ_OPENQRM_USERNAME=$2
+			shift
+			;;
+		-p)
+			OPENVZ_OPENQRM_PASSWORD=$2
+			shift
+			;;
+		-w)
+			OPENVZ_VM_HOSTNAME=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			openvz_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+
+
+# main
+if [ "$OPENVZ_COMMAND" == "" ]; then
+	openvz_usage
+fi
+
+if [ "$OPENVZ_COMMAND" == "post_vm_list" ] || [ "$OPENVZ_COMMAND" == "post_vm_config" ]; then
+		if [ "$OPENVZ_OPENQRM_USERNAME" == "" ]; then
+			openvz_usage
+		fi
+		if [ "$OPENVZ_OPENQRM_PASSWORD" == "" ]; then
+			openvz_usage
+		fi
+else
+
+	if [ "$OPENVZ_COMMAND" != "list" ] && [ "$OPENVZ_COMMAND" != "start_by_mac" ] && [ "$OPENVZ_COMMAND" != "restart_by_mac" ]  && [ "$OPENVZ_COMMAND" != "stop_by_mac" ] && [ "$OPENVZ_COMMAND" != "fence" ] && [ "$OPENVZ_COMMAND" != "addnic" ] && [ "$OPENVZ_COMMAND" != "removenic" ]; then
+		if [ "$OPENVZ_VM_NAME" == "" ]; then
+			openvz_usage
+		fi
+	fi
+fi
+
+
+case "$OPENVZ_COMMAND" in
+
+	create)
+		if [ "$OPENVZ_VM_MAC" == "" ]; then
+			openvz_usage
+		fi
+		if [ "$OPENVZ_VM_SUBNET" == "" ]; then
+			OPENVZ_VM_SUBNET=$OPENQRM_OPENVZ_SUBNET
+		fi
+		if [ "$OPENVZ_VM_NETWORK" == "" ]; then
+			OPENVZ_VM_NETWORK=$OPENQRM_OPENVZ_NETWORK
+		fi
+		if [ "$OPENVZ_VM_HOSTNAME" == "" ]; then
+			OPENVZ_VM_HOSTNAME=$OPENVZ_VM_REALNAME
+		fi
+		if [ "$OPENVZ_VM_DEFAULT_GATEWAY" == "" ]; then
+			OPENVZ_VM_DEFAULT_GATEWAY=$OPENQRM_OPENVZ_DEFAULT_GATEWAY
+		fi
+		if [ "$OPENVZ_VM_CPU" == "" ]; then
+			OPENVZ_VM_CPU=1
+		fi
+		if [ -f "$OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf" ]; then
+			openqrm_post_event 0 "create" 5 "openqrm-openvz-storage" "OPENVZ VM $OPENVZ_VM_NAME already exists"
+			exit 0
+		fi
+
+		CURRENT_DIR=`pwd`
+		openvz_lock aquire
+		openqrm_post_event 0 "create" 5 "openqrm-openvz-storage" "Creating OPENVZ VM $OPENVZ_VM_NAME -> $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf"
+
+		# generating the mac address for the host interface
+		OPENVZ_VM_HOST_MAC=`dd if=/dev/urandom bs=1 count=5 2>/dev/null | od -tx1 | head -1 | cut -d' ' -f2- | awk '{ print $1":"$2":"$3":"$4":"$5 }'`
+		OPENVZ_VM_HOST_MAC="00:"$OPENVZ_VM_HOST_MAC
+
+		# get the next ip
+		# if this ip is empty or 0.0.0.0 we need to gather the idle resource mgmt-ip !
+		if [ "$OPENVZ_VM_IP" == "" ] || [ "$OPENVZ_VM_IP" == "0.0.0.0" ]; then
+			openqrm_post_event 0 "create" 5 "openqrm-openvz-storage" "Have an empty mgmt-ip for openvz VM $OPENVZ_VM_NAME!"
+			OPENVZ_REQUEST_LOOP=0
+			mkdir -p /tmp/$OPENVZ_VM_NAME/openqrm
+			my_resource_ip=$resource_ip
+			unset resource_ip
+			while (true); do
+				$WGET -q -O /tmp/$OPENVZ_VM_NAME/openqrm/openqrm-resource.conf "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$OPENVZ_VM_MAC"
+				. /tmp/$OPENVZ_VM_NAME/openqrm/openqrm-resource.conf
+				if [ "$resource_ip" != "" ] && [ "$resource_ip" != "0.0.0.0" ]; then
+					OPENVZ_VM_IP=$resource_ip
+					export OPENVZ_VM_IP
+					openqrm_post_event 0 "create" 5 "openqrm-openvz-storage" "VM $OPENVZ_VM_NAME found mgmt ip $resource_ip in parameters"
+					break
+				fi
+				sleep 3
+				OPENVZ_REQUEST_LOOP=$(( OPENVZ_REQUEST_LOOP + 1 ))
+				if [ "$OPENVZ_REQUEST_LOOP" == "10" ]; then
+					openqrm_post_event 0 "create" 2 "openqrm-openvz-storage" "VM $OPENVZ_VM_NAME did not got a mgmt ip in parameters"
+					openvz_lock release
+					exit 0
+				fi
+			done
+			resource_ip=$my_resource_ip
+			rm -rf /tmp/$OPENVZ_VM_NAME
+		fi
+
+		# creating the openvz config file
+		mkdir -p $OPENQRM_VM_DIR/root/$OPENVZ_VM_NAME
+		mkdir -p $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME
+
+		cat $OPENQRM_OPENVZ_VM_TEMPLATE    | \
+			sed -e "s#@@OPENVZ_VM_NAME@@#$OPENVZ_VM_NAME#g"    | \
+			sed -e "s#@@OPENVZ_VM_HOST_MAC@@#$OPENVZ_VM_HOST_MAC#g"    | \
+			sed -e "s#@@OPENVZ_VM_CPU@@#$OPENVZ_VM_CPU#g"    | \
+			sed -e "s#@@OPENVZ_VM_HOSTNAME@@#$OPENVZ_VM_HOSTNAME#g"    | \
+			sed -e "s#@@OPENVZ_VM_MAC@@#$OPENVZ_VM_MAC#g" > $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf
+
+		# creating the idle root fs
+		if ! tar -C $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME -xzf $OPENQRM_DEFAULT_INITRD_TEMPLATE; then
+			openqrm_post_event 0 "create" 2 "openqrm-openvz-storage" "Could not create OPENVZ VM $OPENVZ_VM_NAME. Unpacking the idle template failed!"
+			exit 1
+		fi
+		# fill /dev
+		cp -aR /dev/* $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/dev/ 2>/dev/null
+
+		# copy the openqrm-client in place
+		if ! tar -C $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME -xzf $OPENQRM_DEFAULT_OPENQRM_CLIENT; then
+			openqrm_post_event 0 "create" 2 "openqrm-openvz-storage" "Could not create OPENVZ VM $OPENVZ_VM_NAME. Unpacking the openQRM-client failed!"
+			exit 1
+		fi
+		# create init for idle
+		rm -f $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/linuxrc
+		# adapt the linuxrc -> set VM values which are not in /proc/cmdline
+		# first part
+		grep -B 100000 "OPENVZ_CONFIG_MARKER" $OPENQRM_DEFAULT_LINUXRC_TEMPLATE > $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/linuxrc
+		# edit part
+
+		# adapt idle init
+		cat >> $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/linuxrc << EOF
+echo "setup networking ..."
+BOOTIF="$OPENVZ_VM_MAC"
+OPENQRM_SERVER_IP_ADDRESS="$OPENQRM_SERVER_IP"
+id="-1"
+ip="$OPENVZ_VM_IP:$OPENQRM_SERVER_IP:$OPENVZ_VM_DEFAULT_GATEWAY:$OPENVZ_VM_SUBNET"
+
+EOF
+
+		# second part
+		grep -A 100000 "OPENVZ_CONFIG_MARKER" $OPENQRM_DEFAULT_LINUXRC_TEMPLATE | grep -v "collecting some infos from /proc/cmdline" >> $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/linuxrc
+		chmod +x $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/linuxrc
+		# adjust links
+		cd $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/sbin
+		rm -f init
+		ln -s ../linuxrc init
+		cd $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/
+		rm -f init
+		ln -s linuxrc init
+		cd $CURRENT_DIR
+		# prepare openvz network config
+		mkdir -p $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/network/
+		touch $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/network/interfaces
+		touch $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/resolv.conf
+
+		# create additional network cards
+		if [ "$OPENVZ_VM_MAC2" != "" ]; then
+			OPENVZ_VM_HOST_MAC2=`dd if=/dev/urandom bs=1 count=5 2>/dev/null | od -tx1 | head -1 | cut -d' ' -f2- | awk '{ print $1":"$2":"$3":"$4":"$5 }'`
+			OPENVZ_VM_HOST_MAC2="00:"$OPENVZ_VM_HOST_MAC2
+			vzctl set $OPENVZ_VM_NAME --netif_add eth1,$OPENVZ_VM_MAC2,veth$OPENVZ_VM_NAME.1,$OPENVZ_VM_HOST_MAC2 --save
+		fi
+		if [ "$OPENVZ_VM_MAC3" != "" ]; then
+			OPENVZ_VM_HOST_MAC3=`dd if=/dev/urandom bs=1 count=5 2>/dev/null | od -tx1 | head -1 | cut -d' ' -f2- | awk '{ print $1":"$2":"$3":"$4":"$5 }'`
+			OPENVZ_VM_HOST_MAC3="00:"$OPENVZ_VM_HOST_MAC3
+			vzctl set $OPENVZ_VM_NAME --netif_add eth2,$OPENVZ_VM_MAC3,veth$OPENVZ_VM_NAME.2,$OPENVZ_VM_HOST_MAC3 --save
+		fi
+		if [ "$OPENVZ_VM_MAC4" != "" ]; then
+			OPENVZ_VM_HOST_MAC4=`dd if=/dev/urandom bs=1 count=5 2>/dev/null | od -tx1 | head -1 | cut -d' ' -f2- | awk '{ print $1":"$2":"$3":"$4":"$5 }'`
+			OPENVZ_VM_HOST_MAC4="00:"$OPENVZ_VM_HOST_MAC4
+			vzctl set $OPENVZ_VM_NAME --netif_add eth3,$OPENVZ_VM_MAC4,veth$OPENVZ_VM_NAME.3,$OPENVZ_VM_HOST_MAC4 --save
+		fi
+		if [ "$OPENVZ_VM_MAC5" != "" ]; then
+			OPENVZ_VM_HOST_MAC5=`dd if=/dev/urandom bs=1 count=5 2>/dev/null | od -tx1 | head -1 | cut -d' ' -f2- | awk '{ print $1":"$2":"$3":"$4":"$5 }'`
+			OPENVZ_VM_HOST_MAC5="00:"$OPENVZ_VM_HOST_MAC5
+			vzctl set $OPENVZ_VM_NAME --netif_add eth4,$OPENVZ_VM_MAC5,veth$OPENVZ_VM_NAME.4,$OPENVZ_VM_HOST_MAC5 --save
+		fi
+
+		#echo "Starting OpenVZ VM $OPENVZ_VM_NAME"
+		vzctl start $OPENVZ_VM_NAME
+		# add vnets to bridges !
+		add_container_nics_to_bridge $OPENVZ_VM_NAME
+
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			sleep $OPENQRM_VM_START_DELAY
+			$0 post_vm_list -u $OPENVZ_OPENQRM_USERNAME -p $OPENVZ_OPENQRM_PASSWORD
+		fi
+		openvz_lock release
+		;;
+	start)
+		openvz_lock aquire
+		openqrm_post_event 0 "start" 5 "openqrm-openvz-storage" "Starting OpenVZ VM $OPENVZ_VM_NAME"
+		vzctl start $OPENVZ_VM_NAME
+		# add vnets to bridges !
+		add_container_nics_to_bridge $OPENVZ_VM_NAME
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			sleep $OPENQRM_VM_START_DELAY
+			$0 post_vm_list -u $OPENVZ_OPENQRM_USERNAME -p $OPENVZ_OPENQRM_PASSWORD
+		fi
+		openvz_lock release
+		;;
+	start_by_mac)
+		openvz_lock aquire
+		OPENVZ_VM_NAME=`get_openvz_vm_name_by_mac $OPENVZ_VM_MAC`
+		if [ "$OPENVZ_VM_NAME" == "" ]; then
+			openqrm_post_event 0 "start_by_mac" 2 "openqrm-openvz-storage" "OpenVZ VM $OPENVZ_VM_MAC not existing on this Host"
+			exit 1
+		fi
+		openqrm_post_event 0 "start_by_mac" 5 "openqrm-openvz-storage" "Starting OpenVZ VM $OPENVZ_VM_NAME"
+		vzctl start $OPENVZ_VM_NAME
+		# add vnets to bridges !
+		add_container_nics_to_bridge $OPENVZ_VM_NAME
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			sleep $OPENQRM_VM_START_DELAY
+			$0 post_vm_list -u $OPENVZ_OPENQRM_USERNAME -p $OPENVZ_OPENQRM_PASSWORD
+		fi
+		openvz_lock release
+		;;
+	stop)
+		openvz_lock aquire
+		stop_container $OPENVZ_VM_NAME
+		openqrm_post_event 0 "stop" 5 "openqrm-openvz-storage" "Stopped OpenVZ VM $OPENVZ_VM_NAME"
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_vm_list -u $OPENVZ_OPENQRM_USERNAME -p $OPENVZ_OPENQRM_PASSWORD
+		fi
+		openvz_lock release
+		;;
+
+	stop_by_mac)
+		openvz_lock aquire
+		OPENVZ_VM_NAME=`get_openvz_vm_name_by_mac $OPENVZ_VM_MAC`
+		if [ "$OPENVZ_VM_NAME" == "" ]; then
+			openqrm_post_event 0 "stop_by_mac" 2 "openqrm-openvz-storage" "OpenVZ VM $OPENVZ_VM_MAC not existing on this Host"
+			exit 1
+		fi
+		stop_container $OPENVZ_VM_NAME
+		openqrm_post_event 0 "stop_by_mac" 5 "openqrm-openvz-storage" "Stopped OpenVZ VM $OPENVZ_VM_NAME"
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_vm_list -u $OPENVZ_OPENQRM_USERNAME -p $OPENVZ_OPENQRM_PASSWORD
+		fi
+		openvz_lock release
+		;;
+
+	restart_by_mac)
+		# this is the main point of assignment to an appliance !
+		# the disk paramter decides on how the VM is restarted
+		#   idle - umount disk, start idle template
+		#   noop - just restart, do not mount/umount
+		#   empty - just restart, do not mount/umount
+		#   dev-name - make sure root is umounted, mount dev-name + start
+		if [ "$OPENVZ_VM_DEFAULT_GATEWAY" == "" ]; then
+			OPENVZ_VM_DEFAULT_GATEWAY=$OPENQRM_OPENVZ_DEFAULT_GATEWAY
+		fi
+		CURRENT_DIR=`pwd`
+		openvz_lock aquire
+		OPENVZ_VM_NAME=`get_openvz_vm_name_by_mac $OPENVZ_VM_MAC`
+		if [ "$OPENVZ_VM_NAME" == "" ]; then
+			openqrm_post_event 0 "restart_by_mac" 2 "openqrm-openvz-storage" "OpenVZ VM $OPENVZ_VM_MAC not existing on this Host"
+			openvz_lock release
+			exit 1
+		fi
+		openqrm_post_event 0 "restart_by_mac" 5 "openqrm-openvz-storage" "Restarting OpenVZ VM $OPENVZ_VM_NAME"
+		stop_container $OPENVZ_VM_NAME
+
+		if [ "$OPENVZ_VM_DISK" != "" ]; then
+			if [ "$OPENVZ_VM_DISK" != "noop" ]; then
+				if [ "$OPENVZ_VM_DISK" == "idle" ]; then
+					# deassignment, umount root (image dev-name)
+					sync
+					umount $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/
+					sleep $OPENQRM_VM_START_DELAY
+				else
+
+					# we have a real dev-name, mount it on top of root
+					umount -f $OPENVZ_VM_DISK $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/ 1>/dev/null 2>&1
+					# rescan all lvols
+					lvscan >/dev/null
+					# activate the lvol
+					lvchange -ay $OPENVZ_VM_DISK
+					# fsck
+					if ! fsck -y $OPENVZ_VM_DISK; then
+						openqrm_post_event 0 "restart_by_mac" 2 "openqrm-openvz-storage" "Error during filestem-check for root device $OPENVZ_VM_DISK"
+						openvz_lock release
+						exit 1
+					fi
+					# mount
+					if ! mount $OPENVZ_VM_DISK $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/; then
+						openqrm_post_event 0 "restart_by_mac" 2 "openqrm-openvz-storage" "Could not mount openvz vms root device $OPENVZ_VM_DISK at $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/"
+						openvz_lock release
+						exit 1
+					fi
+					sync
+					# !! here we check the arch of the root-filesystem, default i385 !!
+					OPENQRM_CLIENT_ARCH=i386
+					if file $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/bin/ls | grep 32-bit 1>/dev/null; then
+						# i386
+						OPENQRM_CLIENT_ARCH=i386
+					fi
+					if file $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/bin/ls | grep 64-bit 1>/dev/null; then
+						OPENQRM_CLIENT_ARCH=x86_64
+					fi
+					# find out the short distri name
+					if [ -f $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/debian_version ]; then
+						# debian or ubuntu, try to find out without lsb-release which may not be installed
+						if grep -i ubuntu $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/apt/sources.list 1>/dev/null; then
+							OPENQRM_SHORT_DISTRI_NAME="ubuntu"
+						else
+							OPENQRM_SHORT_DISTRI_NAME="debian"
+						fi
+					elif [ -f $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/redhat-release ]; then
+						OPENQRM_SHORT_DISTRI_NAME="centos"
+					else
+							OPENQRM_SHORT_DISTRI_NAME="centos"
+					fi
+
+					#echo "Getting openqrm-client package $OPENQRM_SHORT_DISTRI_NAME/$OPENQRM_CLIENT_ARCH"
+					if ! $WGET -q -O $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/openqrm-client.tgz "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/boot-service/openqrm-client.$OPENQRM_SHORT_DISTRI_NAME.$OPENQRM_CLIENT_ARCH.tgz"; then
+						rm -f $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/openqrm-client.tgz
+						openqrm_post_event 0 "restart_by_mac" 2 "openqrm-openvz-storage" "Failed to get the openqrm-client package arch $OPENQRM_CLIENT_ARCH!"
+						openvz_lock release
+						exit 1
+					else
+						# use the openQRM client which fits to the distri and arch
+						rm -rf $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/$OPENQRM_SERVER_BASE_DIR/openqrm
+						cd $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/
+						tar -xzf openqrm-client.tgz
+						rm -f openqrm-client.tgz
+						# enable start at init
+						chroot $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/ ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/etc/init.d/openqrm-client /etc/init.d/openqrm-client
+						echo "#!/bin/bash -x" > $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/tmp/openqrm-client.enable
+						echo "OPENQRM_SERVER_BASE_DIR=$OPENQRM_SERVER_BASE_DIR" >> $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/tmp/openqrm-client.enable
+						echo ". $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions" >> $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/tmp/openqrm-client.enable
+						echo "openqrm_chkconfig add openqrm-client" >> $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/tmp/openqrm-client.enable
+						chmod +x $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/tmp/openqrm-client.enable
+						chroot $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME /tmp/openqrm-client.enable
+						rm -f $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/tmp/openqrm-client.enable
+						# get the openQRM resource parameters for this active appliance
+						mkdir -p `dirname $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/$OPENQRM_RESOURCE_PARAMETER_FILE`
+						if ! $WGET -q -O $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/$OPENQRM_RESOURCE_PARAMETER_FILE "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$OPENVZ_VM_MAC"; then
+							openqrm_post_event 0 "restart_by_mac" 2 "openqrm-openvz-storage" "Failed to get openvz VM $OPENVZ_VM_NAME resource parameters!"
+							openvz_lock release
+							exit 1
+						fi
+						# set password from outside
+						. $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/$OPENQRM_RESOURCE_PARAMETER_FILE
+						if $WGET -q -O /tmp/image_pass.$image_id "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/action/image-auth/iauth.$image_id" 2>/dev/null; then
+							cryptedpassword=`cat /tmp/image_pass.$image_id`
+							rm -f /tmp/image_pass.$image_id
+							sed -i "s#^root:[^:]*#root:$cryptedpassword#" $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/shadow
+						fi
+						if [ -f "$OPENQRM_RESOURCE_PARAMETER_FILE" ]; then
+							. $OPENQRM_RESOURCE_PARAMETER_FILE
+						fi
+						# adjust network config of the image
+						# setup static ip-config in the image
+						if [ -f $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/debian_version ]; then
+							# debian or ubuntu
+							INTERFACE_CONFIG="$OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/network/interfaces"
+							OPENQRM_OPENVZ_BROADCAST=`echo $OPENQRM_OPENVZ_NETWORK | cut -d'.' -f1-3`
+							OPENQRM_OPENVZ_BROADCAST=$OPENQRM_OPENVZ_BROADCAST".255"
+							echo "auto lo" > $INTERFACE_CONFIG
+							echo "iface lo inet loopback" >> $INTERFACE_CONFIG
+							echo "auto eth0" >> $INTERFACE_CONFIG
+							echo "iface eth0 inet static" >> $INTERFACE_CONFIG
+							echo "	address $OPENVZ_VM_IP" >> $INTERFACE_CONFIG
+							echo "	netmask $OPENQRM_OPENVZ_SUBNET" >> $INTERFACE_CONFIG
+							echo "	network $OPENQRM_OPENVZ_NETWORK" >> $INTERFACE_CONFIG
+							echo "	broadcast $OPENQRM_OPENVZ_BROADCAST" >> $INTERFACE_CONFIG
+							echo "	gateway $OPENQRM_OPENVZ_DEFAULT_GATEWAY" >> $INTERFACE_CONFIG
+						elif [ -f $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/redhat-release ]; then
+							# centos or redhat
+							INTERFACE_CONFIG="$OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/sysconfig/network-scripts/ifcfg-eth0"
+							echo "DEVICE=eth0" > $INTERFACE_CONFIG
+							echo "BOOTPROTO=none" >> $INTERFACE_CONFIG
+							echo "ONBOOT=yes" >> $INTERFACE_CONFIG
+							echo "NETWORK=$OPENQRM_OPENVZ_NETWORK" >> $INTERFACE_CONFIG
+							echo "NETMASK=$OPENQRM_OPENVZ_SUBNET" >> $INTERFACE_CONFIG
+							echo "IPADDR=$OPENVZ_VM_IP" >> $INTERFACE_CONFIG
+							echo "GATEWAY=$OPENQRM_OPENVZ_DEFAULT_GATEWAY" >> $INTERFACE_CONFIG
+							#if ! grep route $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/rc.local 1>/dev/null; then
+							#	echo "route add default gw $OPENQRM_OPENVZ_DEFAULT_GATEWAY" >> $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/etc/rc.local
+							#fi
+						else
+							openqrm_post_event 0 "restart_by_mac" 2 "openqrm-openvz-storage" "Unknown Linux Distribution. Failed to setup ip-address on openvz VM $OPENVZ_VM_NAME!"
+						fi
+						cd $CURRENT_DIR
+					fi
+				fi
+			fi
+		fi
+		# start
+		vzctl start $OPENVZ_VM_NAME
+		# add vnets to bridges !
+		add_container_nics_to_bridge $OPENVZ_VM_NAME
+
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_vm_list -u $OPENVZ_OPENQRM_USERNAME -p $OPENVZ_OPENQRM_PASSWORD
+		fi
+		openvz_lock release
+		;;
+	reboot)
+		openvz_lock aquire
+		openqrm_post_event 0 "reboot" 5 "openqrm-openvz-storage" "Rebooting OpenVZ VM $OPENVZ_VM_NAME"
+		stop_container $OPENVZ_VM_NAME
+		sleep $OPENQRM_VM_START_DELAY
+		vzctl start $OPENVZ_VM_NAME
+		# add vnets to bridges !
+		add_container_nics_to_bridge $OPENVZ_VM_NAME
+
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			sleep $OPENQRM_VM_START_DELAY
+			$0 post_vm_list -u $OPENVZ_OPENQRM_USERNAME -p $OPENVZ_OPENQRM_PASSWORD
+		fi
+		openvz_lock release
+		;;
+	delete)
+		openvz_lock aquire
+		# be sure it is stopped
+		stop_container $OPENVZ_VM_NAME
+		# be sure its directories are umounted
+		umount $OPENQRM_VM_DIR/root/$OPENVZ_VM_NAME
+		vzctl destroy $OPENVZ_VM_NAME
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_vm_list -u $OPENVZ_OPENQRM_USERNAME -p $OPENVZ_OPENQRM_PASSWORD
+		fi
+		openvz_lock release
+		;;
+	list)
+		#echo "Listing OpenVZ vms"
+		vzlist -a -H
+		;;
+	post_vm_list)
+		#echo "Posting VM list to the openQRM-server"
+		VM_LIST_TMP=$resource_id.vm_list
+		> $VM_LIST_TMP
+		for OPENVZ_VEID in `vzlist -a -o veid -H | awk '{ print $1 }'`; do
+			# status
+			if `vzctl status $OPENVZ_VEID | grep running 1>/dev/null`; then
+				OPENVZ_VM_STATUS="running"
+			else
+				OPENVZ_VM_STATUS="stopped"
+			fi
+			# mac
+			OPENVZ_VM_MAC=`cat $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VEID.conf | grep ^NETIF | sed -e "s/.*,mac=//g" | cut -d',' -f1`
+			# hostname
+			unset HOSTNAME
+			unset OPENVZ_VM_HOSTNAME
+			. $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VEID.conf
+			OPENVZ_VM_HOSTNAME=$HOSTNAME
+			echo "@$OPENVZ_VEID@$OPENVZ_VM_STATUS@$OPENVZ_VM_MAC@$OPENVZ_VM_HOSTNAME@" >> $VM_LIST_TMP
+		done
+		# post
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$OPENVZ_OPENQRM_USERNAME --http-password=$OPENVZ_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_LIST_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?openvz_server_command=get_openvz_server; then
+			openqrm_post_event 0 "post_vm_list" 2 "openqrm-openvz-storage" "Could not post VM list to the openQRM-server at $OPENQRM_SERVER_IP!"
+			openvz_log post_lv "ERROR: Could not post VM list to the openQRM-server at $OPENQRM_SERVER_IP!"
+		fi
+		rm -f $VM_LIST_TMP
+		rm -f $VM_LIST_TMP.post
+		;;
+
+	post_vm_config)
+		#echo "Posting VM list to the openQRM-server"
+		VM_CONFIG_TMP=$resource_id.$OPENVZ_VM_NAME.vm_config
+		cat $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf |  grep -v ^# | sed -e '/^$/d' > $VM_CONFIG_TMP
+		. $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf
+		OPENVZ_INTERFACE_0=`echo "$NETIF;" | cut -d';' -f1`
+		OPENVZ_INTERFACE_1=`echo "$NETIF;" | cut -d';' -f2`
+		OPENVZ_INTERFACE_2=`echo "$NETIF;" | cut -d';' -f3`
+		OPENVZ_INTERFACE_3=`echo "$NETIF;" | cut -d';' -f4`
+		OPENVZ_INTERFACE_4=`echo "$NETIF;" | cut -d';' -f5`
+		echo "OPENQRM_OPENVZ_STORAGE_VM_INTERFACE_0=\"$OPENVZ_INTERFACE_0\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_OPENVZ_STORAGE_VM_INTERFACE_1=\"$OPENVZ_INTERFACE_1\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_OPENVZ_STORAGE_VM_INTERFACE_2=\"$OPENVZ_INTERFACE_2\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_OPENVZ_STORAGE_VM_INTERFACE_3=\"$OPENVZ_INTERFACE_3\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_OPENVZ_STORAGE_VM_INTERFACE_4=\"$OPENVZ_INTERFACE_4\"" >> $VM_CONFIG_TMP
+		# and the bridge config
+		echo "OPENQRM_OPENVZ_STORAGE_MGMT_BRIDGE=\"$OPENQRM_PLUGIN_OPENVZ_BRIDGE\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_OPENVZ_STORAGE_BRIDGE_NET1=\"$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET1\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_OPENVZ_STORAGE_BRIDGE_NET2=\"$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET2\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_OPENVZ_STORAGE_BRIDGE_NET3=\"$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET3\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_OPENVZ_STORAGE_BRIDGE_NET4=\"$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET4\"" >> $VM_CONFIG_TMP
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$OPENVZ_OPENQRM_USERNAME --http-password=$OPENVZ_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_CONFIG_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?openvz_server_command=get_openvz_config; then
+			openqrm_post_event 0 "post_vm_config" 2 "openqrm-openvz-storage" "Could not post VM config for OpenVZ VM $OPENVZ_VM_NAME!"
+			openvz_log post_lv "ERROR: Could not post VM config for OpenVZ VM $OPENVZ_VM_NAME!"
+		fi
+		rm -f $VM_CONFIG_TMP
+		rm -f $VM_CONFIG_TMP.post
+		;;
+
+
+	addnic)
+		if [ "$OPENVZ_VM_MAC2" != "" ]; then
+			NEW_OPENVZ_VM_MAC=$OPENVZ_VM_MAC2
+			NEW_OPENVZ_VM_NIC_NUMBER=1
+			NEW_OPENVZ_VM_BRIDGE=$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET1
+		fi
+		if [ "$OPENVZ_VM_MAC3" != "" ]; then
+			NEW_OPENVZ_VM_MAC=$OPENVZ_VM_MAC3
+			NEW_OPENVZ_VM_NIC_NUMBER=2
+			NEW_OPENVZ_VM_BRIDGE=$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET2
+		fi
+		if [ "$OPENVZ_VM_MAC4" != "" ]; then
+			NEW_OPENVZ_VM_MAC=$OPENVZ_VM_MAC4
+			NEW_OPENVZ_VM_NIC_NUMBER=3
+			NEW_OPENVZ_VM_BRIDGE=$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET3
+		fi
+		if [ "$OPENVZ_VM_MAC5" != "" ]; then
+			NEW_OPENVZ_VM_MAC=$OPENVZ_VM_MAC5
+			NEW_OPENVZ_VM_NIC_NUMBER=4
+			NEW_OPENVZ_VM_BRIDGE=$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET4
+		fi
+		if [ "$NEW_OPENVZ_VM_MAC" == "" ]; then
+			openvz_usage
+		fi
+		openqrm_post_event 0 "addnic" 5 "openqrm-openvz-storage" "Adding nic eth$NEW_OPENVZ_VM_NIC_NUMBER / $NEW_OPENVZ_VM_MAC to OpenVZ VM $OPENVZ_VM_NAME"
+		openvz_lock aquire
+		OPENVZ_VM_HOST_MAC=`dd if=/dev/urandom bs=1 count=5 2>/dev/null | od -tx1 | head -1 | cut -d' ' -f2- | awk '{ print $1":"$2":"$3":"$4":"$5 }'`
+		OPENVZ_VM_HOST_MAC="00:"$OPENVZ_VM_HOST_MAC
+		vzctl set $OPENVZ_VM_NAME --netif_add eth$NEW_OPENVZ_VM_NIC_NUMBER,$NEW_OPENVZ_VM_MAC,veth$OPENVZ_VM_NAME.$NEW_OPENVZ_VM_NIC_NUMBER,$OPENVZ_VM_HOST_MAC --save
+		# add vnets to bridges !
+		add_container_nics_to_bridge $OPENVZ_VM_NAME
+
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_vm_config -n $OPENVZ_VM_NAME -u $OPENVZ_OPENQRM_USERNAME -p $OPENVZ_OPENQRM_PASSWORD
+		fi
+		openvz_lock release
+		;;
+
+
+	removenic)
+		if [ "$OPENVZ_VM_CONFIG_PARAMETER" == "" ]; then
+			openvz_usage
+		fi
+		openqrm_post_event 0 "removenic" 5 "openqrm-openvz-storage" "Removing eth$OPENVZ_VM_CONFIG_PARAMETER from OpenVZ VM $OPENVZ_VM_NAME"
+		openvz_lock aquire
+		vzctl set $OPENVZ_VM_NAME --netif_del eth$OPENVZ_VM_CONFIG_PARAMETER --save
+
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_vm_config -n $OPENVZ_VM_NAME -u $OPENVZ_OPENQRM_USERNAME -p $OPENVZ_OPENQRM_PASSWORD
+		fi
+		openvz_lock release
+		;;
+
+
+	fence)
+		unset OPENVZ_VM_NAME
+		if [ "$OPENVZ_VM_MAC" == "" ]; then
+			openvz_usage
+		fi
+		openvz_lock aquire
+		# this command is is running from the openQRM engine which does
+		# not know about the openvz-name
+		OPENVZ_VM_NAME=`get_openvz_vm_name_by_mac $OPENVZ_VM_MAC`
+		if [ "$OPENVZ_VM_NAME" == "" ]; then
+			openqrm_post_event 0 "fence" 2 "openqrm-openvz-storage" "OpenVZ VM $OPENVZ_VM_MAC not existing on this Host"
+			exit 1
+		fi
+		openqrm_post_event 0 "fence" 5 "openqrm-openvz-storage" "Fencing OpenVZ VM $OPENVZ_VM_NAME"
+		stop_container $OPENVZ_VM_NAME
+		openvz_lock release
+		;;
+
+
+
+	migrate)
+		if [ "$OPENVZ_VM_IP" == "" ]; then
+			openvz_usage
+		fi
+		openvz_lock aquire
+		openqrm_post_event 0 "migrate" 5 "openqrm-openvz-storage" "Migrating OpenVZ VM $OPENVZ_VM_NAME to $OPENVZ_VM_IP"
+
+		# vm exists ?
+		if [ ! -f "$OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf" ]; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Source VM $OPENVZ_VM_NAME does not exists. Migration failed!"
+			openvz_lock release
+			exit 1
+		else
+			echo "Migrating OpenVZ VM $OPENVZ_VM_NAME to $OPENVZ_VM_IP"
+		fi
+		# get disk parameters
+		. $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf
+		VM_LVOL=`grep -w $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME /proc/mounts | grep -v simfs | awk '{ print $1 }'`
+		if [ ! -e "$VM_LVOL" ]; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Could not find device for $VE_PRIVATE of VM $OPENVZ_VM_NAME. Migration failed!"
+			openvz_lock release
+			exit 1
+		fi
+		# make sure it is the lvol
+		if ! lvs $VM_LVOL 1>/dev/null; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Device $VM_LVOL/$VE_PRIVATE of VM $OPENVZ_VM_NAME is not LVM. Migration failed!"
+			openvz_lock release
+			exit 1
+		else
+			echo "Found $VM_LVOL logical volume of OpenVZ VM $OPENVZ_VM_NAME"
+		fi
+		# test ssh connection
+		if ! $SSH $OPENVZ_VM_IP /bin/true; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Failed to execute SSH command on $OPENVZ_VM_IP!"
+			openvz_lock release
+			exit 1
+		else
+			echo "SSH test to $OPENVZ_VM_IP successful"
+		fi
+		# dump dir existing ?
+		if [ ! -d "$VZ_DUMP_DIR" ]; then
+			mkdir -p $VZ_DUMP_DIR
+		fi
+		# create root + private + dump on the destination
+		$SSH $OPENVZ_VM_IP mkdir -p $VZ_DUMP_DIR;
+		$SSH $OPENVZ_VM_IP mkdir -p $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME
+		$SSH $OPENVZ_VM_IP mkdir -p $OPENQRM_VM_DIR/root/$OPENVZ_VM_NAME
+
+		# checkpoint
+		VM_DUMP_FILE=$VZ_DUMP_DIR/$OPENVZ_VM_NAME.migrated.img
+		if ! $VZCTL chkpnt $OPENVZ_VM_NAME --dumpfile $VZ_DUMP_DIR/$OPENVZ_VM_NAME.migrated.img; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Failed to checkpoint $OPENVZ_VM_NAME. Migration failed!"
+			openvz_lock release
+			exit 1
+		else
+			echo "Created checkpoint for OpenVZ VM $OPENVZ_VM_NAME -> $VM_DUMP_FILE"
+		fi
+		# transfer checkpoint
+		if ! $SCP $VM_DUMP_FILE $OPENVZ_VM_IP:$VZ_DUMP_DIR/; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Failed to transfer $OPENVZ_VM_NAME. Migration failed!"
+			openvz_lock release
+			exit 1
+		else
+			echo "Successfully transfered checkpoint $VM_DUMP_FILE to $OPENVZ_VM_IP"
+		fi
+		# transfer config
+		if ! $SCP $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf $OPENVZ_VM_IP:$OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf.migrating; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Failed to transfer $OPENVZ_VM_NAME configuration. Migration failed!"
+			openvz_lock release
+			exit 1
+		else
+			echo "Successfully transfered configuration $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf to $OPENVZ_VM_IP"
+		fi
+
+		# point of no return
+
+		# stop/destroy on origin
+		stop_container $OPENVZ_VM_NAME
+		# move origin config
+		mv -f $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf.migrated
+		# umount private on source
+		if ! umount $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Could not umount $VM_LVOL of VM $OPENVZ_VM_NAME. Migration failed!"
+			mv -f $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf.migrated $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf
+			$VZCTL start $OPENVZ_VM_NAME
+			add_container_nics_to_bridge $OPENVZ_VM_NAME
+			openvz_lock release
+			exit 1
+		else
+			echo "Umounted $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME successfully"
+		fi
+
+		# tar + transfer idle rootfs in private on source host
+		tar -czf $VZ_DUMP_DIR/$OPENVZ_VM_NAME.idle.img $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/*
+		echo "Packed idle rootfs for VM $OPENVZ_VM_NAME"
+		$SCP $VZ_DUMP_DIR/$OPENVZ_VM_NAME.idle.img $OPENVZ_VM_IP:$VZ_DUMP_DIR/
+		echo "Transfered idle rootfs for VM $OPENVZ_VM_NAME to $OPENVZ_VM_IP"
+		$SSH $OPENVZ_VM_IP tar -C / -xzf $VZ_DUMP_DIR/$OPENVZ_VM_NAME.idle.img
+		echo "Unpacked idle rootfs for VM $OPENVZ_VM_NAME on $OPENVZ_VM_IP"
+		$SSH $OPENVZ_VM_IP rm -f $VZ_DUMP_DIR/$OPENVZ_VM_NAME.idle.img
+		rm -f $VZ_DUMP_DIR/$OPENVZ_VM_NAME.idle.img
+
+		# deactivate lvol on source
+		if ! lvchange -an $VM_LVOL; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Deactivating $VM_LVOL for $OPENVZ_VM_NAME failed. Migration failed!"
+			mv -f $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf.migrated $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf
+			mount $VM_LVOL $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME
+			$VZCTL start $OPENVZ_VM_NAME
+			add_container_nics_to_bridge $OPENVZ_VM_NAME
+			openvz_lock release
+			exit 1
+		else
+			echo "Deactivated $VM_LVOL on source host successfully"
+		fi
+		# activating lvol on destination
+		if ! $SSH $OPENVZ_VM_IP lvchange -ay $VM_LVOL; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Activating $VM_LVOL for $OPENVZ_VM_NAME on $OPENVZ_VM_IP failed. Migration failed!"
+			mv -f $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf.migrated $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf
+			lvchange -ay $VM_LVOL
+			mount $VM_LVOL $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME
+			$VZCTL start $OPENVZ_VM_NAME
+			add_container_nics_to_bridge $OPENVZ_VM_NAME
+			openvz_lock release
+			exit 1
+		else
+			echo "Activated $VM_LVOL on destination host successfully"
+		fi
+		# activate config on destination
+		if ! $SSH $OPENVZ_VM_IP /bin/mv -f $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf.migrating $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Error on activating VM $OPENVZ_VM_NAME configuration on $OPENVZ_VM_IP. Migration failed!"
+			mv -f $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf.migrated $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf
+			lvchange -ay $VM_LVOL
+			mount $VM_LVOL $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME
+			$VZCTL start $OPENVZ_VM_NAME
+			add_container_nics_to_bridge $OPENVZ_VM_NAME
+			openvz_lock release
+			exit 1
+		else
+			echo "Activated VM configuration $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf on destination host successfully"
+		fi
+		# mounting private on destination
+		if ! $SSH $OPENVZ_VM_IP mount $VM_LVOL $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Could not mount $VM_LVOL at $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME on $OPENVZ_VM_IP. Migration failed!"
+			$SSH $OPENVZ_VM_IP lvchange -an $VM_LVOL
+			mv -f $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf.migrated $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf
+			lvchange -ay $VM_LVOL
+			mount $VM_LVOL $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME
+			$VZCTL start $OPENVZ_VM_NAME
+			add_container_nics_to_bridge $OPENVZ_VM_NAME
+			openvz_lock release
+			exit 1
+		else
+			echo "Mounted VM private dir $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME on destination host successfully"
+		fi
+		# start on new destination
+		if ! $SSH $OPENVZ_VM_IP $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/openvz-storage/bin/openqrm-openvz-storage-vm resume -n $OPENVZ_VM_NAME; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Error starting VM $OPENVZ_VM_NAME on $OPENVZ_VM_IP. Migration failed!"
+			$SSH $OPENVZ_VM_IP umount $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME
+			$SSH $OPENVZ_VM_IP lvchange -an $VM_LVOL
+			mv -f $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf.migrated $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf
+			lvchange -ay $VM_LVOL
+			mount $VM_LVOL $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME
+			$VZCTL start $OPENVZ_VM_NAME
+			add_container_nics_to_bridge $OPENVZ_VM_NAME
+			openvz_lock release
+			exit 1
+		else
+			echo "Restored VM $OPENVZ_VM_NAME on destination host successfully"
+		fi
+		# really destroy on source host
+		mv -f $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf.migrated $OPENQRM_VM_CONFIG_DIR/conf/$OPENVZ_VM_NAME.conf
+		$VZCTL destroy $OPENVZ_VM_NAME 1>/dev/null 2>&1
+		rm -f $VM_DUMP_FILE
+		echo "Successful migrated VM $OPENVZ_VM_NAME to destination host $OPENVZ_VM_IP"
+
+
+		# posting success to openQRM
+		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
+			echo "success" > $OPENVZ_VM_NAME.vm_migrated_successfully
+			if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$OPENVZ_OPENQRM_USERNAME --http-password=$OPENVZ_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $OPENVZ_VM_NAME.vm_migrated_successfully` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?openvz_server_command=get_vm_migration; then
+				openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Could not post VM $OPENVZ_VM_NAME migration status the openQRM-server at $OPENQRM_SERVER_IP!"
+			fi
+			rm -f $OPENVZ_VM_NAME.vm_migrated_successfully
+			rm -f $OPENVZ_VM_NAME.vm_migrated_successfully.post
+		fi
+
+		openqrm_post_event 0 "migrate" 5 "openqrm-openvz-storage" "Migration finished for OpenVZ VM $OPENVZ_VM_NAME to $OPENVZ_VM_IP"
+		openvz_lock release
+		;;
+
+
+	resume)
+		# no locking
+		#openvz_lock aquire
+		openqrm_post_event 0 "resume" 5 "openqrm-openvz-storage" "Resuming OpenVZ VM $OPENVZ_VM_NAME"
+		VM_DUMP_FILE=$VZ_DUMP_DIR/$OPENVZ_VM_NAME.migrated.img
+		if [ ! -f "$VM_DUMP_FILE" ]; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Checkpoint for VM $OPENVZ_VM_NAME not available. Migration failed!"
+			# openvz_lock release
+			exit 1
+		fi
+		if ! $VZCTL restore $OPENVZ_VM_NAME --dumpfile $VM_DUMP_FILE; then
+			openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Restoring VM $OPENVZ_VM_NAME failed. Migration failed!"
+			# openvz_lock release
+			exit 1
+		else
+			echo "Restored $OPENVZ_VM_NAME from $VM_DUMP_FILE"
+		fi
+		add_container_nics_to_bridge $OPENVZ_VM_NAME
+		rm -f $VM_DUMP_FILE
+		openqrm_post_event 0 "resume" 5 "openqrm-openvz-storage" "Resume finished for OpenVZ VM $OPENVZ_VM_NAME"
+		# openvz_lock release
+		exit 0
+		;;
+
+	*)
+		openvz_usage
+		;;
+
+
+esac
+
