@@ -55,48 +55,49 @@ $hl_id_arr = htmlobject_request('hl_id');
 
 function redirect_private($strMsg, $currenttab = 'tab0') {
 	global $thisfile;
-    $url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab."&redirect=yes";
+	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab."&redirect=yes";
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
 
 
 // check if we got some actions to do
+$strMsg = '';
 if (htmlobject_request('redirect') != 'yes') {
-    if(htmlobject_request('action') != '') {
-        switch (htmlobject_request('action')) {
-            case 'set':
-                if (isset($_REQUEST['identifier'])) {
-                    foreach($_REQUEST['identifier'] as $id) {
-                        $presource = new resource();
-                        $presource->get_instance_by_id($id);
-                        $resource_hostlimit = $hl_id_arr[$id];
-                        if (strlen($resource_hostlimit)) {
-                            $strMsg .= "Setting resource $id hostlimit to $resource_hostlimit VMs ...<br>";
-                            unset($set_hostlimit);
-                            $set_hostlimit = new cloudhostlimit();
-                            $set_hostlimit->get_instance_by_resource($id);
-                            unset($cloud_hostlimit_fields);
-                            if (strlen($set_hostlimit->id)) {
-                                // update
-                                $cloud_hostlimit_fields["hl_max_vms"] = $resource_hostlimit;
-                                $set_hostlimit->update($set_hostlimit->id, $cloud_hostlimit_fields);
-                            } else {
-                                // add
-                                $cloud_hostlimit_fields["hl_id"]=openqrm_db_get_free_id('hl_id', $set_hostlimit->_db_table);
-                                $cloud_hostlimit_fields["hl_resource_id"] = $id;
-                                $cloud_hostlimit_fields["hl_max_vms"] = $resource_hostlimit;
-                                $cloud_hostlimit_fields["hl_current_vms"] = 0;
-                                $set_hostlimit->add($cloud_hostlimit_fields);
-                                unset($cloud_hostlimit_fields);
-                            }
-                        }
-                    }
-                    redirect_private($strMsg, 'tab0');
-                }
-                break;
-        }
-    }
+	if(htmlobject_request('action') != '') {
+		switch (htmlobject_request('action')) {
+			case 'set':
+				if (isset($_REQUEST['identifier'])) {
+					foreach($_REQUEST['identifier'] as $id) {
+						$presource = new resource();
+						$presource->get_instance_by_id($id);
+						$resource_hostlimit = $hl_id_arr[$id];
+						if (strlen($resource_hostlimit)) {
+							$strMsg .= "Setting resource $id hostlimit to $resource_hostlimit VMs ...<br>";
+							unset($set_hostlimit);
+							$set_hostlimit = new cloudhostlimit();
+							$set_hostlimit->get_instance_by_resource($id);
+							unset($cloud_hostlimit_fields);
+							if (strlen($set_hostlimit->id)) {
+								// update
+								$cloud_hostlimit_fields["hl_max_vms"] = $resource_hostlimit;
+								$set_hostlimit->update($set_hostlimit->id, $cloud_hostlimit_fields);
+							} else {
+								// add
+								$cloud_hostlimit_fields["hl_id"]=openqrm_db_get_free_id('hl_id', $set_hostlimit->_db_table);
+								$cloud_hostlimit_fields["hl_resource_id"] = $id;
+								$cloud_hostlimit_fields["hl_max_vms"] = $resource_hostlimit;
+								$cloud_hostlimit_fields["hl_current_vms"] = 0;
+								$set_hostlimit->add($cloud_hostlimit_fields);
+								unset($cloud_hostlimit_fields);
+							}
+						}
+					}
+					redirect_private($strMsg, 'tab0');
+				}
+				break;
+		}
+	}
 }
 
 
@@ -104,11 +105,11 @@ function cloud_hostlimit_manager() {
 
 	global $OPENQRM_USER;
 	global $OPENQRM_SERVER_IP_ADDRESS;
-    global $OPENQRM_WEB_PROTOCOL;
+	global $OPENQRM_WEB_PROTOCOL;
 	global $thisfile;
 
 	// get external name
-    $cp_conf = new cloudconfig();
+	$cp_conf = new cloudconfig();
 	$external_portal_name = $cp_conf->get_value(3);  // 3 is the external name
 	if (!strlen($external_portal_name)) {
 		$external_portal_name = "$OPENQRM_WEB_PROTOCOL://$OPENQRM_SERVER_IP_ADDRESS/cloud-portal";
@@ -120,7 +121,7 @@ function cloud_hostlimit_manager() {
 	$arHead['resource_icon'] = array();
 	$arHead['resource_icon']['title'] ='';
 
-    $arHead['resource_id'] = array();
+	$arHead['resource_id'] = array();
 	$arHead['resource_id']['title'] ='ID';
 
 	$arHead['resource_name'] = array();
@@ -140,58 +141,58 @@ function cloud_hostlimit_manager() {
 
 	$arBody = array();
 
-    // prepare selector array
-    $cloud_hostlimit_arr[] = array('value'=> '-1', 'label'=> 'no limit');
-    $cloud_hostlimit_arr[] = array('value'=> '0', 'label'=> 'no VM');
-    $cloud_hostlimit_arr[] = array('value'=> '1', 'label'=> '1 VM');
-    for ($i=2; $i<=100; $i++) {
-        $cloud_hostlimit_arr[] = array('value'=> "$i", 'label'=> "$i VMs");
-    }
+	// prepare selector array
+	$cloud_hostlimit_arr[] = array('value'=> '-1', 'label'=> 'no limit');
+	$cloud_hostlimit_arr[] = array('value'=> '0', 'label'=> 'no VM');
+	$cloud_hostlimit_arr[] = array('value'=> '1', 'label'=> '1 VM');
+	for ($i=2; $i<=100; $i++) {
+		$cloud_hostlimit_arr[] = array('value'=> "$i", 'label'=> "$i VMs");
+	}
 
 	// db select
-    $resource_count = 0;
+	$resource_count = 0;
 	$resource_list = new resource();
 	$resource_array = $resource_list->display_overview($table->offset, $table->limit, $table->sort, $table->order);
 	foreach ($resource_array as $index => $im) {
 		$resource_id = $im["resource_id"];
-        $resource = new resource();
-        $resource->get_instance_by_id($resource_id);
-        // prepare pre-select
-        $hostlimit = new cloudhostlimit();
-        $hostlimit->get_instance_by_resource($resource_id);
-        if (strlen($hostlimit->max_vms)) {
-            $host_preselected = $hostlimit->max_vms;
-        } else {
-            $host_preselected = -1;
-        }
-        // prepare resource list
+		$resource = new resource();
+		$resource->get_instance_by_id($resource_id);
+		// prepare pre-select
+		$hostlimit = new cloudhostlimit();
+		$hostlimit->get_instance_by_resource($resource_id);
+		if (strlen($hostlimit->max_vms)) {
+			$host_preselected = $hostlimit->max_vms;
+		} else {
+			$host_preselected = -1;
+		}
+		// prepare resource list
 		if ($resource->id == 0) {
 			$resource_icon_default="/openqrm/base/img/logo.png";
 			$resource_type = "openQRM";
-            $resource_mac = "x:x:x:x:x:x";
-            $resource_hostlimit_select = htmlobject_select("hl_id[$resource->id]", $cloud_hostlimit_arr, '', array($host_preselected));
+			$resource_mac = "x:x:x:x:x:x";
+			$resource_hostlimit_select = htmlobject_select("hl_id[$resource->id]", $cloud_hostlimit_arr, '', array($host_preselected));
 		} else {
-            $resource_mac = $resource->mac;
+			$resource_mac = $resource->mac;
 			$resource_icon_default="/openqrm/base/img/resource.png";
 
-            // the resource_type
+			// the resource_type
 			if ((strlen($resource->vtype)) && (!strstr($resource->vtype, "NULL"))){
 				// find out what should be preselected
-            	$virtualization = new virtualization();
+				$virtualization = new virtualization();
 				$virtualization->get_instance_by_id($resource->vtype);
-                if ($resource->id == $resource->vhostid) {
-                    // physical system
-    				$resource_type = "<nobr>".$virtualization->name."</nobr>";
-                    $resource_hostlimit_select = htmlobject_select("hl_id[$resource->id]", $cloud_hostlimit_arr, '', array($host_preselected));
+				if ($resource->id == $resource->vhostid) {
+					// physical system
+					$resource_type = "<nobr>".$virtualization->name."</nobr>";
+					$resource_hostlimit_select = htmlobject_select("hl_id[$resource->id]", $cloud_hostlimit_arr, '', array($host_preselected));
 
-                } else {
-                    // vm
-    				$resource_type = "<nobr>".$virtualization->name." on Res. ".$resource->vhostid."</nobr>";
-                    $resource_hostlimit_select = "";
-                }
+				} else {
+					// vm
+					$resource_type = "<nobr>".$virtualization->name." on Res. ".$resource->vhostid."</nobr>";
+					$resource_hostlimit_select = "";
+				}
 			} else {
 				$resource_type = "Unknown";
-                $resource_hostlimit_select = "";
+				$resource_hostlimit_select = "";
 			}
 
 		}
@@ -215,7 +216,7 @@ function cloud_hostlimit_manager() {
 			'resource_type' => $resource_type,
 			'resource_max_vms' => $resource_hostlimit_select,
 		);
-        $resource_count++;
+		$resource_count++;
 	}
 
 	$table->id = 'Tabelle';
@@ -231,8 +232,8 @@ function cloud_hostlimit_manager() {
 		$table->bottom = array('set');
 		$table->identifier = 'resource_id';
 	}
-    // do not show the openQRM server and idle resource
-    $resource_max = $resource_list->get_count("all");
+	// do not show the openQRM server and idle resource
+	$resource_max = $resource_list->get_count("all");
 	$table->max = $resource_max-1;
 
 	//------------------------------------------------------------ set template
@@ -240,7 +241,7 @@ function cloud_hostlimit_manager() {
 	$t->debug = false;
 	$t->setFile('tplfile', './tpl/' . 'cloud-hostlimit-manager-tpl.php');
 	$t->setVar(array(
-        'external_portal_name' => $external_portal_name,
+		'external_portal_name' => $external_portal_name,
 		'cloud_max_vms_table' => $table->get_string(),
 	));
 	$disp =  $t->parse('out', 'tplfile');

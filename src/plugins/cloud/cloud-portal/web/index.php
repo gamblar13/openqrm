@@ -192,7 +192,7 @@ if(htmlobject_request('action') != '') {
 				$user_fields['cu_token'] = $user_token;
 				// prepare more defaults
 				$user_fields['cu_status'] = 0;
-                // default user group
+				// default user group
 				$user_fields['cu_cg_id'] = 0;
 				$user_fields['cu_id'] = openqrm_db_get_free_id('cu_id', $CLOUD_USER_TABLE);
 				// check how many ccunits to give for a new user
@@ -324,7 +324,7 @@ if(htmlobject_request('action') != '') {
 			if ($cloud_user->is_name_free($fusername)) {
 				$strMsg = "No such user on the openQRM Cloud";
 				redirect($strMsg, tab0);
-				break;			
+				break;
 			}
 
 			$cloud_user->get_instance_by_name($fusername);
@@ -419,7 +419,7 @@ function register_user() {
 	$public_register_enabled = $cc_conf->get_value(14);  // 14 is public_register_enabled
 	$cc_admin_email = $cc_conf->get_value(1);  // 1 is admin_email
 
-	if ($public_register_enabled == 'true') {	
+	if ($public_register_enabled == 'true') {
 		$disp = "<h1>Register to the openQRM Cloud</h1>";
 		$disp = $disp."<br>";
 		$disp = $disp."<form action=$thisfile method=post>";
@@ -453,7 +453,7 @@ function register_user() {
 	}
 
 	$disp = $disp."<form action=$thisfile method=post>";
-    $disp = $disp."<br>";
+	$disp = $disp."<br>";
 	$disp = $disp."<hr>";
 	$disp = $disp."<h4>Forgot the password ?</h4>";
 	$disp = $disp."You already have an existing account on the openQRM Cloud but forgot your password ?";
@@ -470,7 +470,7 @@ function register_user() {
 	$disp = $disp."<input type=submit value='Forgot-Password'>";
 	$disp = $disp."</form>";
 
-    return $disp;
+	return $disp;
 }
 
 
@@ -479,7 +479,7 @@ function activate_user() {
 
 	global $OPENQRM_USER;
 	global $thisfile;
-	
+
 	$disp = "<h1>Activate your openQRM Cloud account</h1>";
 	$disp = $disp."<br>";
 	$disp = $disp."<form action=$thisfile method=post>";
@@ -527,11 +527,11 @@ if ($cloud_enabled != 'true') {
 
 $activate = htmlobject_request('activate');
 if (!strcmp($activate, "yes")) {
-    $output[] = array('label' => "<a href=\"$thisfile?currenttab=tab0\">Activate your Account</a>", 'value' => activate_user());
+	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab0\">Activate your Account</a>", 'value' => activate_user());
 } else {
-    $output[] = array('label' => "<a href=\"$thisfile?currenttab=tab0\">Welcome to the openQRM Cloud</a>", 'value' => portal_home());
-    $output[] = array('label' => "<a href=\"$thisfile?currenttab=tab1\">Register</a>", 'value' => register_user());
-    $output[] = array('label' => "<a href=\"/cloud-portal/user/mycloud.php\">Login</a>", 'value' => login_user());
+	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab0\">Welcome to the openQRM Cloud</a>", 'value' => portal_home());
+	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab1\">Register</a>", 'value' => register_user());
+	$output[] = array('label' => "<a href=\"/cloud-portal/user/mycloud.php\">Login</a>", 'value' => login_user());
 }
 echo htmlobject_tabmenu($output);
 

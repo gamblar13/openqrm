@@ -19,8 +19,6 @@
 
 
 
-$cloud_command = $_REQUEST["cloud_command"];
-
 // error_reporting(E_ALL);
 $thisfile = basename($_SERVER['PHP_SELF']);
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
@@ -54,6 +52,8 @@ $OPENQRM_SERVER_IP_ADDRESS=$openqrm_server->get_ip_address();
 global $OPENQRM_SERVER_IP_ADDRESS;
 global $event;
 
+$cloud_command = htmlobject_request('cloud_command');
+
 // user/role authentication
 if ($OPENQRM_USER->role != "administrator") {
 	$event->log("authorization", $_SERVER['REQUEST_TIME'], 1, "cloud-action", "Un-Authorized access to cloud-actions from $OPENQRM_USER->name", "", "", 0, 0, 0);
@@ -80,17 +80,19 @@ foreach ($_REQUEST as $key => $value) {
 	}
 }
 // set ha clone-on deploy
-if (!strcmp($request_fields['cr_ha_req'], "on")) {
+// set ha clone-on deploy
+$cr_ha_req = htmlobject_request('cr_ha_req');
+if (!strcmp($cr_ha_req, "on")) {
 	$request_fields['cr_ha_req']=1;
 } else {
 	$request_fields['cr_ha_req']=0;
 }
-if (!strcmp($request_fields['cr_shared_req'], "on")) {
+$cr_shared_req = htmlobject_request('cr_shared_req');
+if (!strcmp($cr_shared_req, "on")) {
 	$request_fields['cr_shared_req']=1;
 } else {
 	$request_fields['cr_shared_req']=0;
 }
-
 
 function date_to_timestamp($date) {
 	$day = substr($date, 0, 2);
@@ -110,8 +112,8 @@ function redirect($strMsg, $currenttab = 'tab0', $url = '') {
 	if($url == '') {
 		$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab;
 	} else {
-        $url = $url.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab;
-    }
+		$url = $url.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab;
+	}
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
@@ -189,7 +191,7 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			// cr_ip_mgmt VARCHAR(255)
 			// cr_appliance_id VARCHAR(255)
 			// cr_lastbill VARCHAR(20)
-			// 
+			//
 			// -> cloudusers
 			// cu_id BIGINT
 			// cu_cg_id BIGINT
@@ -205,13 +207,13 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			// cu_status SMALLINT
 			// cu_token VARCHAR(100)
 			// cu_ccunits INTEGER
-			// 
+			//
 			// -> cloudusergroup
-            // cg_id BIGINT
+			// cg_id BIGINT
 			// cg_name VARCHAR(20)
 			// cg_role_id BIGINT
 			// cg_description VARCHAR(255)
-            //
+			//
 			// -> clouduserslimits
 			// cl_id BIGINT
 			// cl_cu_id BIGINT
@@ -226,83 +228,83 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			// cc_key VARCHAR(50)
 			// cc_value VARCHAR(50)
 
-            // -> cloudimage
-            // ci_id BIGINT
-            // ci_cr_id BIGINT
-            // ci_image_id BIGINT
-            // ci_appliance_id BIGINT
-            // ci_resource_id BIGINT
-            // ci_disk_size VARCHAR(20)
-            // ci_disk_rsize VARCHAR(20)
-            // ci_clone_name VARCHAR(50)
-            // ci_state SMALLINT
-			
-            // -> cloudappliance
-            // ca_id BIGINT
-            // ca_appliance_id BIGINT
-            // ca_cr_id BIGINT
-            // ca_cmd SMALLINT
-            // ca_state SMALLINT
+			// -> cloudimage
+			// ci_id BIGINT
+			// ci_cr_id BIGINT
+			// ci_image_id BIGINT
+			// ci_appliance_id BIGINT
+			// ci_resource_id BIGINT
+			// ci_disk_size VARCHAR(20)
+			// ci_disk_rsize VARCHAR(20)
+			// ci_clone_name VARCHAR(50)
+			// ci_state SMALLINT
 
-            // -> cloudnat
-            // cn_id BIGINT
-            // cn_internal_net VARCHAR(50)
-            // cn_external_net VARCHAR(50)
+			// -> cloudappliance
+			// ca_id BIGINT
+			// ca_appliance_id BIGINT
+			// ca_cr_id BIGINT
+			// ca_cmd SMALLINT
+			// ca_state SMALLINT
 
-            // -> cloudtransaction
-            // ct_id BIGINT
-            // ct_time VARCHAR(50),
-            // ct_cr_id BIGINT
-            // ct_cu_id BIGINT
-            // ct_ccu_charge SMALLINT
-            // ct_ccu_balance SMALLINT
-            // ct_reason VARCHAR(20)
-            // ct_comment VARCHAR(255)
+			// -> cloudnat
+			// cn_id BIGINT
+			// cn_internal_net VARCHAR(50)
+			// cn_external_net VARCHAR(50)
 
-            // -> cloudirlc
-            // cd_id BIGINT
-            // cd_appliance_id BIGINT
-            // cd_state SMALLINT
+			// -> cloudtransaction
+			// ct_id BIGINT
+			// ct_time VARCHAR(50),
+			// ct_cr_id BIGINT
+			// ct_cu_id BIGINT
+			// ct_ccu_charge SMALLINT
+			// ct_ccu_balance SMALLINT
+			// ct_reason VARCHAR(20)
+			// ct_comment VARCHAR(255)
 
-            // -> cloudiplc
-            // cp_id BIGINT
-            // cp_appliance_id BIGINT
-            // cp_cu_id BIGINT
-            // cp_state SMALLINT
-            // cp_start_private VARCHAR(20)
+			// -> cloudirlc
+			// cd_id BIGINT
+			// cd_appliance_id BIGINT
+			// cd_state SMALLINT
 
-            // -> cloudprivateimage
-            // co_id BIGINT
-            // co_image_id BIGINT
-            // co_cu_id BIGINT
-            // co_state SMALLINT
-            // co_comment VARCHAR(255)
+			// -> cloudiplc
+			// cp_id BIGINT
+			// cp_appliance_id BIGINT
+			// cp_cu_id BIGINT
+			// cp_state SMALLINT
+			// cp_start_private VARCHAR(20)
 
-            // -> cloudselector
-            // id BIGINT
-            // type VARCHAR(255)
-            // sort_id BIGINT
-            // quantity VARCHAR(255)
-            // price SMALLINT
-            // name VARCHAR(20)
-            // description VARCHAR(255)
-            // state SMALLINT
+			// -> cloudprivateimage
+			// co_id BIGINT
+			// co_image_id BIGINT
+			// co_cu_id BIGINT
+			// co_state SMALLINT
+			// co_comment VARCHAR(255)
 
-            // -> cloudrespool
-            // rp_id BIGINT
-            // rp_resource_id BIGINT
-            // rp_cg_id BIGINT
+			// -> cloudselector
+			// id BIGINT
+			// type VARCHAR(255)
+			// sort_id BIGINT
+			// quantity VARCHAR(255)
+			// price SMALLINT
+			// name VARCHAR(20)
+			// description VARCHAR(255)
+			// state SMALLINT
 
-            // -> cloudhostlimit
-            // hl_id BIGINT
-            // hl_resource_id BIGINT
-            // hl_current_vms SMALLINT
-            // hl_max_vms SMALLINT
+			// -> cloudrespool
+			// rp_id BIGINT
+			// rp_resource_id BIGINT
+			// rp_cg_id BIGINT
 
-            // -> cloudpowersaver
-            // ps_id BIGINT
-            // ps_frequence VARCHAR(50)
-            // ps_last_check VARCHAR(50)
+			// -> cloudhostlimit
+			// hl_id BIGINT
+			// hl_resource_id BIGINT
+			// hl_current_vms SMALLINT
+			// hl_max_vms SMALLINT
+
+			// -> cloudpowersaver
+			// ps_id BIGINT
+			// ps_frequence VARCHAR(50)
+			// ps_last_check VARCHAR(50)
 
 			// -> cloud_profiles
 			// pr_id BIGINT
@@ -368,12 +370,12 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			// vc_id BIGINT
 			// vc_resource_id BIGINT
 			// vc_cr_id BIGINT
-            // vc_cr_resource_number SMALLINT
+			// vc_cr_resource_number SMALLINT
 			// vc_request_time VARCHAR(20)
 			// vc_vm_create_timeout SMALLINT
 			// vc_state SMALLINT
 
-            $create_cloud_requests = "create table cloud_requests(cr_id BIGINT, cr_cu_id BIGINT, cr_status SMALLINT, cr_request_time VARCHAR(20), cr_start VARCHAR(20), cr_stop VARCHAR(20), cr_kernel_id BIGINT, cr_image_id BIGINT, cr_ram_req VARCHAR(20), cr_cpu_req VARCHAR(20), cr_disk_req VARCHAR(20), cr_network_req VARCHAR(255), cr_resource_quantity SMALLINT, cr_resource_type_req VARCHAR(20), cr_deployment_type_req VARCHAR(50), cr_ha_req VARCHAR(5), cr_shared_req VARCHAR(5), cr_appliance_id VARCHAR(255), cr_puppet_groups VARCHAR(255), cr_ip_mgmt VARCHAR(255), cr_lastbill VARCHAR(20))";
+			$create_cloud_requests = "create table cloud_requests(cr_id BIGINT, cr_cu_id BIGINT, cr_status SMALLINT, cr_request_time VARCHAR(20), cr_start VARCHAR(20), cr_stop VARCHAR(20), cr_kernel_id BIGINT, cr_image_id BIGINT, cr_ram_req VARCHAR(20), cr_cpu_req VARCHAR(20), cr_disk_req VARCHAR(20), cr_network_req VARCHAR(255), cr_resource_quantity SMALLINT, cr_resource_type_req VARCHAR(20), cr_deployment_type_req VARCHAR(50), cr_ha_req VARCHAR(5), cr_shared_req VARCHAR(5), cr_appliance_id VARCHAR(255), cr_puppet_groups VARCHAR(255), cr_ip_mgmt VARCHAR(255), cr_lastbill VARCHAR(20))";
 			$create_cloud_users = "create table cloud_users(cu_id BIGINT, cu_cg_id BIGINT, cu_name VARCHAR(50), cu_password VARCHAR(50), cu_forename VARCHAR(50), cu_lastname VARCHAR(50), cu_email VARCHAR(50), cu_street VARCHAR(100), cu_city VARCHAR(100), cu_country VARCHAR(100), cu_phone VARCHAR(100), cu_status SMALLINT, cu_token VARCHAR(100), cu_ccunits INTEGER)";
 			$create_cloud_usergroups = "create table cloud_usergroups(cg_id BIGINT, cg_name VARCHAR(50), cg_role_id BIGINT, cg_description VARCHAR(255))";
 			$create_cloud_users_limit = "create table cloud_users_limits(cl_id BIGINT, cl_cu_id BIGINT, cl_resource_limit SMALLINT, cl_memory_limit INTEGER, cl_disk_limit INTEGER, cl_cpu_limit SMALLINT, cl_network_limit SMALLINT)";
@@ -389,12 +391,12 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			$create_cloud_resource_pool = "create table cloud_respool(rp_id BIGINT, rp_resource_id BIGINT, rp_cg_id BIGINT)";
 			$create_cloud_host_limit = "create table cloud_hostlimit(hl_id BIGINT, hl_resource_id BIGINT, hl_current_vms SMALLINT, hl_max_vms SMALLINT)";
 			$create_cloud_power_saver = "create table cloud_power_saver(ps_id BIGINT, ps_frequence VARCHAR(50), ps_last_check VARCHAR(50))";
-            $create_cloud_profiles = "create table cloud_profiles(pr_id BIGINT, pr_name VARCHAR(20), pr_cu_id BIGINT, pr_status SMALLINT, pr_request_time VARCHAR(20), pr_start VARCHAR(20), pr_stop VARCHAR(20), pr_kernel_id BIGINT, pr_image_id BIGINT, pr_ram_req VARCHAR(20), pr_cpu_req VARCHAR(20), pr_disk_req VARCHAR(20), pr_network_req VARCHAR(255), pr_resource_quantity SMALLINT, pr_resource_type_req VARCHAR(20), pr_deployment_type_req VARCHAR(50), pr_ha_req VARCHAR(5), pr_shared_req VARCHAR(5), pr_appliance_id VARCHAR(255), pr_puppet_groups VARCHAR(255), pr_ip_mgmt VARCHAR(255), pr_lastbill VARCHAR(20), pr_description VARCHAR(255))";
-            $create_cloud_icons = "create table cloud_icons(ic_id BIGINT, ic_cu_id BIGINT, ic_type SMALLINT, ic_object_id BIGINT, ic_filename VARCHAR(255))";
-            $create_cloud_matrix = "create table cloud_matrix(cm_id BIGINT, cm_cu_id BIGINT, cm_description VARCHAR(255), cm_row01 VARCHAR(255), cm_row02 VARCHAR(255), cm_row03 VARCHAR(255), cm_row04 VARCHAR(255), cm_row05 VARCHAR(255), cm_row06 VARCHAR(255), cm_row07 VARCHAR(255), cm_row08 VARCHAR(255), cm_row09 VARCHAR(255), cm_row10 VARCHAR(255), cm_row11 VARCHAR(255), cm_row12 VARCHAR(255))";
-            $create_cloud_matrix_object = "create table cloud_matrix_object(mo_id BIGINT, mo_pr_id BIGINT, mo_cr_id BIGINT, mo_ca_id BIGINT, mo_ne_id BIGINT, mo_table SMALLINT, mo_x SMALLINT, mo_y SMALLINT, mo_state SMALLINT)";
-            $create_cloud_create_vm_lc = "create table cloud_create_vm_lc(vc_id BIGINT, vc_resource_id BIGINT, vc_cr_id BIGINT, vc_cr_resource_number SMALLINT, vc_request_time VARCHAR(20), vc_vm_create_timeout SMALLINT, vc_state SMALLINT)";
-            $db=openqrm_get_db_connection();
+			$create_cloud_profiles = "create table cloud_profiles(pr_id BIGINT, pr_name VARCHAR(20), pr_cu_id BIGINT, pr_status SMALLINT, pr_request_time VARCHAR(20), pr_start VARCHAR(20), pr_stop VARCHAR(20), pr_kernel_id BIGINT, pr_image_id BIGINT, pr_ram_req VARCHAR(20), pr_cpu_req VARCHAR(20), pr_disk_req VARCHAR(20), pr_network_req VARCHAR(255), pr_resource_quantity SMALLINT, pr_resource_type_req VARCHAR(20), pr_deployment_type_req VARCHAR(50), pr_ha_req VARCHAR(5), pr_shared_req VARCHAR(5), pr_appliance_id VARCHAR(255), pr_puppet_groups VARCHAR(255), pr_ip_mgmt VARCHAR(255), pr_lastbill VARCHAR(20), pr_description VARCHAR(255))";
+			$create_cloud_icons = "create table cloud_icons(ic_id BIGINT, ic_cu_id BIGINT, ic_type SMALLINT, ic_object_id BIGINT, ic_filename VARCHAR(255))";
+			$create_cloud_matrix = "create table cloud_matrix(cm_id BIGINT, cm_cu_id BIGINT, cm_description VARCHAR(255), cm_row01 VARCHAR(255), cm_row02 VARCHAR(255), cm_row03 VARCHAR(255), cm_row04 VARCHAR(255), cm_row05 VARCHAR(255), cm_row06 VARCHAR(255), cm_row07 VARCHAR(255), cm_row08 VARCHAR(255), cm_row09 VARCHAR(255), cm_row10 VARCHAR(255), cm_row11 VARCHAR(255), cm_row12 VARCHAR(255))";
+			$create_cloud_matrix_object = "create table cloud_matrix_object(mo_id BIGINT, mo_pr_id BIGINT, mo_cr_id BIGINT, mo_ca_id BIGINT, mo_ne_id BIGINT, mo_table SMALLINT, mo_x SMALLINT, mo_y SMALLINT, mo_state SMALLINT)";
+			$create_cloud_create_vm_lc = "create table cloud_create_vm_lc(vc_id BIGINT, vc_resource_id BIGINT, vc_cr_id BIGINT, vc_cr_resource_number SMALLINT, vc_request_time VARCHAR(20), vc_vm_create_timeout SMALLINT, vc_state SMALLINT)";
+			$db=openqrm_get_db_connection();
 			$recordSet = &$db->Execute($create_cloud_requests);
 			$recordSet = &$db->Execute($create_cloud_users);
 			$recordSet = &$db->Execute($create_cloud_usergroups);
@@ -485,18 +487,18 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			$create_default_cloud_config33 = "insert into cloud_config(cc_id, cc_key, cc_value) values (33, 'max-parallel-phase-seven-actions', '0')";
 			$recordSet = &$db->Execute($create_default_cloud_config33);
 
-            // fill in default cloud products for the cloudselector
-            $create_default_cloudselector_config = "insert into cloud_selector VALUES (1,'cpu',0,'1',1,'1 CPU','1 CPU',1),(2,'cpu',1,'2',2,'2 CPUs','2 CPUs',1),(3,'cpu',2,'4',4,'4 CPUs','4 CPUs',1),(4,'disk',0,'2000',2,'2 GB','2 GB Disk Space',1),(5,'disk',1,'5000',5,'5 GB','5 GB Disk Space',1),(6,'disk',2,'10000',10,'10 GB','10 GB Disk Space',1),(7,'disk',3,'20000',20,'20 GB','20 GB Disk Space',1),(8,'disk',4,'50000',50,'50 GB','50 GB Disk Space',1),(9,'disk',5,'100000',100,'100 GB','100 GB Disk Space',1),(11,'memory',1,'512',2,'512 MB','512 MB Memory',1),(10,'memory',0,'256',1,'256 MB','256 MB Memory',1),(12,'memory',2,'1024',4,'1 GB','1 GB Memory',1),(13,'memory',3,'2048',8,'2 GB','2 GB Memory',1),(16,'network',2,'3',3,'3 NICs','3 Network Cards',1),(15,'network',1,'2',2,'2 NICs','2 Network Cards',1),(14,'network',0,'1',1,'1 NIC','1 Network Card',1),(17,'network',3,'4',4,'4 NICs','4 Network Cards',1),(18,'quantity',0,'1',1,'1','1 CloudAppliance',1),(19,'quantity',1,'2',2,'2','2 CloudAppliances',1),(20,'quantity',2,'3',3,'3','3 CloudAppliances',1),(21,'quantity',3,'4',4,'4','4 CloudAppliances',1),(22,'quantity',4,'5',5,'5','5 CloudAppliances',1);";
+			// fill in default cloud products for the cloudselector
+			$create_default_cloudselector_config = "insert into cloud_selector VALUES (1,'cpu',0,'1',1,'1 CPU','1 CPU',1),(2,'cpu',1,'2',2,'2 CPUs','2 CPUs',1),(3,'cpu',2,'4',4,'4 CPUs','4 CPUs',1),(4,'disk',0,'2000',2,'2 GB','2 GB Disk Space',1),(5,'disk',1,'5000',5,'5 GB','5 GB Disk Space',1),(6,'disk',2,'10000',10,'10 GB','10 GB Disk Space',1),(7,'disk',3,'20000',20,'20 GB','20 GB Disk Space',1),(8,'disk',4,'50000',50,'50 GB','50 GB Disk Space',1),(9,'disk',5,'100000',100,'100 GB','100 GB Disk Space',1),(11,'memory',1,'512',2,'512 MB','512 MB Memory',1),(10,'memory',0,'256',1,'256 MB','256 MB Memory',1),(12,'memory',2,'1024',4,'1 GB','1 GB Memory',1),(13,'memory',3,'2048',8,'2 GB','2 GB Memory',1),(16,'network',2,'3',3,'3 NICs','3 Network Cards',1),(15,'network',1,'2',2,'2 NICs','2 Network Cards',1),(14,'network',0,'1',1,'1 NIC','1 Network Card',1),(17,'network',3,'4',4,'4 NICs','4 Network Cards',1),(18,'quantity',0,'1',1,'1','1 CloudAppliance',1),(19,'quantity',1,'2',2,'2','2 CloudAppliances',1),(20,'quantity',2,'3',3,'3','3 CloudAppliances',1),(21,'quantity',3,'4',4,'4','4 CloudAppliances',1),(22,'quantity',4,'5',5,'5','5 CloudAppliances',1);";
 			$recordSet = &$db->Execute($create_default_cloudselector_config);
-            // create default user group
-            $create_default_usergroup = "insert into cloud_usergroups VALUES (0,'Default',0,'The default CloudUser Group');";
+			// create default user group
+			$create_default_usergroup = "insert into cloud_usergroups VALUES (0,'Default',0,'The default CloudUser Group');";
 			$recordSet = &$db->Execute($create_default_usergroup);
-            // default power-saver config
-            $create_default_power_saver_config = "insert into cloud_power_saver VALUES (0,'1800','');";
+			// default power-saver config
+			$create_default_power_saver_config = "insert into cloud_power_saver VALUES (0,'1800','');";
 			$recordSet = &$db->Execute($create_default_power_saver_config);
 
 
-		    $db->Close();
+			$db->Close();
 			break;
 
 		case 'uninstall':
@@ -543,7 +545,7 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 			$recordSet = &$db->Execute($drop_cloud_matrix);
 			$recordSet = &$db->Execute($drop_cloud_matrix_object);
 			$recordSet = &$db->Execute($drop_cloud_create_vm_lc);
-		    $db->Close();
+			$db->Close();
 			break;
 
 		case 'create_user':
@@ -565,14 +567,14 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 
 			// email valid ?
 			$cloud_email = new clouduser();
-            if (strcmp($user_fields['cu_email'], "@localhost")) {
-                if (!$cloud_email->checkEmail($user_fields['cu_email'])) {
-                    $strMsg = "Email address is invalid. <br>";
-                    $c_error = 1;
-                    redirect($strMsg, 'tab0', "cloud-user.php");
-                    exit(0);
-                }
-            }
+			if (strcmp($user_fields['cu_email'], "@localhost")) {
+				if (!$cloud_email->checkEmail($user_fields['cu_email'])) {
+					$strMsg = "Email address is invalid. <br>";
+					$c_error = 1;
+					redirect($strMsg, 'tab0', "cloud-user.php");
+					exit(0);
+				}
+			}
 
 			// password min 6 characters
 			if (strlen($user_fields['cu_password'])<6) {
@@ -598,76 +600,85 @@ $event->log("$cloud_command", $_SERVER['REQUEST_TIME'], 5, "cloud-action", "Proc
 				exit(0);
 			}
 
-            if ($c_error == 0) {
-                // check how many ccunits to give for a new user
-                $cc_conf = new cloudconfig();
-                $cc_auto_give_ccus = $cc_conf->get_value(12);  // 12 is auto_give_ccus
-                $user_fields['cu_ccunits'] = $cc_auto_give_ccus;
-                $cl_user = new clouduser();
-                $cl_user->add($user_fields);
-                // add user to htpasswd
-                $cloud_htpasswd = "$CloudDir/user/.htpasswd";
-                if (file_exists($cloud_htpasswd)) {
-                    $openqrm_server_command="htpasswd -b $CloudDir/user/.htpasswd $username $password";
-                } else {
-                    $openqrm_server_command="htpasswd -c -b $CloudDir/user/.htpasswd $username $password";
-                }
-                $output = shell_exec($openqrm_server_command);
+			if ($c_error == 0) {
+				// check how many ccunits to give for a new user
+				$cc_conf = new cloudconfig();
+				$cc_auto_give_ccus = $cc_conf->get_value(12);  // 12 is auto_give_ccus
+				$user_fields['cu_ccunits'] = $cc_auto_give_ccus;
+				$cl_user = new clouduser();
+				$cl_user->add($user_fields);
+				// add user to htpasswd
+				$cloud_htpasswd = "$CloudDir/user/.htpasswd";
+				if (file_exists($cloud_htpasswd)) {
+					$openqrm_server_command="htpasswd -b $CloudDir/user/.htpasswd $username $password";
+				} else {
+					$openqrm_server_command="htpasswd -c -b $CloudDir/user/.htpasswd $username $password";
+				}
+				$output = shell_exec($openqrm_server_command);
 
-                // set user permissions and limits, set to 0 (infinite) by default
-                $cloud_user_limit = new clouduserlimits();
-                $cloud_user_limits_fields['cl_id'] = openqrm_db_get_free_id('cl_id', $cloud_user_limit->_db_table);
-                $cloud_user_limits_fields['cl_cu_id'] = $user_fields['cu_id'];
-                $cloud_user_limits_fields['cl_resource_limit'] = 0;
-                $cloud_user_limits_fields['cl_memory_limit'] = 0;
-                $cloud_user_limits_fields['cl_disk_limit'] = 0;
-                $cloud_user_limits_fields['cl_cpu_limit'] = 0;
-                $cloud_user_limits_fields['cl_network_limit'] = 0;
-                $cloud_user_limit->add($cloud_user_limits_fields);
+				// set user permissions and limits, set to 0 (infinite) by default
+				$cloud_user_limit = new clouduserlimits();
+				$cloud_user_limits_fields['cl_id'] = openqrm_db_get_free_id('cl_id', $cloud_user_limit->_db_table);
+				$cloud_user_limits_fields['cl_cu_id'] = $user_fields['cu_id'];
+				$cloud_user_limits_fields['cl_resource_limit'] = 0;
+				$cloud_user_limits_fields['cl_memory_limit'] = 0;
+				$cloud_user_limits_fields['cl_disk_limit'] = 0;
+				$cloud_user_limits_fields['cl_cpu_limit'] = 0;
+				$cloud_user_limits_fields['cl_network_limit'] = 0;
+				$cloud_user_limit->add($cloud_user_limits_fields);
 
-                // send mail to user
-                // get admin email
-                $cc_admin_email = $cc_conf->get_value(1);  // 1 is admin_email
-                // get external name
-                $external_portal_name = $cc_conf->get_value(3);  // 3 is the external name
-                if (!strlen($external_portal_name)) {
-                    $external_portal_name = "http://$OPENQRM_SERVER_IP_ADDRESS/cloud-portal";
-                }
-                $email = $user_fields['cu_email'];
-                $forename = $user_fields['cu_forename'];
-                $lastname = $user_fields['cu_lastname'];
-                $rmail = new cloudmailer();
-                $rmail->to = "$email";
-                $rmail->from = "$cc_admin_email";
-                $rmail->subject = "openQRM Cloud: Your account has been created";
-                $rmail->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/welcome_new_cloud_user.mail.tmpl";
-                $arr = array('@@USER@@'=>"$username", '@@PASSWORD@@'=>"$password", '@@EXTERNALPORTALNAME@@'=>"$external_portal_name", '@@FORENAME@@'=>"$forename", '@@LASTNAME@@'=>"$lastname", '@@CLOUDADMIN@@'=>"$cc_admin_email");
-                $rmail->var_array = $arr;
-                $rmail->send();
+				// send mail to user
+				// get admin email
+				$cc_admin_email = $cc_conf->get_value(1);  // 1 is admin_email
+				// get external name
+				$external_portal_name = $cc_conf->get_value(3);  // 3 is the external name
+				if (!strlen($external_portal_name)) {
+					$external_portal_name = "http://$OPENQRM_SERVER_IP_ADDRESS/cloud-portal";
+				}
+				$email = $user_fields['cu_email'];
+				$forename = $user_fields['cu_forename'];
+				$lastname = $user_fields['cu_lastname'];
+				$rmail = new cloudmailer();
+				$rmail->to = "$email";
+				$rmail->from = "$cc_admin_email";
+				$rmail->subject = "openQRM Cloud: Your account has been created";
+				$rmail->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/welcome_new_cloud_user.mail.tmpl";
+				$arr = array('@@USER@@'=>"$username", '@@PASSWORD@@'=>"$password", '@@EXTERNALPORTALNAME@@'=>"$external_portal_name", '@@FORENAME@@'=>"$forename", '@@LASTNAME@@'=>"$lastname", '@@CLOUDADMIN@@'=>"$cc_admin_email");
+				$rmail->var_array = $arr;
+				$rmail->send();
 
-                $strMsg = "Added user $usecrname";
-                redirect($strMsg, 'tab0', "cloud-user.php");
-            }
+				$strMsg = "Added user $username";
+				redirect($strMsg, 'tab0', "cloud-user.php");
+			}
 			break;
 
 
 		case 'create_user_group':
+			$cg_name = htmlobject_request('cg_name');
+			$cg_description = htmlobject_request('cg_description');
+			// does username already exists ?
+			$c_user_group = new cloudusergroup();
+			if (!$c_user_group->is_name_free($cg_name)) {
+				$strMsg = "A usergroup with the name $cg_name already exist.<br>Please choose another groupname <br>";
+				redirect($strMsg, 'tab0', "cloud-usergroup.php");
+				exit(0);
+			}
 			$user_group_fields['cg_id'] = openqrm_db_get_free_id('cg_id', $CLOUD_USER_GROUPS_TABLE);
 			// enabled by default
 			$user_group_fields['cg_role_id'] = 1;
 			// checks
-			check_param("Groupname", $user_group_fields['cg_name']);
-			check_param("Description", $user_group_fields['cg_description']);
+			check_param("Groupname", $cg_name);
+			check_param("Description", $cg_description);
 
-            $cl_user_group = new cloudusergroup();
-            $cl_user_group->add($user_group_fields);
-            $strMsg = "Added user group $cg_name";
-            redirect($strMsg, 'tab0', "cloud-usergroup.php");
+			$cl_user_group = new cloudusergroup();
+			$cl_user_group->add($user_group_fields);
+			$strMsg = "Added user group $cg_name";
+			redirect($strMsg, 'tab0', "cloud-usergroup.php");
 			break;
 
 
-        case 'create_request':
-		
+		case 'create_request':
+
 			// check if the user has ccunits
 			$cr_cu_id = $request_fields['cr_cu_id'];
 			$cl_user = new clouduser();

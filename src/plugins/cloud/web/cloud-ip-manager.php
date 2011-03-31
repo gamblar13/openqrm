@@ -59,43 +59,44 @@ $private_id_arr = htmlobject_request('cg_id');
 
 function redirect_private($strMsg, $currenttab = 'tab0') {
 	global $thisfile;
-    $url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab."&redirect=yes";
+	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab."&redirect=yes";
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
 
 
 // check if we got some actions to do
+$strMsg = '';
 if (htmlobject_request('redirect') != 'yes') {
-    if(htmlobject_request('action') != '') {
-        switch (htmlobject_request('action')) {
-            case 'set':
-                if (isset($_REQUEST['identifier'])) {
-                    foreach($_REQUEST['identifier'] as $ip_mgmt_name) {
-                        $private_cg_id = $private_id_arr[$ip_mgmt_name];
-                        if ($private_cg_id == -1) {
-                            $private_name = "Hide";
-                        } else if ($private_cg_id == 0) {
-                            $private_name = "Default Cloud User Group";
-                        } else {
-                            $pcloudusergroup = new cloudusergroup();
-                            $pcloudusergroup->get_instance_by_id($private_cg_id);
-                            $private_name = $pcloudusergroup->name;
-                        }
-                        $strMsg .= "Setting IP Network $ip_mgmt_name to $private_name ( $private_cg_id )....<br>";
+	if(htmlobject_request('action') != '') {
+		switch (htmlobject_request('action')) {
+			case 'set':
+				if (isset($_REQUEST['identifier'])) {
+					foreach($_REQUEST['identifier'] as $ip_mgmt_name) {
+						$private_cg_id = $private_id_arr[$ip_mgmt_name];
+						if ($private_cg_id == -1) {
+							$private_name = "Hide";
+						} else if ($private_cg_id == 0) {
+							$private_name = "Default Cloud User Group";
+						} else {
+							$pcloudusergroup = new cloudusergroup();
+							$pcloudusergroup->get_instance_by_id($private_cg_id);
+							$private_name = $pcloudusergroup->name;
+						}
+						$strMsg .= "Setting IP Network $ip_mgmt_name to $private_name ( $private_cg_id )....<br>";
 
-                        $private_cloud_ip_mgmt_fields["ip_mgmt_user_id"] = $private_cg_id;
-                    	$ip_mgmt = new ip_mgmt();
-                        $ip_mgmt->update($ip_mgmt_name, $private_cloud_ip_mgmt_fields);
-                    }
-                    redirect_private($strMsg, 'tab0');
-                }
-                break;
+						$private_cloud_ip_mgmt_fields["ip_mgmt_user_id"] = $private_cg_id;
+						$ip_mgmt = new ip_mgmt();
+						$ip_mgmt->update($ip_mgmt_name, $private_cloud_ip_mgmt_fields);
+					}
+					redirect_private($strMsg, 'tab0');
+				}
+				break;
 
 
 
-        }
-    }
+		}
+	}
 }
 
 
@@ -103,25 +104,25 @@ function cloud_ip_mgmt_pool_selector() {
 
 	global $OPENQRM_USER;
 	global $OPENQRM_SERVER_IP_ADDRESS;
-    global $OPENQRM_WEB_PROTOCOL;
+	global $OPENQRM_WEB_PROTOCOL;
 	global $thisfile;
-    global $RootDir;
+	global $RootDir;
 
-    // private-resource enabled ?
-    $cp_conf = new cloudconfig();
-    $show_ip_mgmt = $cp_conf->get_value(26);	// ip-mgmt enabled ?
-    if (strcmp($show_ip_mgmt, "true")) {
-        $strMsg = "<strong>IP-Management is not enabled in this Cloud !</strong>";
-        return $strMsg;
-        exit(0);
-    } else {
-        // is the ip-mgmt plugin enabled ?
-        if (!file_exists("$RootDir/plugins/ip-mgmt/.running")) {
-            $strMsg = "<strong>The IP-Management plug-in is not enabled in this openQRM Server !</strong>";
-            return $strMsg;
-            exit(0);
-        }
-    }
+	// private-resource enabled ?
+	$cp_conf = new cloudconfig();
+	$show_ip_mgmt = $cp_conf->get_value(26);	// ip-mgmt enabled ?
+	if (strcmp($show_ip_mgmt, "true")) {
+		$strMsg = "<strong>IP-Management is not enabled in this Cloud !</strong>";
+		return $strMsg;
+		exit(0);
+	} else {
+		// is the ip-mgmt plugin enabled ?
+		if (!file_exists("$RootDir/plugins/ip-mgmt/.running")) {
+			$strMsg = "<strong>The IP-Management plug-in is not enabled in this openQRM Server !</strong>";
+			return $strMsg;
+			exit(0);
+		}
+	}
 	// get external name
 	$external_portal_name = $cp_conf->get_value(3);  // 3 is the external name
 	if (!strlen($external_portal_name)) {
@@ -143,34 +144,34 @@ function cloud_ip_mgmt_pool_selector() {
 
 	$arBody = array();
 
-    // prepare selector array
-    $cloud_user_group_sel = new cloudusergroup();
-    $cloud_user_group_arr = $cloud_user_group_sel->get_list();
-    $cloud_user_group_arr = array_reverse($cloud_user_group_arr);
-    $cloud_user_group_arr[] = array('value'=> '-1', 'label'=> 'Hide');
-    $cloud_user_group_arr = array_reverse($cloud_user_group_arr);
+	// prepare selector array
+	$cloud_user_group_sel = new cloudusergroup();
+	$cloud_user_group_arr = $cloud_user_group_sel->get_list();
+	$cloud_user_group_arr = array_reverse($cloud_user_group_arr);
+	$cloud_user_group_arr[] = array('value'=> '-1', 'label'=> 'Hide');
+	$cloud_user_group_arr = array_reverse($cloud_user_group_arr);
 
 	// db select
-    $ip_mgmt_count = 0;
+	$ip_mgmt_count = 0;
 	$ip_mgmt_list = new ip_mgmt();
 	$ip_mgmt_array = $ip_mgmt_list->get_names();
 
-    foreach ($ip_mgmt_array as $ip_mgmt_name) {
-        // find out which is selected
-    	$ip_mgmt_sel = new ip_mgmt();
-        $ip_mgmt_lib_by_name = $ip_mgmt_sel->get_list($ip_mgmt_name);
-        $pi_selected = $ip_mgmt_lib_by_name[$ip_mgmt_name]['first']['ip_mgmt_user_id'];
-        if (!strlen($pi_selected)) {
-            $pi_selected=-1;
-        }
-        $ip_mgmt_icon_default="/openqrm/base/plugins/cloud/img/cloudipgroups.png";
-        $ip_mgmt_pool_select = htmlobject_select("cg_id[$ip_mgmt_name]", $cloud_user_group_arr, '', array($pi_selected));
+	foreach ($ip_mgmt_array as $ip_mgmt_name) {
+		// find out which is selected
+		$ip_mgmt_sel = new ip_mgmt();
+		$ip_mgmt_lib_by_name = $ip_mgmt_sel->get_list($ip_mgmt_name);
+		$pi_selected = $ip_mgmt_lib_by_name[$ip_mgmt_name]['first']['ip_mgmt_user_id'];
+		if (!strlen($pi_selected)) {
+			$pi_selected=-1;
+		}
+		$ip_mgmt_icon_default="/openqrm/base/plugins/cloud/img/cloudipgroups.png";
+		$ip_mgmt_pool_select = htmlobject_select("cg_id[$ip_mgmt_name]", $cloud_user_group_arr, '', array($pi_selected));
 		$arBody[] = array(
 			'ip_mgmt_icon' => "<img width=24 height=24 src=$ip_mgmt_icon_default>",
 			'ip_mgmt_name' => $ip_mgmt_name,
 			'ip_mgmt_selector' => $ip_mgmt_pool_select,
 		);
-        $ip_mgmt_count++;
+		$ip_mgmt_count++;
 	}
 	$table->id = 'Tabelle';
 	$table->css = 'htmlobject_table';
@@ -192,7 +193,7 @@ function cloud_ip_mgmt_pool_selector() {
 	$t->debug = false;
 	$t->setFile('tplfile', './tpl/' . 'cloud-ip-manager-tpl.php');
 	$t->setVar(array(
-        'external_portal_name' => $external_portal_name,
+		'external_portal_name' => $external_portal_name,
 		'cloud_private_ip_table' => $table->get_string(),
 	));
 	$disp =  $t->parse('out', 'tplfile');

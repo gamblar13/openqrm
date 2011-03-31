@@ -52,20 +52,20 @@ function openqrm_cloud_resource($cmd, $resource_fields) {
 	// $event->log("openqrm_remove_resource", $_SERVER['REQUEST_TIME'], 5, "openqrm-cloud-resource-hook.php", "Handling $cmd event $resource_id/$resource_ip/$resource_mac", "", "", 0, 0, $resource_id);
 	switch($cmd) {
 		case "remove":
-            if (strlen($resource_id)) {
-                // cloudrespool
-                $resource_pool = new cloudrespool();
-                $resource_pool->get_instance_by_resource($resource_id);
-                if (strlen($resource_pool->id)) {
-                    $resource_pool->remove($resource_pool->id);
-                }
-                // cloudhostlimit
-                $resource_hostlimit = new cloudhostlimit();
-                $resource_hostlimit->get_instance_by_resource($resource_id);
-                if (strlen($resource_hostlimit->id)) {
-                    $resource_hostlimit->remove($resource_hostlimit->id);
-                }
-            }
+			if (strlen($resource_id)) {
+				// cloudrespool
+				$resource_pool = new cloudrespool();
+				$resource_pool->get_instance_by_resource($resource_id);
+				if (strlen($resource_pool->id)) {
+					$resource_pool->remove($resource_pool->id);
+				}
+				// cloudhostlimit
+				$resource_hostlimit = new cloudhostlimit();
+				$resource_hostlimit->get_instance_by_resource($resource_id);
+				if (strlen($resource_hostlimit->id)) {
+					$resource_hostlimit->remove($resource_hostlimit->id);
+				}
+			}
 			break;
 	}
 }

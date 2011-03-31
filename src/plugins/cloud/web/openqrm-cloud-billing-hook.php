@@ -66,21 +66,21 @@ function openqrm_custom_cloud_billing($cr_id, $cu_id, $cu_ccunits) {
 	global $BaseDir;
 	global $RootDir;
 
-    // please implement your custom calcuation here
-    // -> in the following example we just substract 1 for each active cloud appliance per hour
-    $custom_costs = 1;
-    $new_cu_ccunits = $cu_ccunits-$custom_costs;
+	// please implement your custom calcuation here
+	// -> in the following example we just substract 1 for each active cloud appliance per hour
+	$custom_costs = 1;
+	$new_cu_ccunits = $cu_ccunits-$custom_costs;
 
-    // check if CCU credits are going low
-    if ($new_cu_ccunits < 0) {
-        $new_cu_ccunits = 0;
-    }
-    // $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "openqrm-cloud-billing-hook", "Applying basic charge $new_cu_ccunits = $cu_ccunits-$basic_costs for request ID $cr_id", "", "", 0, 0, 0);
-    // transaction logging
-    $ct = new cloudtransaction();
-    $ct->push($cr_id, $cu_id, $custom_costs, $new_cu_ccunits, "Custom Cloud billing", "Custom CCU charge for a Cloud appliance");
+	// check if CCU credits are going low
+	if ($new_cu_ccunits < 0) {
+		$new_cu_ccunits = 0;
+	}
+	// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "openqrm-cloud-billing-hook", "Applying basic charge $new_cu_ccunits = $cu_ccunits-$basic_costs for request ID $cr_id", "", "", 0, 0, 0);
+	// transaction logging
+	$ct = new cloudtransaction();
+	$ct->push($cr_id, $cu_id, $custom_costs, $new_cu_ccunits, "Custom Cloud billing", "Custom CCU charge for a Cloud appliance");
 
-    return $new_cu_ccunits;
+	return $new_cu_ccunits;
 }
 
 ?>

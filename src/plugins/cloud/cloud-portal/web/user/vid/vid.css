@@ -9,7 +9,7 @@ Nov, 2009.
 body{
 	font-family: arial;
 	margin: 0px; /* for IE6 / IE7 */
-    background-color: rgb(211,211,211);
+	background-color: rgb(211,211,211);
 }
 
 
@@ -86,7 +86,7 @@ div#drag td{
 /* "Click" button */
 .button{
 	background-color: #6A93D4;
-	color: white; 
+	color: white;
 	border-width: 1px;
 	width: 60px;
 	padding: 0px;
@@ -117,13 +117,13 @@ div#drag td{
 
 
 #vidinfobox {
-    position: absolute;
-    left: 10px;
-    top: 10px;
-    width: 360px;
-    height: 410px;
-    padding: 10px;
-    border: solid 1px #808080;
+	position: absolute;
+	left: 10px;
+	top: 10px;
+	width: 360px;
+	height: 410px;
+	padding: 10px;
+	border: solid 1px #808080;
 }
 
 .htmlobject_table {
@@ -136,78 +136,75 @@ div#drag td{
 
 
 #titlebox {
-    position: absolute;
-    left: 20px;
-    top: 10px;
-    width: 500px;
-    height: 20px;
+	position: absolute;
+	left: 20px;
+	top: 10px;
+	width: 500px;
+	height: 20px;
 }
 
 
 #logo {
-    position: absolute;
-    left: 720px;
-    top: 3px;
-    width: 150px;
-    height: 50px;
-    background-image: url(img/logo.gif);
-    background-repeat: no-repeat;
-
+	position: absolute;
+	left: 720px;
+	top: 3px;
+	width: 150px;
+	height: 50px;
 }
 
 
 #overallstatusbox {
-    position: absolute;
-    left: 720px;
-    top: 80px;
-    width: 150px;
-    height: 20px;
-    border: solid 1px #808080;
-    background-color: white;
+	position: absolute;
+	left: 720px;
+	top: 80px;
+	width: 150px;
+	height: 20px;
+	border: solid 1px #808080;
+	background-color: white;
 }
 
 
 #soundcheckbox {
-    position: absolute;
-    left: 720px;
-    top: 130px;
-    width: 150px;
-    height: 20px;
+	position: absolute;
+	left: 720px;
+	top: 130px;
+	width: 150px;
+	height: 20px;
 }
 
 #refreshdelaybox {
-    position: absolute;
-    left: 720px;
-    top: 105px;
-    width: 150px;
-    height: 20px;
+	position: absolute;
+	left: 720px;
+	top: 105px;
+	width: 150px;
+	height: 20px;
 }
 
 
 
 #sponsorbox {
-    position: relative;
-    left: 20px;
-    top: 0px;
-    width: 250px;
-    height: 20px;
+	position: relative;
+	left: 20px;
+	top: 0px;
+	width: 250px;
+	height: 20px;
 }
 
 
 
 a:link {
-    text-decoration: none;
-    color: black;
+	text-decoration: none;
+	color: black;
 }
 a:visited {
-        text-decoration: none;
-        color: black;
+		text-decoration: none;
+		color: black;
 }
 a:active {
-        text-decoration: none;
-        color: black;
+		text-decoration: none;
+		color: black;
 }
 a:hover {
-        font-weight:bold; color: black;
+		font-weight:bold; color: black;
 }
 

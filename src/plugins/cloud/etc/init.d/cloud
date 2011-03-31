@@ -26,7 +26,7 @@ OPENQRM_SERVER_IP=$resource_openqrmserver
 NETWORK_CONF="/tmp/cloud-net.conf"
 # define wget to use with https
 if [ "$openqrm_web_protocol" == "https" ]; then
-    WGET_NO_CERT_CHECK="--no-check-certificate"
+	WGET_NO_CERT_CHECK="--no-check-certificate"
 fi
 
 

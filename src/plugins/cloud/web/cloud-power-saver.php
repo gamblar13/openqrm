@@ -55,39 +55,46 @@ $ps_app_id_arr = htmlobject_request('ps_id');
 
 function redirect_private($strMsg, $currenttab = 'tab0') {
 	global $thisfile;
-    $url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab."&redirect=yes";
+	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab."&redirect=yes";
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
 
 
 // check if we got some actions to do
+$strMsg = '';
 if (htmlobject_request('redirect') != 'yes') {
-    if(htmlobject_request('action') != '') {
-        switch (htmlobject_request('action')) {
-            case 'set':
-                if (isset($_REQUEST['identifier'])) {
-                    foreach($_REQUEST['identifier'] as $id) {
-                        $ps_appliance = new appliance();
-                        $ps_appliance->get_instance_by_id($id);
-                        // is this the openQRM Server itself ?
-                        if ($ps_appliance->resources == 0) {
-                            continue;
-                        }
-                        $ps_resource = new resource();
-                        $ps_resource->get_instance_by_id($ps_appliance->resources);
-                        $ps_state = $ps_app_id_arr[$ps_appliance->id];
-                        $ps_resource->set_resource_capabilities('CPS', $ps_state);
-                        $strMsg .= "Setting appliance $id to power-save mode $ps_state ....<br>";
-                    }
-                    redirect_private($strMsg, 'tab0');
-                }
-                break;
+	if(htmlobject_request('action') != '') {
+		switch (htmlobject_request('action')) {
+			case 'set':
+				if (isset($_REQUEST['identifier'])) {
+					foreach($_REQUEST['identifier'] as $id) {
+						$ps_appliance = new appliance();
+						$ps_appliance->get_instance_by_id($id);
+						// is this the openQRM Server itself ?
+						if ($ps_appliance->resources == 0) {
+							continue;
+						}
+						// resource autoselect
+						if ($ps_appliance->resources < 0) {
+							continue;
+						}
+						$ps_resource = new resource();
+						$ps_resource->get_instance_by_id($ps_appliance->resources);
+						if (isset($ps_app_id_arr[$ps_appliance->id])) {
+							$ps_state = $ps_app_id_arr[$ps_appliance->id];
+							$ps_resource->set_resource_capabilities('CPS', $ps_state);
+							$strMsg .= "Setting appliance $id to power-save mode $ps_state ....<br>";
+						}
+					}
+					redirect_private($strMsg, 'tab0');
+				}
+				break;
 
 
 
-        }
-    }
+		}
+	}
 }
 
 
@@ -95,11 +102,11 @@ function cloud_resource_pool_selector() {
 
 	global $OPENQRM_USER;
 	global $OPENQRM_SERVER_IP_ADDRESS;
-    global $OPENQRM_WEB_PROTOCOL;
+	global $OPENQRM_WEB_PROTOCOL;
 	global $thisfile;
-
+	
 	// get external name
-    $cp_conf = new cloudconfig();
+	$cp_conf = new cloudconfig();
 	$external_portal_name = $cp_conf->get_value(3);  // 3 is the external name
 	if (!strlen($external_portal_name)) {
 		$external_portal_name = "$OPENQRM_WEB_PROTOCOL://$OPENQRM_SERVER_IP_ADDRESS/cloud-portal";
@@ -111,7 +118,7 @@ function cloud_resource_pool_selector() {
 	$arHead['appliance_icon'] = array();
 	$arHead['appliance_icon']['title'] ='';
 
-    $arHead['appliance_id'] = array();
+	$arHead['appliance_id'] = array();
 	$arHead['appliance_id']['title'] ='ID';
 
 	$arHead['appliance_name'] = array();
@@ -128,43 +135,44 @@ function cloud_resource_pool_selector() {
 
 	$arBody = array();
 
-    // prepare selector array
-    $cloud_power_save_selector_arr[] = array('value'=> '1', 'label'=> 'Enabled');
-    $cloud_power_save_selector_arr[] = array('value'=> '0', 'label'=> 'Disabled');
+	// prepare selector array
+	$cloud_power_save_selector_arr[] = array('value'=> '1', 'label'=> 'Enabled');
+	$cloud_power_save_selector_arr[] = array('value'=> '0', 'label'=> 'Disabled');
 
 	// db select
-    $appliance_count = 0;
+	$appliance_count = 0;
 	$appliance_list = new appliance();
 	$appliance_array = $appliance_list->display_overview($table->offset, $table->limit, $table->sort, $table->order);
 	foreach ($appliance_array as $index => $ps_app) {
-        unset($cloud_power_save_select);
+		unset($cloud_power_save_select);
+		$cloud_power_save_select = '';
 		$appliance_id = $ps_app["appliance_id"];
-        $appliance = new appliance();
-        $appliance->get_instance_by_id($appliance_id);
-        $resource = new resource();
-        $resource->get_instance_by_id($appliance->resources);
+		$appliance = new appliance();
+		$appliance->get_instance_by_id($appliance_id);
+		$resource = new resource();
+		$resource->get_instance_by_id($appliance->resources);
 
-        // prepare resource list
+		// prepare resource list
 		if ($resource->id == 0) {
 			$resource_icon_default="/openqrm/base/img/logo.png";
 			$resource_type = "openQRM";
-            $resource_mac = "x:x:x:x:x:x";
+			$resource_mac = "x:x:x:x:x:x";
 		} else {
-            $resource_mac = $resource->mac;
+			$resource_mac = $resource->mac;
 			$resource_icon_default="/openqrm/base/img/resource.png";
-            // the appliance virtualization type
-            $virtualization = new virtualization();
-            $virtualization->get_instance_by_id($appliance->virtualization);
-            if (strstr($virtualization->name, "Host")) {
-                // check if power-saving is already set
-                $power_saving_parameter = $resource->get_resource_capabilities('CPS');
-                if ($power_saving_parameter == 1) {
-                    $cloud_power_save_select = htmlobject_select("ps_id[$appliance->id]", $cloud_power_save_selector_arr, '', array(1));
-                } else {
-                    $cloud_power_save_select = htmlobject_select("ps_id[$appliance->id]", $cloud_power_save_selector_arr, '', array(0));
-                }
-            }
-            $resource_type = "<nobr>".$virtualization->name."</nobr>";
+			// the appliance virtualization type
+			$virtualization = new virtualization();
+			$virtualization->get_instance_by_id($appliance->virtualization);
+			if (strstr($virtualization->name, "Host")) {
+				// check if power-saving is already set
+				$power_saving_parameter = $resource->get_resource_capabilities('CPS');
+				if ($power_saving_parameter == 1) {
+					$cloud_power_save_select = htmlobject_select("ps_id[$appliance->id]", $cloud_power_save_selector_arr, '', array(1));
+				} else {
+					$cloud_power_save_select = htmlobject_select("ps_id[$appliance->id]", $cloud_power_save_selector_arr, '', array(0));
+				}
+			}
+			$resource_type = "<nobr>".$virtualization->name."</nobr>";
 
 		}
 		$state_icon="/openqrm/base/img/$resource->state.png";
@@ -184,7 +192,7 @@ function cloud_resource_pool_selector() {
 			'appliance_virtualization' => $resource_type,
 			'appliance_selector' => $cloud_power_save_select,
 		);
-        $appliance_count++;
+		$appliance_count++;
 	}
 
 	$table->id = 'Tabelle';
@@ -200,8 +208,8 @@ function cloud_resource_pool_selector() {
 		$table->bottom = array('set');
 		$table->identifier = 'appliance_id';
 	}
-    // do not show the openQRM server and idle resource
-    $appliance_max = $appliance_list->get_count();
+	// do not show the openQRM server and idle resource
+	$appliance_max = $appliance_list->get_count();
 	$table->max = $appliance_max-1;
 
 	//------------------------------------------------------------ set template
@@ -209,7 +217,7 @@ function cloud_resource_pool_selector() {
 	$t->debug = false;
 	$t->setFile('tplfile', './tpl/' . 'cloud-power-saver-tpl.php');
 	$t->setVar(array(
-        'external_portal_name' => $external_portal_name,
+		'external_portal_name' => $external_portal_name,
 		'cloud_power_saver_table' => $table->get_string(),
 	));
 	$disp =  $t->parse('out', 'tplfile');

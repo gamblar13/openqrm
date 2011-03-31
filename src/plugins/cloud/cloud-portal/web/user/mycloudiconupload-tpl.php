@@ -5,19 +5,19 @@
 /*
   This file is part of openQRM.
 
-    openQRM is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License version 2
-    as published by the Free Software Foundation.
+	openQRM is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License version 2
+	as published by the Free Software Foundation.
 
-    openQRM is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+	openQRM is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU General Public License
+	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
 */
 -->
 
@@ -41,13 +41,13 @@
 
 <style type="text/css">
 #iconuploadbox {
-    position: absolute;
-    left: 10px;
-    top: 10px;
-    width: 350px;
-    height: 130px;
-    padding: 10px;
-    border: solid 1px #808080;
+	position: absolute;
+	left: 10px;
+	top: 10px;
+	width: 350px;
+	height: 130px;
+	padding: 10px;
+	border: solid 1px #808080;
 }
 
 
@@ -55,25 +55,25 @@
 
 
 <script language="JavaScript" type="text/javascript">
-    window.onunload=function() {
-        window.opener.doRefresh()
-    }
+	window.onunload=function() {
+		window.opener.doRefresh()
+	}
 
-    window.onload=function() {
-        {window_close_trigger}
-    }
+	window.onload=function() {
+		{window_close_trigger}
+	}
 
 </script>
 
 
 <div id="iconuploadbox">
-    <a href="javascript:window.close();"><small>Close Window</small></a>
-    <h2>Upload a custom icon for Cloud {cloud_object} </h2>
-    <small>(48px x 48px, png, gif, jpg)</small>
-    <form action="" method="post" enctype="multipart/form-data">
-    <input type="file" name="pic[]" class="multi" />
-    <input type="submit" name="upload" value="Upload" />
-    </form>
+	<a href="javascript:window.close();"><small>Close Window</small></a>
+	<h2>Upload a custom icon for Cloud {cloud_object} </h2>
+	<small>(48px x 48px, png, gif, jpg)</small>
+	<form action="" method="post" enctype="multipart/form-data">
+	<input type="file" name="pic[]" class="multi" />
+	<input type="submit" name="upload" value="Upload" />
+	</form>
 </div>
 
 

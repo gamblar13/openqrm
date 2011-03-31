@@ -181,18 +181,18 @@ function remove($cloudcreatevmlc_id) {
 
 // updates a cloudcreatevmlc
 function update($vc_id, $vc_fields) {
-    global $CLOUD_CREATE_VM_LC_TABLE;
-    global $event;
-    if ($vc_id < 0 || ! is_array($vc_fields)) {
-        $this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "cloudcreatevmlc.class.php", "Unable to update cloudcreatevmlc $vc_id", "", "", 0, 0, 0);
-        return 1;
-    }
-    $db=openqrm_get_db_connection();
-    unset($vc_fields["vc_id"]);
-    $result = $db->AutoExecute($this->_db_table, $vc_fields, 'UPDATE', "vc_id = $vc_id");
-    if (! $result) {
-        $this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "cloudcreatevmlc.class.php", "Failed updating cloudcreatevmlc $vc_id", "", "", 0, 0, 0);
-    }
+	global $CLOUD_CREATE_VM_LC_TABLE;
+	global $event;
+	if ($vc_id < 0 || ! is_array($vc_fields)) {
+		$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "cloudcreatevmlc.class.php", "Unable to update cloudcreatevmlc $vc_id", "", "", 0, 0, 0);
+		return 1;
+	}
+	$db=openqrm_get_db_connection();
+	unset($vc_fields["vc_id"]);
+	$result = $db->AutoExecute($this->_db_table, $vc_fields, 'UPDATE', "vc_id = $vc_id");
+	if (! $result) {
+		$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "cloudcreatevmlc.class.php", "Failed updating cloudcreatevmlc $vc_id", "", "", 0, 0, 0);
+	}
 }
 
 

@@ -55,71 +55,72 @@ $private_id_arr = htmlobject_request('cg_id');
 
 function redirect_private($strMsg, $currenttab = 'tab0') {
 	global $thisfile;
-    $url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab."&redirect=yes";
+	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab='.$currenttab."&redirect=yes";
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
 
 
 // check if we got some actions to do
+$strMsg = '';
 if (htmlobject_request('redirect') != 'yes') {
-    if(htmlobject_request('action') != '') {
-        switch (htmlobject_request('action')) {
-            case 'set':
-                if (isset($_REQUEST['identifier'])) {
-                    foreach($_REQUEST['identifier'] as $id) {
-                        $presource = new resource();
-                        $presource->get_instance_by_id($id);
-                        $private_cg_id = $private_id_arr[$id];
-                        if ($private_cg_id == -1) {
-                            $private_name = "Hide";
-                        } else if ($private_cg_id == 0) {
-                            $private_name = "Default Cloud User Group";
-                        } else {
-                            $pcloudusergroup = new cloudusergroup();
-                            $pcloudusergroup->get_instance_by_id($private_cg_id);
-                            $private_name = $pcloudusergroup->name;
-                        }
-                        $strMsg .= "Setting resource $id to $private_name ( $private_cg_id )....<br>";
+	if(htmlobject_request('action') != '') {
+		switch (htmlobject_request('action')) {
+			case 'set':
+				if (isset($_REQUEST['identifier'])) {
+					foreach($_REQUEST['identifier'] as $id) {
+						$presource = new resource();
+						$presource->get_instance_by_id($id);
+						$private_cg_id = $private_id_arr[$id];
+						if ($private_cg_id == -1) {
+							$private_name = "Hide";
+						} else if ($private_cg_id == 0) {
+							$private_name = "Default Cloud User Group";
+						} else {
+							$pcloudusergroup = new cloudusergroup();
+							$pcloudusergroup->get_instance_by_id($private_cg_id);
+							$private_name = $pcloudusergroup->name;
+						}
+						$strMsg .= "Setting resource $id to $private_name ( $private_cg_id )....<br>";
 
 
-                        // check if existing, if not create, otherwise update
-                        unset($cloud_private_resource);
-                        $cloud_private_resource = new cloudrespool();
-                        $cloud_private_resource->get_instance_by_resource($id);
-                        if (strlen($cloud_private_resource->id)) {
-                            if ($private_cg_id == -1) {
-                                // remove from table
-                                $cloud_private_resource->remove($cloud_private_resource->id);
-                            } else {
-                                // update
-                                $private_cloud_resource_fields["rp_cg_id"] = $private_cg_id;
-                                $cloud_private_resource->update($cloud_private_resource->id, $private_cloud_resource_fields);
-                                unset($private_cloud_resource_fields);
-                            }
+						// check if existing, if not create, otherwise update
+						unset($cloud_private_resource);
+						$cloud_private_resource = new cloudrespool();
+						$cloud_private_resource->get_instance_by_resource($id);
+						if (strlen($cloud_private_resource->id)) {
+							if ($private_cg_id == -1) {
+								// remove from table
+								$cloud_private_resource->remove($cloud_private_resource->id);
+							} else {
+								// update
+								$private_cloud_resource_fields["rp_cg_id"] = $private_cg_id;
+								$cloud_private_resource->update($cloud_private_resource->id, $private_cloud_resource_fields);
+								unset($private_cloud_resource_fields);
+							}
 
-                        } else {
-                            // create
-                            if ($private_cg_id >= 0) {
-                                // create array for add
-                                $private_cloud_resource_fields["rp_id"]=openqrm_db_get_free_id('rp_id', $cloud_private_resource->_db_table);
-                                $private_cloud_resource_fields["rp_resource_id"] = $id;
-                                $private_cloud_resource_fields["rp_cg_id"] = $private_cg_id;
-                                $cloud_private_resource->add($private_cloud_resource_fields);
-                                unset($private_cloud_resource_fields);
-                            }
-                        }
-
-
-                    }
-                    redirect_private($strMsg, 'tab0');
-                }
-                break;
+						} else {
+							// create
+							if ($private_cg_id >= 0) {
+								// create array for add
+								$private_cloud_resource_fields["rp_id"]=openqrm_db_get_free_id('rp_id', $cloud_private_resource->_db_table);
+								$private_cloud_resource_fields["rp_resource_id"] = $id;
+								$private_cloud_resource_fields["rp_cg_id"] = $private_cg_id;
+								$cloud_private_resource->add($private_cloud_resource_fields);
+								unset($private_cloud_resource_fields);
+							}
+						}
 
 
+					}
+					redirect_private($strMsg, 'tab0');
+				}
+				break;
 
-        }
-    }
+
+
+		}
+	}
 }
 
 
@@ -127,17 +128,17 @@ function cloud_resource_pool_selector() {
 
 	global $OPENQRM_USER;
 	global $OPENQRM_SERVER_IP_ADDRESS;
-    global $OPENQRM_WEB_PROTOCOL;
+	global $OPENQRM_WEB_PROTOCOL;
 	global $thisfile;
 
-    // private-resource enabled ?
-    $cp_conf = new cloudconfig();
-    $show_resource_pools = $cp_conf->get_value(25);	// resource_pools enabled ?
-    if (strcmp($show_resource_pools, "true")) {
-        $strMsg = "<strong>Resource Pooling is not enabled in this Cloud !</strong>";
-        return $strMsg;
-        exit(0);
-    }
+	// private-resource enabled ?
+	$cp_conf = new cloudconfig();
+	$show_resource_pools = $cp_conf->get_value(25);	// resource_pools enabled ?
+	if (strcmp($show_resource_pools, "true")) {
+		$strMsg = "<strong>Resource Pooling is not enabled in this Cloud !</strong>";
+		return $strMsg;
+		exit(0);
+	}
 	// get external name
 	$external_portal_name = $cp_conf->get_value(3);  // 3 is the external name
 	if (!strlen($external_portal_name)) {
@@ -150,7 +151,7 @@ function cloud_resource_pool_selector() {
 	$arHead['resource_icon'] = array();
 	$arHead['resource_icon']['title'] ='';
 
-    $arHead['resource_id'] = array();
+	$arHead['resource_id'] = array();
 	$arHead['resource_id']['title'] ='ID';
 
 	$arHead['resource_name'] = array();
@@ -171,61 +172,61 @@ function cloud_resource_pool_selector() {
 
 	$arBody = array();
 
-    // prepare selector array
-    $cloud_user_group_sel = new cloudusergroup();
-    $cloud_user_group_arr = $cloud_user_group_sel->get_list();
-    $cloud_user_group_arr = array_reverse($cloud_user_group_arr);
-    $cloud_user_group_arr[] = array('value'=> '-1', 'label'=> 'Hide');
-    $cloud_user_group_arr = array_reverse($cloud_user_group_arr);
+	// prepare selector array
+	$cloud_user_group_sel = new cloudusergroup();
+	$cloud_user_group_arr = $cloud_user_group_sel->get_list();
+	$cloud_user_group_arr = array_reverse($cloud_user_group_arr);
+	$cloud_user_group_arr[] = array('value'=> '-1', 'label'=> 'Hide');
+	$cloud_user_group_arr = array_reverse($cloud_user_group_arr);
 
 	// db select
-    $resource_count = 0;
+	$resource_count = 0;
 	$resource_list = new resource();
 	$resource_array = $resource_list->display_overview($table->offset, $table->limit, $table->sort, $table->order);
 	foreach ($resource_array as $index => $im) {
 		$resource_id = $im["resource_id"];
-        $resource = new resource();
-        $resource->get_instance_by_id($resource_id);
+		$resource = new resource();
+		$resource->get_instance_by_id($resource_id);
 
-        // is a private resource already ?
-        $private_resource = new cloudrespool();
-        $private_resource->get_instance_by_resource($resource->id);
-        if (strlen($private_resource->id)) {
-            if ($private_resource->cg_id > 0) {
-                $cloud_user = new cloudusergroup();
-                $cloud_user->get_instance_by_id($private_resource->cg_id);
-                $pi_selected = $cloud_user->id;
-            } else if ($private_resource->cg_id == 0) {
-                 $pi_selected = 0;
-            } else {
-                $pi_selected = -1;
-            }
-        } else {
-            $pi_selected = -1;
-        }
-        $resource_pool_select = htmlobject_select("cg_id[$resource->id]", $cloud_user_group_arr, '', array($pi_selected));
+		// is a private resource already ?
+		$private_resource = new cloudrespool();
+		$private_resource->get_instance_by_resource($resource->id);
+		if (strlen($private_resource->id)) {
+			if ($private_resource->cg_id > 0) {
+				$cloud_user = new cloudusergroup();
+				$cloud_user->get_instance_by_id($private_resource->cg_id);
+				$pi_selected = $cloud_user->id;
+			} else if ($private_resource->cg_id == 0) {
+				 $pi_selected = 0;
+			} else {
+				$pi_selected = -1;
+			}
+		} else {
+			$pi_selected = -1;
+		}
+		$resource_pool_select = htmlobject_select("cg_id[$resource->id]", $cloud_user_group_arr, '', array($pi_selected));
 
-        // prepare resource list
+		// prepare resource list
 		if ($resource->id == 0) {
 			$resource_icon_default="/openqrm/base/img/logo.png";
 			$resource_type = "openQRM";
-            $resource_mac = "x:x:x:x:x:x";
+			$resource_mac = "x:x:x:x:x:x";
 		} else {
-            $resource_mac = $resource->mac;
+			$resource_mac = $resource->mac;
 			$resource_icon_default="/openqrm/base/img/resource.png";
 
-            // the resource_type
+			// the resource_type
 			if ((strlen($resource->vtype)) && (!strstr($resource->vtype, "NULL"))){
 				// find out what should be preselected
-            	$virtualization = new virtualization();
+				$virtualization = new virtualization();
 				$virtualization->get_instance_by_id($resource->vtype);
-                if ($resource->id == $resource->vhostid) {
-                    // physical system
-    				$resource_type = "<nobr>".$virtualization->name."</nobr>";
-                } else {
-                    // vm
-    				$resource_type = "<nobr>".$virtualization->name." on Res. ".$resource->vhostid."</nobr>";
-                }
+				if ($resource->id == $resource->vhostid) {
+					// physical system
+					$resource_type = "<nobr>".$virtualization->name."</nobr>";
+				} else {
+					// vm
+					$resource_type = "<nobr>".$virtualization->name." on Res. ".$resource->vhostid."</nobr>";
+				}
 			} else {
 				$resource_type = "Unknown";
 			}
@@ -251,7 +252,7 @@ function cloud_resource_pool_selector() {
 			'resource_type' => $resource_type,
 			'resource_selector' => $resource_pool_select,
 		);
-        $resource_count++;
+		$resource_count++;
 	}
 
 	$table->id = 'Tabelle';
@@ -267,8 +268,8 @@ function cloud_resource_pool_selector() {
 		$table->bottom = array('set');
 		$table->identifier = 'resource_id';
 	}
-    // do not show the openQRM server and idle resource
-    $resource_max = $resource_list->get_count("all");
+	// do not show the openQRM server and idle resource
+	$resource_max = $resource_list->get_count("all");
 	$table->max = $resource_max-1;
 
 	//------------------------------------------------------------ set template
@@ -276,7 +277,7 @@ function cloud_resource_pool_selector() {
 	$t->debug = false;
 	$t->setFile('tplfile', './tpl/' . 'cloud-resource-pools-tpl.php');
 	$t->setVar(array(
-        'external_portal_name' => $external_portal_name,
+		'external_portal_name' => $external_portal_name,
 		'cloud_private_resource_table' => $table->get_string(),
 	));
 	$disp =  $t->parse('out', 'tplfile');

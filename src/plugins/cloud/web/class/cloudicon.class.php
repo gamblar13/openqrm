@@ -169,18 +169,18 @@ function remove($cloudicon_id) {
 
 // updates a cloudicon
 function update($ic_id, $ic_fields) {
-    global $CLOUD_ICON_TABLE;
-    global $event;
-    if ($ic_id < 0 || ! is_array($ic_fields)) {
-        $this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "cloudicon.class.php", "Unable to update Cloudimage $ic_id", "", "", 0, 0, 0);
-        return 1;
-    }
-    $db=openqrm_get_db_connection();
-    unset($ic_fields["ic_id"]);
-    $result = $db->AutoExecute($this->_db_table, $ic_fields, 'UPDATE', "ic_id = $ic_id");
-    if (! $result) {
-        $this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "cloudicon.class.php", "Failed updating Cloudimage $ic_id", "", "", 0, 0, 0);
-    }
+	global $CLOUD_ICON_TABLE;
+	global $event;
+	if ($ic_id < 0 || ! is_array($ic_fields)) {
+		$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "cloudicon.class.php", "Unable to update Cloudimage $ic_id", "", "", 0, 0, 0);
+		return 1;
+	}
+	$db=openqrm_get_db_connection();
+	unset($ic_fields["ic_id"]);
+	$result = $db->AutoExecute($this->_db_table, $ic_fields, 'UPDATE', "ic_id = $ic_id");
+	if (! $result) {
+		$this->_event->log("update", $_SERVER['REQUEST_TIME'], 2, "cloudicon.class.php", "Failed updating Cloudimage $ic_id", "", "", 0, 0, 0);
+	}
 }
 
 

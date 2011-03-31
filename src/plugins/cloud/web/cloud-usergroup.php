@@ -32,8 +32,8 @@ function getPassword(length, extraChars, firstNumber, firstLower, firstUpper, fi
 }
 
 function statusMsg(msg) {
-    window.status=msg;
-    return true;
+	window.status=msg;
+	return true;
 }
 
 
@@ -110,7 +110,7 @@ function cloud_user_group_manager() {
 
 	global $OPENQRM_USER;
 	global $OPENQRM_SERVER_IP_ADDRESS;
-    global $OPENQRM_WEB_PROTOCOL;
+	global $OPENQRM_WEB_PROTOCOL;
 	global $thisfile;
 	$table = new htmlobject_db_table('cg_id', 'ASC');
 	$cc_conf = new cloudconfig();
@@ -130,10 +130,10 @@ function cloud_user_group_manager() {
 	$arHead['cg_description'] = array();
 	$arHead['cg_description']['title'] ='Description';
 
-    $arBody = array();
+	$arBody = array();
 
 	// db select
-    $cl_user_group_count = 0;
+	$cl_user_group_count = 0;
 	$cl_user_group = new cloudusergroup();
 	$user_group_array = $cl_user_group->display_overview($table->offset, $table->limit, $table->sort, $table->order);
 	foreach ($user_group_array as $index => $cg) {
@@ -142,7 +142,7 @@ function cloud_user_group_manager() {
 			'cg_name' => $cg["cg_name"],
 			'cg_descrption' => $cg["cg_description"],
 		);
-        $cl_user_group_count++;
+		$cl_user_group_count++;
 	}
 
 	$table->id = 'Tabelle';
@@ -164,8 +164,8 @@ function cloud_user_group_manager() {
 	$t->debug = false;
 	$t->setFile('tplfile', './tpl/' . 'cloud-user-group-manager-tpl.php');
 	$t->setVar(array(
-        'thisfile' => $thisfile,
-        'external_portal_name' => $external_portal_name,
+		'thisfile' => $thisfile,
+		'external_portal_name' => $external_portal_name,
 		'cloud_user_group_table' => $table->get_string(),
 	));
 	$disp =  $t->parse('out', 'tplfile');
@@ -178,7 +178,7 @@ function cloud_create_user_group() {
 
 	global $OPENQRM_USER;
 	global $OPENQRM_SERVER_IP_ADDRESS;
-    global $OPENQRM_WEB_PROTOCOL;
+	global $OPENQRM_WEB_PROTOCOL;
 	global $thisfile;
 	$cc_conf = new cloudconfig();
 	// get external name
@@ -193,10 +193,10 @@ function cloud_create_user_group() {
 	$t->debug = false;
 	$t->setFile('tplfile', './tpl/' . 'cloud-user-group-create-tpl.php');
 	$t->setVar(array(
-        'cg_name' => $cg_name,
-        'cg_description' => $cg_description,
-        'thisfile' => 'cloud-action.php',
-        'external_portal_name' => $external_portal_name,
+		'cg_name' => $cg_name,
+		'cg_description' => $cg_description,
+		'thisfile' => 'cloud-action.php',
+		'external_portal_name' => $external_portal_name,
 	));
 	$disp =  $t->parse('out', 'tplfile');
 	return $disp;
@@ -208,18 +208,23 @@ function cloud_create_user_group() {
 
 $output = array();
 
-
-if(htmlobject_request('action') != '') {
-	switch (htmlobject_request('action')) {
-		case 'create':
-			$output[] = array('label' => 'Create Cloud User', 'value' => cloud_create_user_group());
-			break;
-		default:
-			$output[] = array('label' => 'Cloud User Manager', 'value' => cloud_user_group_manager());
-			break;
-	}
+// if ldap is enabled do not allow access the the openQRM cloud user administration
+if (file_exists("$RootDir/plugins/ldap/.running")) {
+	unset($output);
+	$output[] = array('label' => 'Disabled', 'value' => "The openQRM Cloud User-Management is disabled by the LDAP-Plugin!");
 } else {
-	$output[] = array('label' => 'Cloud User Manager', 'value' => cloud_user_group_manager());
+	if(htmlobject_request('action') != '') {
+		switch (htmlobject_request('action')) {
+			case 'create':
+				$output[] = array('label' => 'Create Cloud User', 'value' => cloud_create_user_group());
+				break;
+			default:
+				$output[] = array('label' => 'Cloud User Manager', 'value' => cloud_user_group_manager());
+				break;
+		}
+	} else {
+		$output[] = array('label' => 'Cloud User Manager', 'value' => cloud_user_group_manager());
+	}
 }
 echo htmlobject_tabmenu($output);
 ?>

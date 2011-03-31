@@ -67,7 +67,7 @@ function cloud_config_manager() {
 
 	global $OPENQRM_USER;
 	global $OPENQRM_SERVER_IP_ADDRESS;
-    global $OPENQRM_WEB_PROTOCOL;
+	global $OPENQRM_WEB_PROTOCOL;
 	global $thisfile;
 	$table = new htmlobject_table_builder();
 
@@ -102,7 +102,7 @@ function cloud_config_manager() {
 			case '12':
 			case '13':
 			case '24':
-				$input_value = htmlobject_input($cc["cc_key"], array('value' => $cc["cc_value"]), 'text');
+				$input_value = htmlobject_input($cc["cc_key"], array('value' => $cc["cc_value"], 'label' => ''), 'text');
 			break;
 			case '2':
 			case '4':
@@ -123,7 +123,7 @@ function cloud_config_manager() {
 			case '26':
 				$ar = array();
 				$ar[] = array('value'=> 'true', 'label'=> 'true');
-				$ar[] = array('value'=> 'false', 'label'=> 'false'); 
+				$ar[] = array('value'=> 'false', 'label'=> 'false');
 				$input_value = htmlobject_select($cc["cc_key"], $ar , '', array($cc["cc_value"]));
 			break;
 			case '6':
@@ -163,7 +163,7 @@ function cloud_config_manager() {
 				$ar[] = array('value'=> 'Euro', 'label'=> 'Euro');
 				$input_value = htmlobject_select($cc["cc_key"], $ar , '', array($cc["cc_value"]));
 			break;
-            
+
 			case '27':
 			case '28':
 			case '29':
@@ -195,9 +195,9 @@ function cloud_config_manager() {
 				$input_value = htmlobject_select($cc["cc_key"], $ar , '', array($cc["cc_value"]));
 			break;
 
-			
+
 		}
-		$input_value .= htmlobject_input('identifier[]', array('value' => $cc["cc_id"]), 'hidden');
+		$input_value .= htmlobject_input('identifier[]', array('value' => $cc["cc_id"], 'label' => ''), 'hidden');
 		$arBody[] = array(
 			'cc_id' => $cc["cc_id"],
 			'cc_key' => $cc["cc_key"],
@@ -223,7 +223,7 @@ function cloud_config_manager() {
 	$t->debug = false;
 	$t->setFile('tplfile', './tpl/' . 'cloud-config-tpl.php');
 	$t->setVar(array(
-        'external_portal_name' => $external_portal_name,
+		'external_portal_name' => $external_portal_name,
 		'cloud_config_table' => $table->get_string(),
 	));
 	$disp =  $t->parse('out', 'tplfile');

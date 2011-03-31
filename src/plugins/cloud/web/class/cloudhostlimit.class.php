@@ -74,7 +74,7 @@ var $current_vms = '';
 // returns an appliance from the db selected by id or name
 function get_instance($id, $resource_id) {
 	global $CLOUD_HOSTLIMIT_TABLE;
-    $CLOUD_HOSTLIMIT_TABLE="cloud_hostlimit";
+	$CLOUD_HOSTLIMIT_TABLE="cloud_hostlimit";
 	global $event;
 	$db=openqrm_get_db_connection();
 	if ("$id" != "") {

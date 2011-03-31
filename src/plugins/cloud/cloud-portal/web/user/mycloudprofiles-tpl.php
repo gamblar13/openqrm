@@ -21,7 +21,7 @@
 <script language="JavaScript">
 
 function doRefresh() {
-    window.location.reload();
+	window.location.reload();
 }
 </script>
 
