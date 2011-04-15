@@ -142,7 +142,7 @@ if (file_exists("./unconfigured")) {
 		while (!feof($handle)) {
 			$buffer = fgets($handle, 4096);
 			if (strlen($buffer)) {
-				$oqc_available_nics[] = $buffer;
+				$oqc_available_nics[] = trim($buffer);
 			}
 		}
 		fclose($handle);
