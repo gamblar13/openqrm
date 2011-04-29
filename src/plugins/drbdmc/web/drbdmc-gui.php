@@ -19,7 +19,7 @@
 ?>
 
 
-<applet archive="DMC-applet-0.9.0.jar"
+<applet archive="DMC-applet-0.9.2.jar"
 	code="drbd.DrbdMCApplet"
 	name=DrbdMCApplet
 	height="100%"
