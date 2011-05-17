@@ -164,8 +164,9 @@ var $request_filter;
 			$arg = stripslashes($arg);
 			if(is_array($this->request_filter)) {
 				foreach ($this->request_filter as $reg) {
-					$str = regex::replace($reg['pattern'], $reg['replace'], $arg);
+					$arg = regex::replace($reg['pattern'], $reg['replace'], $arg);
 				}
+				$str = $arg;
 			} else {
 				debug::add('no filter set - use set_request_filter()', 'NOTICE');
 				$str = $arg;

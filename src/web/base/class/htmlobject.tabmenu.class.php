@@ -233,6 +233,7 @@ var $_tabs = array();
 	//----------------------------------------------------------------------------------------
 	function _get_messagebox() {
 		$_str = '';
+		$this->add_request_filter($this->message_replace);
 		$msg = $this->get_request($this->message_param);
 		if($msg != "") {
 			$_str .= '';
