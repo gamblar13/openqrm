@@ -620,7 +620,7 @@ function get_count_per_virtualization($virtualization_id) {
 	global $APPLIANCE_INFO_TABLE;
 	$count=0;
 	$db=openqrm_get_db_connection();
-	$rs = $db->Execute("select count(appliance_id) as num from $APPLIANCE_INFO_TABLE where appliance_virtualization=$virtualization_id");
+	$rs = $db->Execute("select count(appliance_id) as num from $APPLIANCE_INFO_TABLE where appliance_virtualization='$virtualization_id'");
 	if (!$rs) {
 		print $db->ErrorMsg();
 	} else {
