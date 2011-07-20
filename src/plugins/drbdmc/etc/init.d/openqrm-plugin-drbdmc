@@ -24,7 +24,7 @@ OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $
 . $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/drbdmc/include/openqrm-plugin-drbdmc-functions
 . $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/drbdmc/etc/openqrm-plugin-drbdmc.conf
 
-DRBD_MC_VERSION="0.9.2"
+DRBD_MC_VERSION="0.9.5"
 
 function openqrm_plugin_drbdmc_start() {
 	echo "Starting the openQRM drbdmc-plugin"
