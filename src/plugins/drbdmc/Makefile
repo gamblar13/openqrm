@@ -36,7 +36,7 @@ install:
 	. $(OPENQRM_SERVER_CONF) && cp web/*.php $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/drbdmc/web/
 	. $(OPENQRM_SERVER_CONF) && mkdir -p $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/drbdmc/web/img
 	. $(OPENQRM_SERVER_CONF) && cp web/img/*.png $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/drbdmc/web/img/
-	. $(OPENQRM_SERVER_CONF) && if ! cp $$OPENQRM_BUILD_TMP_DIR/openqrm-build/DMC-applet/source/DMC-applet-0.9.5.jar $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/drbdmc/web/ 2>/dev/null; then cp ../../$$OPENQRM_BUILD_TMP_DIR/openqrm-build/DMC-applet/source/DMC-applet-0.9.5.jar $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/drbdmc/web; fi
+	. $(OPENQRM_SERVER_CONF) && if ! cp $$OPENQRM_BUILD_TMP_DIR/openqrm-build/DMC-applet/source/DMC-applet-0.9.7.jar $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/drbdmc/web/ 2>/dev/null; then cp ../../$$OPENQRM_BUILD_TMP_DIR/openqrm-build/DMC-applet/source/DMC-applet-0.9.7.jar $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/drbdmc/web; fi
 
 	# menu icons
 	. $(OPENQRM_SERVER_CONF) && mkdir -p $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/img/menu/drbdmc
