@@ -1,0 +1,360 @@
+#!/bin/bash
+# this script automatically manages citrix storage
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/include/openqrm-plugin-citrix-storage-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/etc/openqrm-plugin-citrix-storage.conf
+OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+resource_id=0
+resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+export LANG=C
+LINEBR='
+'
+# how long to wait for the VDI authentication
+CITRIX_AUTH_DELAY=10
+# place for clone-stat files
+CITRIX_TMP_DIR="/var/spool/citrix/openqrm"
+if [ ! -d "$CITRIX_TMP_DIR" ]; then
+	mkdir -p $CITRIX_TMP_DIR
+fi
+
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+
+function citrix_storage_usage() {
+	echo "Usage : $0 add/list <-n image-name> <-i citrix-storage-ip> <-s citrix-storage-uuid> [-m size in MB] [-t <citrix-deployment>]"
+	echo "        $0 remove  <-i citrix-storage-ip> <-r image-rootdevice> [-t <citrix-deployment>]"
+	echo "        $0 clone  <-i citrix-storage-ip> <-r image-rootdevice> <-s image-snapshot-name> [-m size in MB] [-t <citrix-deployment>]"
+	echo "        $0 auth  <-i citrix-storage-ip> <-r image-rootdevice> <-a authidentifier> [-t <citrix-deployment>]"
+	echo "        $0 post_vdi  <-i citrix-storage-ip> <-u username> <-p password> [-t <citrix-deployment>]"
+	echo "        $0 post_identifier  <-i citrix-storage-ip> <-u username> <-p password> [-t <citrix-deployment>]"
+	exit 1
+}
+
+
+
+FULL_COMMANDLINE="$0 $@"
+CITRIX_STORAGE_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			CITRIX_STORAGE_IMAGE_NAME=$2
+			shift
+			;;
+		-m)
+			CITRIX_STORAGE_IMAGE_SIZE=$2
+			shift
+			;;
+		-s)
+			CITRIX_STORAGE_IMAGE_SNAPSHOT_NAME=$2
+			shift
+			;;
+		-a)
+			CITRIX_STORAGE_IMAGE_AUTH=$2
+			shift
+			;;
+		-r)
+			CITRIX_STORAGE_IMAGE_ROOTDEVICE=$2
+			shift
+			;;
+		-u)
+			CITRIX_STORAGE_OPENQRM_USERNAME=$2
+			shift
+			;;
+		-p)
+			CITRIX_STORAGE_OPENQRM_PASSWORD=$2
+			shift
+			;;
+		-t)
+			CITRIX_STORAGE_DEPLOYMENT_TYPE=$2
+			shift
+			;;
+		-i)
+			CITRIX_STORAGE_SERVER_IP=$2
+			shift
+			;;
+		-x)
+			CITRIX_STORAGE_UUID=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			citrix_storage_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+
+
+# main
+if [ "$CITRIX_STORAGE_COMMAND" == "" ]; then
+	citrix_storage_usage
+fi
+if [ "$CITRIX_STORAGE_SERVER_IP" == "" ]; then
+	citrix_storage_usage
+fi
+# set default deployment type
+if [ "$CITRIX_STORAGE_DEPLOYMENT_TYPE" == "" ]; then
+	CITRIX_STORAGE_DEPLOYMENT_TYPE="citrix-deployment"
+fi
+# check params
+if [ "$CITRIX_STORAGE_COMMAND" == "post_vdi" ] || [ "$CITRIX_STORAGE_COMMAND" == "post_identifier" ]; then
+		if [ "$CITRIX_STORAGE_OPENQRM_USERNAME" == "" ]; then
+			citrix_storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_OPENQRM_PASSWORD" == "" ]; then
+			citrix_storage_usage
+		fi
+else
+	if [ "$CITRIX_STORAGE_COMMAND" != "list" ] && [ "$CITRIX_STORAGE_COMMAND" != "auth" ] && [ "$CITRIX_STORAGE_COMMAND" != "remove" ] && [ "$CITRIX_STORAGE_COMMAND" != "clone" ]; then
+		if [ "$CITRIX_STORAGE_IMAGE_NAME" == "" ]; then
+			citrix_storage_usage
+		fi
+	fi
+fi
+CITRIX_STORAGE_SERVER_PASSWD_FILE=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat/citrix-storage-host.pwd.$CITRIX_STORAGE_SERVER_IP
+if [ ! -f $CITRIX_STORAGE_SERVER_PASSWD_FILE ]; then
+	citrix_storage_log openqrm-citrix-storage "No password file ($CITRIX_STORAGE_SERVER_PASSWD_FILE) existing for Citrix-storage host $CITRIX_STORAGE_SERVER_IP"
+	openqrm_post_event 0 "$CITRIX_STORAGE_COMMAND" 3 "openqrm-citrix-storage" "No password file ($CITRIX_STORAGE_SERVER_PASSWD_FILE) existing for Citrix-storage host $CITRIX_STORAGE_SERVER_IP"
+	exit 1
+fi
+CITRIX_STORAGE_VDI_LIST=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat/vdi.stat.$CITRIX_STORAGE_SERVER_IP
+CITRIX_STORAGE_SR_LIST=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat/sr.stat.$CITRIX_STORAGE_SERVER_IP
+mkdir -p `dirname $CITRIX_STORAGE_VDI_LIST`
+chmod 777 `dirname $CITRIX_STORAGE_VDI_LIST`
+
+
+case "$CITRIX_STORAGE_COMMAND" in
+
+	add)
+		if [ "$CITRIX_STORAGE_UUID" == "" ]; then
+			citrix_storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_IMAGE_SIZE" == "" ]; then
+			CITRIX_STORAGE_IMAGE_SIZE=$DEFAULT_IMAGE_SIZE
+		fi
+		export CITRIX_STORAGE_IMAGE_SIZE
+		echo "Creating VDI $CITRIX_STORAGE_IMAGE_NAME size $CITRIX_STORAGE_IMAGE_SIZE MB"
+		citrix_storage_lock aquire
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vdi-create sr-uuid=$CITRIX_STORAGE_UUID name-label="$CITRIX_STORAGE_IMAGE_NAME" type="system" virtual-size="$CITRIX_STORAGE_IMAGE_SIZE"; then
+			citrix_storage_log openqrm-citrix-storage "Failed to create new VDI $CITRIX_STORAGE_IMAGE_NAME!"
+			openqrm_post_event 0 "remove" 3 "openqrm-citrix-storage" "Failed to create new VDI $CITRIX_STORAGE_IMAGE_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		citrix_storage_lock release
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$CITRIX_STORAGE_OPENQRM_USERNAME" != "" ] && [ "$CITRIX_STORAGE_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_vdi -i $CITRIX_STORAGE_SERVER_IP -u $CITRIX_STORAGE_OPENQRM_USERNAME -p $CITRIX_STORAGE_OPENQRM_PASSWORD -t $CITRIX_STORAGE_DEPLOYMENT_TYPE
+		fi
+		openqrm_post_event 0 "add" 5 "openqrm-citrix-storage" "Created VDI $CITRIX_STORAGE_IMAGE_NAME."
+		;;
+
+	remove)
+		if [ "$CITRIX_STORAGE_IMAGE_ROOTDEVICE" == "" ]; then
+			citrix_storage_usage
+		fi
+		citrix_storage_lock aquire
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vdi-destroy uuid=$CITRIX_STORAGE_IMAGE_ROOTDEVICE; then
+			citrix_storage_log openqrm-citrix-storage "Failed to remove VDI $CITRIX_STORAGE_IMAGE_ROOTDEVICE!"
+			openqrm_post_event 0 "remove" 3 "openqrm-citrix-storage" "Failed to remove VDI $CITRIX_STORAGE_IMAGE_ROOTDEVICE!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		citrix_storage_lock release
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$CITRIX_STORAGE_OPENQRM_USERNAME" != "" ] && [ "$CITRIX_STORAGE_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_vdi -i $CITRIX_STORAGE_SERVER_IP -u $CITRIX_STORAGE_OPENQRM_USERNAME -p $CITRIX_STORAGE_OPENQRM_PASSWORD -t $CITRIX_STORAGE_DEPLOYMENT_TYPE
+		fi
+		openqrm_post_event 0 "remove" 5 "openqrm-citrix-storage" "Removed VDI $CITRIX_STORAGE_IMAGE_ROOTDEVICE."
+		;;
+
+
+	auth)
+		# this is just for starting auth, make sure the device is there, otherwise wait
+		if [ "$CITRIX_STORAGE_OPENQRM_USERNAME" != "" ] && [ "$CITRIX_STORAGE_OPENQRM_PASSWORD" != "" ] && [ "$CITRIX_STORAGE_IMAGE_NAME" != "" ]; then
+			#sleep $CITRIX_AUTH_DELAY
+			# if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+			if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$CITRIX_STORAGE_OPENQRM_USERNAME --http-password=$CITRIX_STORAGE_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/citrix-storage/citrix-storage-action.php?citrix_storage_command=auth_finished&citrix_storage_image_name=$CITRIX_STORAGE_IMAGE_NAME"; then
+				openqrm_post_event 0 "auth" 2 "openqrm-citrix-storage" "Could not remove auth-blocker for VDI $CITRIX_STORAGE_IMAGE_NAME!"
+			fi
+		fi
+		;;
+
+	list)
+		echo "list"
+		;;
+	post_vdi)
+		VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE3=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE4=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE5=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+
+		# first create the sr-list
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE sr-list >$VM_TMPFILE4; then
+			citrix_storage_log openqrm-citrix-storage "Failed get the SR List!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed get the SR List!"
+			exit 1
+		fi
+		cat $VM_TMPFILE4 | grep ^uuid | cut -d':' -f2 > $VM_TMPFILE5
+		> $CITRIX_STORAGE_SR_LIST
+		for CITRIX_SR_UUID in `cat $VM_TMPFILE5`; do
+			CITRIX_SR_NAME=`grep -A1 $CITRIX_SR_UUID $VM_TMPFILE4 | grep name-label | cut -d':' -f2 | awk '{ print $1 }' | sed -e "s/ \{1,\}/@/g"`
+			echo "$CITRIX_SR_UUID:$CITRIX_SR_NAME" >> $CITRIX_STORAGE_SR_LIST
+		done
+		# vdi list
+		> $VM_TMPFILE3
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vdi-list >$VM_TMPFILE1; then
+			citrix_storage_log openqrm-citrix-storage "Failed get the VDI List!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed get the VDI List!"
+			exit 1
+		fi
+		cat $VM_TMPFILE1 | grep ^uuid | cut -d':' -f2 > $VM_TMPFILE2
+		for CITRIX_VDI_UUID in `cat $VM_TMPFILE2`; do
+			CITRIX_VDI_NAME=`grep -A1 $CITRIX_VDI_UUID $VM_TMPFILE1 | grep name-label | cut -d':' -f2 | sed -e "s/ \{1,\}/@/g"`
+			CITRIX_VDI_DESCRIPTION=`grep -A2 $CITRIX_VDI_UUID $VM_TMPFILE1 | grep name-description | cut -d':' -f2 | sed -e "s/ \{1,\}/@/g"`
+			CITRIX_VDI_SR_UUID=`grep -A3 $CITRIX_VDI_UUID $VM_TMPFILE1 | grep sr-uuid | cut -d':' -f2`
+			CITRIX_VDI_SR_NAME=`cat $CITRIX_STORAGE_SR_LIST | grep $CITRIX_VDI_SR_UUID | cut -d':' -f2`
+			CITRIX_VDI_SIZE=`grep -A4 $CITRIX_VDI_UUID $VM_TMPFILE1 | grep virtual-size | cut -d':' -f2 | sed -e "s/ \{1,\}/@/g"`
+			echo "$CITRIX_VDI_UUID:$CITRIX_VDI_NAME:$CITRIX_VDI_DESCRIPTION:$CITRIX_VDI_SR_NAME:$CITRIX_VDI_SIZE" >> $VM_TMPFILE3
+		done
+		/bin/cp -f $VM_TMPFILE3 $CITRIX_STORAGE_VDI_LIST
+		chmod 777 $CITRIX_STORAGE_VDI_LIST
+		rm -f $VM_TMPFILE1 $VM_TMPFILE2 $VM_TMPFILE3
+		;;
+
+	post_identifier)
+		STORAGE_STATUS_TMP=$CITRIX_STORAGE_SERVER_IP.vdi.citrix-deployment.ident
+		> $STORAGE_STATUS_TMP
+		VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vdi-list >$VM_TMPFILE1; then
+			citrix_storage_log openqrm-citrix-storage "Failed get the VDI List!"
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix-storage" "Failed get the VDI List!"
+			exit 1
+		fi
+		cat $VM_TMPFILE1 | grep ^uuid | cut -d':' -f2 > $VM_TMPFILE2
+		for CITRIX_VDI_UUID in `cat $VM_TMPFILE2`; do
+			CITRIX_VDI_NAME=`grep -A1 $CITRIX_VDI_UUID $VM_TMPFILE1 | grep name-label | cut -d':' -f2 | sed -e "s/ \{1,\}/@/g"`
+			echo "$CITRIX_VDI_UUID:$CITRIX_VDI_NAME" >> $STORAGE_STATUS_TMP
+		done
+		rm -f $VM_TMPFILE1 $VM_TMPFILE2
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$CITRIX_STORAGE_OPENQRM_USERNAME --http-password=$CITRIX_STORAGE_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/citrix-storage/citrix-storage-action.php?citrix_storage_command=get_ident; then
+			openqrm_post_event 0 "post_identifier" 2 "openqrm-citrix-storage" "Could not post the VDI identifier to the openQRM-server at $OPENQRM_SERVER_IP!"
+		fi
+		rm -f $STORAGE_STATUS_TMP
+		rm -f $STORAGE_STATUS_TMP.post
+		;;
+
+
+
+	clone)
+		if [ "$CITRIX_STORAGE_IMAGE_ROOTDEVICE" == "" ]; then
+			citrix_storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_IMAGE_SNAPSHOT_NAME" == "" ]; then
+			citrix_storage_usage
+		fi
+		# re-run in background via screen
+		if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+			if [ -x /usr/bin/screen.real ]; then
+				RUNSCREEN="/usr/bin/screen.real"
+			else
+				RUNSCREEN=`which screen`
+			fi
+			export RUN_IN_BACKGROUND=true
+			SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+			$RUNSCREEN -dmS $SCREEN_NAME $FULL_COMMANDLINE
+			exit
+		fi
+
+
+		# get sr uuid
+		VDI_SR_UUID=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vdi-list | grep -A3 $CITRIX_STORAGE_IMAGE_ROOTDEVICE | grep sr-uuid | cut -d':' -f2 | awk '{ print $1 }'`
+		if [ "$VDI_SR_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed get the VDIs SR uuid!"
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix-storage" "Failed get the VDIs SR uuid!"
+			exit 1
+		fi
+		# send clone command, this command will block until clone is finished
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vdi-copy uuid=$CITRIX_STORAGE_IMAGE_ROOTDEVICE sr-uuid=$VDI_SR_UUID > $CITRIX_TMP_DIR/$CITRIX_STORAGE_IMAGE_SNAPSHOT_NAME; then
+			citrix_storage_log openqrm-citrix-storage "Failed to clone VDI $CITRIX_STORAGE_IMAGE_ROOTDEVICE!"
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix-storage" "Failed to clone VDI $CITRIX_STORAGE_IMAGE_ROOTDEVICE!"
+			exit 1
+		fi
+		# here we need to re-name the new vdi to image-snapshot-name
+		NEW_VDI_UUID=`cat $CITRIX_TMP_DIR/$CITRIX_STORAGE_IMAGE_SNAPSHOT_NAME`
+		if [ "$NEW_VDI_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed get the new VDI uuid!"
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix-storage" "Failed get the new VDI uuid!"
+			exit 1
+		fi
+		# set new name
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vdi-param-set uuid=$NEW_VDI_UUID name-label="$CITRIX_STORAGE_IMAGE_SNAPSHOT_NAME" name-description="Cloned by openQRM"; then
+			citrix_storage_log openqrm-citrix-storage "Failed to re-name new VDI $NEW_VDI_UUID!"
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix-storage" "Failed to re-name new VDI $NEW_VDI_UUID!"
+			exit 1
+		fi
+
+		# here we notify openQRM that cloning has finished
+		# this is for the cloud clone command of private images
+		if [ "$CITRIX_STORAGE_OPENQRM_USERNAME" != "" ] && [ "$CITRIX_STORAGE_OPENQRM_PASSWORD" != "" ]; then
+			CLONE_FINISHED="$CITRIX_STORAGE_IMAGE_SNAPSHOT_NAME.clone"
+			echo "$NEW_VDI_UUID" > $CLONE_FINISHED
+			if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$CITRIX_STORAGE_OPENQRM_USERNAME --http-password=$CITRIX_STORAGE_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $CLONE_FINISHED` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/citrix-storage/citrix-storage-action.php?citrix_storage_command=clone_finished; then
+				openqrm_post_event 0 "clone" 2 "openqrm-citrix-storage" "Could not post clone-finished status to the openQRM-server at $OPENQRM_SERVER_IP!"
+			fi
+			# post vdi
+			$0 post_vdi -i $CITRIX_STORAGE_SERVER_IP -u $CITRIX_STORAGE_OPENQRM_USERNAME -p $CITRIX_STORAGE_OPENQRM_PASSWORD -t $CITRIX_STORAGE_DEPLOYMENT_TYPE
+		fi
+		openqrm_post_event 0 "clone" 5 "openqrm-citrix-storage" "Cloned VDI $CITRIX_STORAGE_IMAGE_ROOTDEVICE to $CITRIX_STORAGE_IMAGE_SNAPSHOT_NAME"
+		;;
+
+
+
+	*)
+		citrix_storage_usage
+		;;
+
+
+esac
+

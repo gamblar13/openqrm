@@ -1,0 +1,71 @@
+#!/bin/bash
+# this is the functions file for the citrix_storage-plugin
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+CITRIX_STORAGE_SERVER_LOCK_FILE=/var/run/openqrm/citrix_storage-plugin.lock
+CITRIX_STORAGE_SERVER_LOCK_DELAY=5
+CITRIX_STORAGE_SERVER_LOCK_RETRY=100
+CITRIX_STORAGE_SERVER_LOCK_TIMEOUT=500
+
+CITRIX_STORAGE_XE_BINARY="/usr/sbin/xe"
+
+
+################ common citrix_storage functions
+
+# logs for citrix_storage
+function citrix_storage_log() {
+	local COMPONENT=$1
+	shift
+	local MESSAGE=$@
+	logger -i -t "citrix_storage plug-in" "$COMPONENT : $MESSAGE"
+}
+
+
+# locking function
+function citrix_storage_lock() {
+	local COMMAND=$1
+	local RET=1
+
+	if [ ! -d `dirname $CITRIX_STORAGE_SERVER_LOCK_FILE` ]; then
+		mkdir -p `dirname $CITRIX_STORAGE_SERVER_LOCK_FILE`
+	fi
+	case "$COMMAND" in
+		aquire)
+				lockfile -s $CITRIX_STORAGE_SERVER_LOCK_DELAY -r $CITRIX_STORAGE_SERVER_LOCK_RETRY -l $CITRIX_STORAGE_SERVER_LOCK_TIMEOUT $CITRIX_STORAGE_SERVER_LOCK_FILE
+				RET=$?
+				citrix_storage_log citrix_storage_lock "Aquired the lock"
+				return $RET
+				;;
+		release)
+				/bin/rm -f $CITRIX_STORAGE_SERVER_LOCK_FILE
+				RET=$?
+				citrix_storage_log citrix_storage_lock "Released the lock"
+				return $RET
+				;;
+		*)
+			citrix_storage_log citrix_storage_lock "No such command. Try 'aquire' or 'release'"
+			return 1
+			;;
+	esac
+}
+
+
+
+################ citrix_storage functions
+

@@ -1,0 +1,57 @@
+<!--
+/*
+  This file is part of openQRM.
+
+    openQRM is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License version 2
+    as published by the Free Software Foundation.
+
+    openQRM is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+*/
+-->
+<h1><img border=0 src="/openqrm/base/plugins/citrix-storage/img/plugin.png"> Citrix-storage XenServer plugin</h1>
+<strong>This plugin is tested with Citrix-storage XenServer 5.6 (SP2)</strong>
+<br>
+<br>
+<b>How to use :</b>
+<br>
+<ul>
+<li>
+install Citrix-storage-XenServer on a server system
+</li><li>
+also install the second cd containing the support for Linux vms
+</li><li>
+login to the Citrix-storage XenServer via ssh and scp the /usr/sbin/xe util to the openQRM servers /usr/sbin dir
+</li><li>
+enable the openQRM Citrix-storage plugin via the plugin manager
+</li><li>
+manually add a resource via "Base -> Resources -> New", provide the Citrix-storage servers mac- and ip-address
+</li><li>
+create a storage type "Local-installed server" via "Base -> Storage -> New", select the Citrix-storage server resource and provide a name
+</li><li>
+create an image via "Base -> Image -> New", provide a name
+</li><li>
+create an appliance via "Base -> Appliances -> New", select the Citrix-storage servers resource, the default kernel and the previously created image
+</li><li>
+set the appliance "Resource type" to "Citrix-storage Host" and save
+</li><li>
+go to "Plugins -> Virtualization -> Citrix-storage -> Citrix-storage VM Manager", select the Citrix-storage Host appliance
+</li><li>
+now click on "auth" and provide the authentication details to login to the Citrix-storage Host
+</li><li>
+create a new vm via the "+VM" button
+</li><li>
+the new vm will boot-up via the network and in a short time appear in the resource overview as a new idle resource in the data-center
+
+</li>
+</ul>
+<br>
+<br>
