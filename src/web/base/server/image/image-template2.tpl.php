@@ -17,12 +17,32 @@
     Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
-<h1>openQRM Event Summary</h1>
-<br>
-{events_all} Events in the database  --  Errors :  {events_error}
-<br>
-<br>
-Top {max_show_error} Error Events :
-<br>
-<br>
-{events_error_table}
+<style>
+.htmlobject_tab_box {
+	width:800px;
+}
+</style>
+<h1>Select a Deployment Template</h1>
+<form action="{formaction}" method="GET">
+{local_deployment_hidden_image_id}
+{local_deployment_hidden_storage_id}
+{local_deployment_hidden_local_deployment_method}
+
+	<div style="float:left;">
+	{local_deployment_templates_select}
+	{local_deployment_persistent}
+	</div>
+	<div style="float:right;">
+	{local_deployment_additional_parameter}
+	</div>
+	<div style="clear:both;line-height:0px;">&#160;</div>
+
+	<div style="float:left;">
+	<br>
+	{submit}
+	</div>
+	<div style="float:right;">
+	<br>
+	</div>
+
+</form>

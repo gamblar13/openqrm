@@ -49,13 +49,14 @@ function getPassword(length, extraChars, firstNumber, firstLower, firstUpper, fi
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 $thisfile = basename($_SERVER['PHP_SELF']);
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
 $BaseDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/';
 require_once "$RootDir/include/user.inc.php";
+require_once "$RootDir/class/plugin.class.php";
 require_once "$RootDir/class/image.class.php";
 require_once "$RootDir/class/storage.class.php";
 require_once "$RootDir/class/resource.class.php";
@@ -96,7 +97,7 @@ if(htmlobject_request('action') != '') {
 				$error = 1;
 			}
 			if (htmlobject_request('identifier') == '') {
-				$strMsg .= 'Storageid not set<br/>';
+				$strMsg .= 'Storage id not set<br/>';
 				$error = 1;
 			}
 			// check that name is unique
@@ -213,15 +214,27 @@ if(htmlobject_request('action') != '') {
 
 				$strMsg .= 'added new image <b>'.$fields["image_name"].'</b><br>';
 				$args = '?strMsg='.$strMsg;
-				$args .= '&image_id='.$fields["image_id"];
+				$args .= '&image_id='.$new_image_id;
 				$args .= '&currentab=tab0';
 				$url = 'image-index.php'.$args;
-			}
-			// if something went wrong
-			else {
+
+				// if local-deployment method is set redirect to template setup
+				$image->get_instance_by_id($new_image_id);
+				if(strlen(htmlobject_request('local_deployment_method'))) {
+					$local_deployment_method = htmlobject_request('local_deployment_method');
+					$strMsg .= 'Configuring installation method via '.$local_deployment_method.'<br>';
+					$args = '?strMsg='.$strMsg;
+					$args .= '&image_id='.$new_image_id;
+					$args .= '&local_deployment_method='.$local_deployment_method;
+					$args .= '&currentab=tab1';
+					$url = 'image-template.php'.$args;
+				}
+				redirect('', '', $url);
+
+			}	else {
+				// if something went wrong
 				$url = error_redirect($strMsg);
 			}
-			redirect('', '', $url);
 		break;
 	}
 }
@@ -254,7 +267,7 @@ function image_form() {
 		if(htmlobject_request('image_isshared') == true) { $shared = true; }
 		else { $shared = false; }
 
-		// making the deployment parameters plugg-able
+		// making the image parameter plugg-able
 		$deployment_default_parameters="";
 		$deployment_default_parameters_file = "$BaseDir/boot-service/image.$deployment->type";
 		if (file_exists($deployment_default_parameters_file) && htmlobject_request('image_deployment_parameter') == '') {
@@ -264,7 +277,7 @@ function image_form() {
 		}
 		// making the rootdevice parameter plugg-able
 		$rootdevice_identifier_hook="";
-		$rootdevice_identifier_hook = "$BaseDir/boot-service/image.$deployment->type.php";
+		$rootdevice_identifier_hook = $BaseDir."/boot-service/image.".$deployment->type.".php";
 		// require once
 		if (file_exists($rootdevice_identifier_hook)) {
 			require_once "$rootdevice_identifier_hook";
@@ -275,12 +288,33 @@ function image_form() {
 			$rootfs_default = get_image_default_rootfs();
 			$rootfs_transfer_methods = get_rootfs_transfer_methods();
 			$rootfs_set_password_method = get_rootfs_set_password_method();
+			$rootfs_local_deployment_enabled = get_local_deployment_enabled();
 
 		} else {
 			$rootdevice_input = htmlobject_input('image_rootdevice', array("value" => htmlobject_request('image_rootdevice'), "label" => 'Root-device'), 'text', 20);
 			$rootfs_default = htmlobject_request('image_rootfstype');
 			$rootfs_transfer_methods = false;
 			$rootfs_set_password_method = false;
+			$rootfs_local_deployment_enabled = false;
+		}
+
+		// making the local deployment parameter plugg-able
+		$local_deployment_methods_input = "";
+		if ($rootfs_local_deployment_enabled) {
+			$local_deployment_methods_arr[] = array("value" => "", "label" => "");
+			$local_deployment = new deployment();
+			$deployment_id_arr = $local_deployment->get_deployment_ids();
+			foreach($deployment_id_arr as $deployment_id) {
+				$local_deployment->get_instance_by_id($deployment_id['deployment_id']);
+				$local_deployment_templates_identifier_hook = $BaseDir."/boot-service/template.".$local_deployment->type.".php";
+				if (file_exists($local_deployment_templates_identifier_hook)) {
+					require_once "$local_deployment_templates_identifier_hook";
+					$deployment_function="get_"."$local_deployment->type"."_methods";
+					$deployment_function=str_replace("-", "_", $deployment_function);
+					$local_deployment_methods_arr[] = $deployment_function();
+				}
+			}
+			$local_deployment_methods_input = htmlobject_select('local_deployment_method', $local_deployment_methods_arr, 'Installation');
 		}
 
 		$html = new htmlobject_div();
@@ -394,6 +428,7 @@ function image_form() {
 			$transfer_to_local_input = htmlobject_input('transfer_to_local', array("value" => '', "label" => 'Transfer-to-local'), 'text', 100);
 		}
 
+
 		//------------------------------------------------------------ set template
 		$t = new Template_PHPLIB();
 		$t->debug = false;
@@ -414,6 +449,7 @@ function image_form() {
 			'transfer_to_nfs' => $transfer_to_nfs_input,
 			'install_from_local' => $install_from_local_input,
 			'transfer_to_local' => $transfer_to_local_input,
+			'local_deployment_methods' => $local_deployment_methods_input,
 			'image_deployment_parameter' => htmlobject_textarea('image_deployment_parameter', array("value" => $deployment_default_parameters, "label" => 'Deployment parameter')),
 			'image_deployment_comment' => htmlobject_textarea('image_comment', array("value" => htmlobject_request('image_comment'), "label" => 'Comment')),
 			'image_capabilities' => htmlobject_textarea('image_capabilities', array("value" => htmlobject_request('image_capabilities'), "label" => 'Capabilities')),

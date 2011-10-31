@@ -41,7 +41,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 $thisfile = basename($_SERVER['PHP_SELF']);
@@ -206,6 +206,12 @@ function resource_display() {
 	$arHead['resource_memtotal'] = array();
 	$arHead['resource_memtotal']['title'] ='Memory';
 
+	$arHead['resource_cpunumber'] = array();
+	$arHead['resource_cpunumber']['title'] ='CPUs';
+
+	$arHead['resource_nics'] = array();
+	$arHead['resource_nics']['title'] ='NICs';
+
 	$arHead['resource_load'] = array();
 	$arHead['resource_load']['title'] ='Load';
 
@@ -265,6 +271,8 @@ function resource_display() {
 			'resource_ip' => $resource_db["resource_ip"],
 			'resource_type' => $resource_type,
 			'resource_memtotal' => $mem,
+			'resource_cpunumber' => $resource_db["resource_cpunumber"],
+			'resource_nics' => $resource_db["resource_nics"],
 			'resource_load' => $resource_db["resource_load"],
 		);
 
@@ -283,6 +291,13 @@ function resource_display() {
 		$table->identifier = 'resource_id';
 		$table->identifier_disabled = array(0);
 	}
+	$table->limit_select = array(
+		array("value" => 10, "text" => 10),
+		array("value" => 20, "text" => 20),
+		array("value" => 30, "text" => 30),
+		array("value" => 50, "text" => 50),
+		array("value" => 100, "text" => 100),
+	);
 	$table->max = $resource_tmp->get_count('all') + 1; // adding openqrmserver
 
 	// set template

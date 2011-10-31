@@ -49,7 +49,7 @@ function getPassword(length, extraChars, firstNumber, firstLower, firstUpper, fi
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 $thisfile = basename($_SERVER['PHP_SELF']);
@@ -131,7 +131,7 @@ if(htmlobject_request('action') != '') {
 
 				# set password if given
 				$image_auth_id = $fields["image_id"];
-				if(strlen($fields["image_passwd"])) {
+				if(strlen(htmlobject_request('image_passwd'))) {
 					$image_passwd = $fields["image_passwd"];
 					$image->set_root_password($image_auth_id, $image_passwd);
 				} else {
@@ -207,19 +207,30 @@ if(htmlobject_request('action') != '') {
 				} else {
 					$image->set_deployment_parameters("IMAGE_TRANSFER_TO_LOCAL", "");
 				}
-
-
+				// prepare redirect
 				$strMsg .= 'saved image <b>'.$fields["image_name"].'</b><br>';
 				$args = '?strMsg='.$strMsg;
 				$args .= '&image_id='.$fields["image_id"];
 				$args .= '&currentab=tab0';
 				$url = 'image-index.php'.$args;
-			}
-			// if something went wrong
-			else {
+				// if local-deployment method is set redirect to template setup
+				$image->get_instance_by_id($image_id);
+				if(strlen(htmlobject_request('local_deployment_method'))) {
+					$local_deployment_method = htmlobject_request('local_deployment_method');
+					$strMsg .= 'Configuring installation method via '.$local_deployment_method.'<br>';
+					$args = '?strMsg='.$strMsg;
+					$args .= '&image_id='.$image_id;
+					$args .= '&local_deployment_method='.$local_deployment_method;
+					$args .= '&currentab=tab1';
+					$url = 'image-template.php'.$args;
+				}
+				// reset deployment parameter INSTALL_CONFIG
+				$image->set_deployment_parameters("INSTALL_CONFIG", "");
+				redirect('', '', $url);
+			} else {
+				// if something went wrong
 				$url = error_redirect($strMsg);
 			}
-			redirect('', '', $url);
 		break;
 	}
 }
@@ -287,11 +298,33 @@ function image_form() {
 		$rootdevice_input = htmlobject_select('image_rootdevice', $rootdevice_identifier_arr, 'Root-device', array($image_rootdevice));
 		$rootfs_transfer_methods = get_rootfs_transfer_methods();
 		$rootfs_set_password_method = get_rootfs_set_password_method();
+		$rootfs_local_deployment_enabled = get_local_deployment_enabled();
 	} else {
 		$rootdevice_input = htmlobject_input('image_rootdevice', array("value" => htmlobject_request('image_rootdevice'), "label" => 'Root-device'), 'text', 20);
 		$rootfs_transfer_methods = false;
 		$rootfs_set_password_method = false;
+		$rootfs_local_deployment_enabled = false;
 	}
+
+	// making the local deployment parameter plugg-able
+	$local_deployment_methods_input = "";
+	if ($rootfs_local_deployment_enabled) {
+		$local_deployment_methods_arr[] = array("value" => "", "label" => "");
+		$local_deployment = new deployment();
+		$deployment_id_arr = $local_deployment->get_deployment_ids();
+		foreach($deployment_id_arr as $deployment_id) {
+			$local_deployment->get_instance_by_id($deployment_id['deployment_id']);
+			$local_deployment_templates_identifier_hook = $BaseDir."/boot-service/template.".$local_deployment->type.".php";
+			if (file_exists($local_deployment_templates_identifier_hook)) {
+				require_once "$local_deployment_templates_identifier_hook";
+				$deployment_function="get_"."$local_deployment->type"."_methods";
+				$deployment_function=str_replace("-", "_", $deployment_function);
+				$local_deployment_methods_arr[] = $deployment_function();
+			}
+		}
+		$local_deployment_methods_input = htmlobject_select('local_deployment_method', $local_deployment_methods_arr, 'Installation');
+	}
+
 
 	// in case the deployment type allows to set the password in the image
 	if ($rootfs_set_password_method) {
@@ -429,6 +462,7 @@ function image_form() {
 		'transfer_to_nfs' => $transfer_to_nfs_input,
 		'install_from_local' => $install_from_local_input,
 		'transfer_to_local' => $transfer_to_local_input,
+		'local_deployment_methods' => $local_deployment_methods_input,
 		'image_deployment_parameter' => htmlobject_textarea('image_deployment_parameter', array("value" => $image_deployment_parameter, "label" => 'Deployment parameter')),
 		'image_deployment_comment' => htmlobject_textarea('image_comment', array("value" => $image_comment, "label" => 'Comment')),
 		'image_capabilities' => htmlobject_textarea('image_capabilities', array("value" => $image_capabilities, "label" => 'Capabilities')),

@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 $thisfile = basename($_SERVER['PHP_SELF']);
@@ -195,7 +195,14 @@ function kernel_display() {
 		$table->bottom = array('edit', 'set-default', 'remove');
 		$table->identifier = 'kernel_id';
 	}
-		$kernel_max = $kernel_tmp->get_count();
+	$table->limit_select = array(
+		array("value" => 10, "text" => 10),
+		array("value" => 20, "text" => 20),
+		array("value" => 30, "text" => 30),
+		array("value" => 50, "text" => 50),
+		array("value" => 100, "text" => 100),
+	);
+	$kernel_max = $kernel_tmp->get_count();
 	$table->max = $kernel_max - 1;
 	#$table->limit = 10;
 

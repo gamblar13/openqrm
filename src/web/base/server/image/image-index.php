@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 $thisfile = basename($_SERVER['PHP_SELF']);
@@ -163,6 +163,9 @@ function image_display() {
 	$arHead['image_type'] = array();
 	$arHead['image_type']['title'] ='Deployment Type';
 
+	$arHead['image_isactive'] = array();
+	$arHead['image_isactive']['title'] ='Active';
+
 	$arHead['image_comment'] = array();
 	$arHead['image_comment']['title'] ='Comment';
 	$arHead['image_comment']['sortable'] = false;
@@ -188,6 +191,13 @@ function image_display() {
 		if($image_db["image_id"] != 1) {
 			$strEdit = '<a href="image-edit.php?image_id='.$image_db["image_id"].'&currenttab=tab2"><img src="../../img/edit.png" width="24" height="24" alt="edit"/> Edit</a>';
 		}
+		// set the active icon
+		$isactive_icon = "/openqrm/base/plugins/aa_plugins/img/enable.png";
+		if ($image_db["image_isactive"] == 1) {
+			$isactive_icon = "/openqrm/base/plugins/aa_plugins/img/disable.png";
+			$strEdit = '';
+		}
+		$image_isactive_icon = "<img src=".$isactive_icon." width='24' height='24' alt='State'>";
 
 		$arBody[] = array(
 			'image_icon' => "<img width=20 height=20 src=$image_icon>",
@@ -195,6 +205,7 @@ function image_display() {
 			'image_name' => $image_db["image_name"],
 			'image_version' => $image_db["image_version"],
 			'image_type' => $image_deployment->description,
+			'image_isactive' => $image_isactive_icon,
 			'image_comment' => $image_db["image_comment"],
 			'image_edit' => $strEdit,
 		);
@@ -215,8 +226,15 @@ function image_display() {
 		$table->identifier_name = 'id';
 		$table->identifier_disabled = array(1);
 	}
-		// do not show the openQRM server and idle image
-		$image_max = $image_tmp->get_count();
+	$table->limit_select = array(
+		array("value" => 10, "text" => 10),
+		array("value" => 20, "text" => 20),
+		array("value" => 30, "text" => 30),
+		array("value" => 50, "text" => 50),
+		array("value" => 100, "text" => 100),
+	);
+	// do not show the openQRM server and idle image
+	$image_max = $image_tmp->get_count();
 	$table->max = $image_max-2;
 	#$table->limit = 10;
 

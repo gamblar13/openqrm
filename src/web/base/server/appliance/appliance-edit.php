@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 $thisfile = basename($_SERVER['PHP_SELF']);
@@ -145,6 +145,8 @@ function appliance_form() {
 	global $OPENQRM_USER, $ar_request, $appliance_id;
 	global $thisfile;
 
+	$p_appliance = new appliance();
+	$p_appliance->get_instance_by_id($appliance_id);
 	$image = new image();
 	$image_list = array();
 	$image_list = $image->get_list();
@@ -157,6 +159,10 @@ function appliance_form() {
 		$image_arr_id = $image_arr['value'];
 		$tmpimage = new image();
 		$tmpimage->get_instance_by_id($image_arr_id);
+		// is image active ? then do not show it here
+		if (($tmpimage->isactive == 1) && ($image_arr_id != $p_appliance->imageid)) {
+			continue;
+		}
 		if (!strstr($tmpimage->capabilities, "TYPE=local-server")) {
 			$image_filtered_list[] = $image_arr;
 		}
@@ -235,8 +241,6 @@ function appliance_form() {
 			$available_nics_uniq[] .= $tres->nics;
 		}
 	}
-	$p_appliance = new appliance();
-	$p_appliance->get_instance_by_id($appliance_id);
 	// set current res_id
 	$current_resource_id = $ar_request['appliance_resources'];
 	$current_resource = new resource();

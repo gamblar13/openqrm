@@ -17,12 +17,11 @@
     Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
-<h1>openQRM Event Summary</h1>
-<br>
-{events_all} Events in the database  --  Errors :  {events_error}
-<br>
-<br>
-Top {max_show_error} Error Events :
-<br>
-<br>
-{events_error_table}
+<style>
+.htmlobject_tab_box {
+	width:800px;
+}
+</style>
+<form action="{formaction}" method="GET">
+{storage_server_table}
+</form>

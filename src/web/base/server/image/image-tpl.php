@@ -14,12 +14,12 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
 <style>
 .htmlobject_tab_box {
-	width:600px;
+	width:800px;
 }
 </style>
 <form action="{thisfile}">
@@ -54,6 +54,14 @@
 	{install_from_local}
 	{transfer_to_local}
 	</div>
+
+	<div style="float:left;">
+	{local_deployment_methods}
+	</div>
+	<div style="float:right;">
+	<br>
+	</div>
+
 
 	<div style="clear:both;line-height:0px;">&#160;</div>
 </div>

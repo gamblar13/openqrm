@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -264,6 +264,11 @@ function appliance_form_step2($resource_id) {
 		$image_arr_id = $image_arr['value'];
 		$tmpimage = new image();
 		$tmpimage->get_instance_by_id($image_arr_id);
+		// is image active ? then do not show it here
+		if ($tmpimage->isactive == 1) {
+			continue;
+		}
+		// filter local-server images
 		if (!strstr($tmpimage->capabilities, "TYPE=local-server")) {
 			$tmp_image_name = $image_arr['label'];
 			$tmpdeployment = new deployment();

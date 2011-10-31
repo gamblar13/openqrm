@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 $thisfile = basename($_SERVER['PHP_SELF']);
@@ -119,10 +119,6 @@ if(htmlobject_request('action') != '') {
 						$resource->get_instance_by_id($appliance->resources);
 						if ($appliance->resources == 0) {
 							$strMsg .= "An appliance with the openQRM-server as resource is always active!<br>";
-							continue;
-						}
-						if (!strcmp($appliance->state, "stopped"))  {
-							$strMsg .= "Not stopping already stopped appliance $id <br>";
 							continue;
 						}
 						// here we stop
@@ -381,6 +377,13 @@ function appliance_display() {
 		$table->bottom = array('start', 'stop', 'remove');
 		$table->identifier = 'appliance_id';
 	}
+	$table->limit_select = array(
+		array("value" => 10, "text" => 10),
+		array("value" => 20, "text" => 20),
+		array("value" => 30, "text" => 30),
+		array("value" => 50, "text" => 50),
+		array("value" => 100, "text" => 100),
+	);
 	$table->max = $appliance_tmp->get_count();
 	#$table->limit = 10;
 

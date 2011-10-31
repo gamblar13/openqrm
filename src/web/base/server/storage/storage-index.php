@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 $thisfile = basename($_SERVER['PHP_SELF']);
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
@@ -234,6 +234,12 @@ function storage_display() {
 		$storage_edit = '<a href="storage-edit.php?storage_id='.$storage_db["storage_id"].'&currenttab=tab2&storage_filter='.htmlobject_request('storage_filter').'"><img src="../../img/edit.png" width="24" height="24" alt="edit"/> Edit</a>';
 		$storage_mgmt_url = "/openqrm/base/plugins/".$deployment->storagetype."/".$deployment->storagetype."-manager.php?currenttab=tab0&action=select&identifier[]=".$storage->id;
 		$storage_mgmt_file = "/openqrm/base/plugins/".$deployment->storagetype."/".$deployment->storagetype."-manager.php";
+		if( $deployment->storagetype === 'lvm-storage' ||
+			$deployment->storagetype === 'nfs-storage')
+		{
+			$storage_mgmt_url = "/openqrm/base/plugins/".$deployment->storagetype.'/index.php?'.str_replace('-', '_',$deployment->storagetype).'_action=edit&storage_id='.$storage->id;
+			$storage_mgmt_file = "/openqrm/base/plugins/".$deployment->storagetype."/index.php";
+		}
 		if (file_exists($_SERVER["DOCUMENT_ROOT"]."/".$storage_mgmt_file)) {
 			$storage_mgmt = '<a href="'.$storage_mgmt_url.'"><img src="../../img/manage.png" width="24" height="24" alt="manage"/> Mgmt</a>';
 		} else {
@@ -276,6 +282,13 @@ function storage_display() {
 		$table->identifier_name = 'id';
 		$table->identifier = 'storage_id';
 	}
+	$table->limit_select = array(
+		array("value" => 10, "text" => 10),
+		array("value" => 20, "text" => 20),
+		array("value" => 30, "text" => 30),
+		array("value" => 50, "text" => 50),
+		array("value" => 100, "text" => 100),
+	);
 	$table->max = $storage_tmp->get_count();
 
 	return $disp.$table->get_string();

@@ -35,6 +35,16 @@
 	width:110px;
 	vertical-align:bottom;
 }
+.htmlobject_td.resource_cpunumber {
+	text-align:center;
+	width:25px;
+	vertical-align:bottom;
+}
+.htmlobject_td.resource_nics {
+	text-align:center;
+	width:25px;
+	vertical-align:bottom;
+}
 .htmlobject_td.resource_load {
 	text-align:left;
 	width:50px;

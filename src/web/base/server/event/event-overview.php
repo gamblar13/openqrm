@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 #error_reporting(0);
@@ -231,6 +231,13 @@ function event_display() {
 			$table->bottom = array('remove', 'acknowledge');
 			$table->identifier = 'event_id';
 	}
+	$table->limit_select = array(
+		array("value" => 10, "text" => 10),
+		array("value" => 20, "text" => 20),
+		array("value" => 30, "text" => 30),
+		array("value" => 50, "text" => 50),
+		array("value" => 100, "text" => 100),
+	);
 	$table->max = $event_tmp->get_count();
 
 	// set template
@@ -347,6 +354,13 @@ function errors_only_display() {
 		$table->bottom = array('remove', 'acknowledge');
 		$table->identifier = 'event_id';
 	}
+	$table->limit_select = array(
+		array("value" => 10, "text" => 10),
+		array("value" => 20, "text" => 20),
+		array("value" => 30, "text" => 30),
+		array("value" => 50, "text" => 50),
+		array("value" => 100, "text" => 100),
+	);
 	$table->max = $event_tmp->get_error_count();
 
 		// set template
