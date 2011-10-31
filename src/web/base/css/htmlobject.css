@@ -365,6 +365,16 @@ input, textarea, select {
 	margin: 5px 0 !important;
 }
 
+.htmlobject_td.sort_form {
+    border: 0 none;
+    text-align: right;
+}
+.htmlobject_td.actions {
+    border: 0 none;
+    padding-top: 15px !important;
+    text-align: right;
+}
+
 .tr_hover {
 	background-color: #eee;
 	border-left: 0px none;
