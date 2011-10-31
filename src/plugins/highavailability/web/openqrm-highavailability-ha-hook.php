@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -148,6 +148,10 @@ function find_virtualization_host($v_plugin_name, $avoid_resource_id) {
 	$vhost_type = new virtualization();
 	$vhost_type->get_instance_by_type($v_plugin_name);
 	$event->log("find_virtualization_host", $_SERVER['REQUEST_TIME'], 5, "openqrm-highavailability-ha-hook.php", "Trying to find a Virtualizatin Host type  $vhost_type->type $vhost_type->name", "", "", 0, 0, 0);
+	$ha_conf_file="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/highavailability/etc/openqrm-plugin-highavailability.conf";
+	$store = openqrm_parse_conf($xen_vm_conf_file);
+	extract($store);
+	$migrate_when_failover=$store['OPENQRM_HA_MIGRATE_FAILED_VM'];
 
 	// for all in appliance list, find virtualization host appliances
 	$appliance_tmp = new appliance();
@@ -160,31 +164,39 @@ function find_virtualization_host($v_plugin_name, $avoid_resource_id) {
 			$appliance->get_instance_by_id($id);
 			// active ?
 			if ($appliance->stoptime == 0 || $appliance->resources == 0) {
-				if ($appliance->virtualization == $vhost_type->id) {
-					// we have found an active appliance from the right virtualization type
-					$active_appliance_list[] .= $id;
-					// if not origin vhost add to second list
-					if ($appliance->resources != $avoid_resource_id) {
-						$active_appliance_list_without_origin_vhost[] .= $id;
-					}
+				$host_resource = new resource();
+				$host_resource->get_instance_by_id($appliance->resources);
+				if (!strcmp($host_resource->state, "active")) {
+					if ($appliance->virtualization == $vhost_type->id) {
+						$event->log("find_virtualization_host", $_SERVER['REQUEST_TIME'], 5, "openqrm-highavailability-ha-hook.php", "- Found appliance ".$id." as potential candidate for creating the new VM", "", "", 0, 0, 0);
+						// we have found an active appliance from the right virtualization type
+						$active_appliance_list[] .= $id;
+						// if not origin vhost add to second list
+						if ($appliance->resources != $avoid_resource_id) {
+							$active_appliance_list_without_origin_vhost[] .= $id;
+						}
 
+					}
 				}
 			}
 		}
 	}
-	// really avoid origin host for now
-	$active_appliance_list = $active_appliance_list_without_origin_vhost;
+	// if we should avoid origin host
+	if (!strcmp($migrate_when_failover, "true")) {
+		$event->log("find_virtualization_host", $_SERVER['REQUEST_TIME'], 5, "openqrm-highavailability-ha-hook.php", "- Avoiding origin Host of the VM in error", "", "", 0, 0, 0);
+		$active_appliance_list = $active_appliance_list_without_origin_vhost;
+	}
 
 	// did we found any ?
 	if (count($active_appliance_list) < 1) {
 		$event->log("find_virtualization_host", $_SERVER['REQUEST_TIME'], 2, "openqrm-highavailability-ha-hook.php", "Warning ! There is no virtualization host type $vhost_type->name available to bring up a new VM", "", "", 0, 0, 0);
 		return -1;
 	}
-		// if we found more than one host remove the origin vhostid of the failed-resource
-	//	if (count($active_appliance_list) > 1) {
-	//		$active_appliance_list = $active_appliance_list_without_origin_vhost;
-	//	}
-
+	// if we found more than one host remove the origin vhostid of the failed-resource
+	if (count($active_appliance_list) > 1) {
+		$event->log("find_virtualization_host", $_SERVER['REQUEST_TIME'], 5, "openqrm-highavailability-ha-hook.php", "- There is more than once Host candidate for creating the new VM, trying to avoid origin Host.", "", "", 0, 0, 0);
+		$active_appliance_list = $active_appliance_list_without_origin_vhost;
+	}
 	// find the appliance with the most capacities on it
 	$max_resourc_load = 100;
 	$less_load_resource_id=-1;
@@ -460,7 +472,7 @@ function openqrm_highavailability_ha_hook($resource_id) {
 				$anic = 1;
 				$additional_nics = $old_vm_res->nics -1;
 				$create_resource_additional_nic_str="";
-				while ($anic < $additional_nics) {
+				while ($anic <= $additional_nics) {
 					$new_vm_mac = generate_vm_mac($virtualization_plugin_name);
 					switch ($virtualization_plugin_name) {
 						# citrix + vbox vms network parameter starts with -m1
