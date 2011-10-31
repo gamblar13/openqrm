@@ -1,4 +1,4 @@
-<!--
+<?php
 /*
   This file is part of openQRM.
 
@@ -16,23 +16,18 @@
 
     Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
--->
-<form action="{thisfile}" method="GET">
-<h1><img border=0 src="/openqrm/base/plugins/nfs-storage/img/volumes.png"> {label}</h1>
-{table}
-</form>
+$thisfile = basename($_SERVER['PHP_SELF']);
+$RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
+$BaseDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/';
+require_once "$RootDir/include/user.inc.php";
+require_once "$RootDir/class/image.class.php";
+require_once "$RootDir/class/storage.class.php";
+require_once "$RootDir/class/resource.class.php";
+require_once "$RootDir/class/deployment.class.php";
+require_once "$RootDir/plugins/nfs-storage/class/nfs-storage.controller.class.php";
 
-
-<table id="wait" style="display:none; border:0px none;">
-<tr>
-	<td style="vertical-align:middle;border:0px none;">{please_wait}</td>
-	<td style="vertical-align:middle;border:0px none;"><img src="../../img/loading.gif"></td>
-</tr>
-</table>
-
-<script type="text/javascript">
-function wait() {
-	document.getElementById('Tabelle').style.display = 'none';
-	document.getElementById('wait').style.display = 'block';
-}
-</script>
+$user = new user($_SERVER['PHP_AUTH_USER']);
+$controller = new nfs_storage_controller($user);
+$controller->api();
+#$output = $action->action();
+?>

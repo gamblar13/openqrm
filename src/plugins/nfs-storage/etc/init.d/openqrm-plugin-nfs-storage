@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
@@ -33,32 +33,32 @@ function openqrm_plugin_nfs_storage_start() {
 	if [ "$NFS_STORAGE_AUTO_START" == "yes" ]; then
 		if [ -x "/etc/init.d/portmap" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d portmap start || exit $?
+				invoke-rc.d portmap start
 			else
-				/etc/init.d/portmap start || exit $?
+				/etc/init.d/portmap start
 			fi
 		fi
 		if [ -x "/etc/init.d/nfs-kernel-server" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d nfs-kernel-server start || exit $?
+				invoke-rc.d nfs-kernel-server start
 			else
-				/etc/init.d/nfs-kernel-server start || exit $?
+				/etc/init.d/nfs-kernel-server start
 			fi
 		fi
 
 
 		if [ -x "/etc/init.d/nfs" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d nfs start || exit $?
+				invoke-rc.d nfs start
 			else
-				/etc/init.d/nfs start || exit $?
+				/etc/init.d/nfs start
 			fi
 		fi
 		if [ -x "/etc/init.d/nfslock" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d nfslock start || exit $?
+				invoke-rc.d nfslock start
 			else
-				/etc/init.d/nfslock start || exit $?
+				/etc/init.d/nfslock start
 			fi
 		fi
 		# for Suse
@@ -75,31 +75,31 @@ function openqrm_plugin_nfs_storage_stop() {
 	if [ "$NFS_STORAGE_AUTO_START" == "yes" ]; then
 		if [ -x "/etc/init.d/nfs-kernel-server" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d nfs-kernel-server stop || exit $?
+				invoke-rc.d nfs-kernel-server stop
 			else
-				/etc/init.d/nfs-kernel-server stop || exit $?
+				/etc/init.d/nfs-kernel-server stop
 			fi
 		fi
 		if [ -x "/etc/init.d/portmap" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d portmap stop || exit $?
+				invoke-rc.d portmap stop
 			else
-				/etc/init.d/portmap stop || exit $?
+				/etc/init.d/portmap stop
 			fi
 		fi
 
 		if [ -x "/etc/init.d/nfs" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d nfs stop || exit $?
+				invoke-rc.d nfs stop
 			else
-				/etc/init.d/nfs stop || exit $?
+				/etc/init.d/nfs stop
 			fi
 		fi
 		if [ -x "/etc/init.d/nfslock" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d nfslock stop || exit $?
+				invoke-rc.d nfslock stop
 			else
-				/etc/init.d/nfslock stop || exit $?
+				/etc/init.d/nfslock stop
 			fi
 		fi
 		# for Suse
