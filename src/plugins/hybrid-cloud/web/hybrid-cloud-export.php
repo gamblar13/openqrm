@@ -44,7 +44,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -436,8 +436,11 @@ function hybrid_cloud_ami_setup($image_id, $hybrid_cloud_id) {
 		$ars = array();
 		$ars[] = array('value'=> 'US', 'label'=> 'US Standard - US');
 		$ars[] = array('value'=> 'EU', 'label'=> 'Europe - EU');
-		$ars[] = array('value'=> 'us-west-1', 'label'=> 'US West - us-west-1');
-		$ars[] = array('value'=> 'ap-southeast-1', 'label'=> 'Asia East - ap-southeast-1');
+		$ars[] = array('value'=> 'us-east-1', 'label'=> 'US East (Virginia) - us-east-1');
+		$ars[] = array('value'=> 'us-west-1', 'label'=> 'US West (California) - us-west-1');
+		$ars[] = array('value'=> 'eu-west-1', 'label'=> 'Eu West (Ireland) - eu-west-1');
+		$ars[] = array('value'=> 'ap-southeast-1', 'label'=> 'Asia Pacific (Singapore) - ap-southeast-1');
+		$ars[] = array('value'=> 'ap-southwest-1', 'label'=> 'Asia Pacific (Tokyo) - ap-southwest-1');
 		$hybrid_cloud_ami_export_location_select = htmlobject_select("hybrid_cloud_ami_export_location", $ars , 'Export to ', 0);
 	}
 
