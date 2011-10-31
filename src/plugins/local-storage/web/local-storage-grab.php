@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-	<title>Select ZFS Storage</title>
+	<title>Select Local Storage</title>
 	<link rel="stylesheet" type="text/css" href="../../css/htmlobject.css" />
 	<link type="text/css" href="/openqrm/base/js/jquery/development-bundle/themes/smoothness/ui.all.css" rel="stylesheet" />
 	<script type="text/javascript" src="/openqrm/base/js/jquery/js/jquery-1.3.2.min.js"></script>
@@ -48,7 +48,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -56,8 +56,11 @@
 $thisfile = basename($_SERVER['PHP_SELF']);
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
 $BaseDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/';
+// place for the storage stat files
+$StorageDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/plugins/local-storage/storage';
 require_once "$RootDir/include/user.inc.php";
 require_once "$RootDir/class/image.class.php";
+require_once "$RootDir/class/image_authentication.class.php";
 require_once "$RootDir/class/storage.class.php";
 require_once "$RootDir/class/deployment.class.php";
 require_once "$RootDir/class/resource.class.php";
@@ -66,46 +69,69 @@ require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
 // special local-storage classes
 require_once "$RootDir/plugins/local-storage/class/localstoragestate.class.php";
+$openqrm_server = new openqrm_server();
+$OPENQRM_SERVER_IP_ADDRESS=$openqrm_server->get_ip_address();
+global $OPENQRM_SERVER_IP_ADDRESS;
+global $IMAGE_AUTHENTICATION_TABLE;
+$event = new event();
+global $event;
 
 $resource_id = htmlobject_request('resource_id');
-$action=htmlobject_request('action');
+$storage_id = htmlobject_request('storage_id');
+$template_export = htmlobject_request('template_export');
 global $resource_id;
+global $storage_id;
+global $template_export;
 global $APPLIANCE_INFO_TABLE;
+$action=htmlobject_request('action');
+$step=htmlobject_request('step');
+if (!strlen($step)) {
+	$step=1;
+}
+
 
 $refresh_delay=1;
 $refresh_loop_max=20;
 
 
-function redirect_resource($strMsg, $resource_id) {
+function redirect_resource($strMsg, $resource_id, $step) {
 	global $thisfile;
 	global $action;
-	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&identifier[]='.$resource_id;
+	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&identifier[]='.$resource_id.'&step='.$step;
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
 
-function redirect_image($strMsg, $resource_id, $image_id) {
+function redirect_storage($strMsg, $resource_id, $storage_id, $step) {
 	global $thisfile;
 	global $action;
-	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&resource_id='.$resource_id.'&identifier[]='.$image_id;
+	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&identifier[]='.$storage_id.'&resource_id='.$resource_id.'&step='.$step;
+	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
+	exit;
+}
+function redirect_template_export($strMsg, $resource_id, $storage_id, $template_export, $step) {
+	global $thisfile;
+	global $action;
+	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&resource_id='.$resource_id.'&storage_id='.$storage_id.'&identifier[]='.$template_export.'&step='.$step;
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
 
-// function to set the resource capabilities
-function set_res_capabilities($res_id, $cmd, $key, $value) {
-	$resource = new resource();
-	$resource->get_instance_by_id($res_id);
 
-	switch ($cmd) {
-		case 'set':
-			$resource_fields["resource_capabilities"] = "$resource->capabilities $key='$value'";
-			break;
+function wait_for_template_exports($sfile) {
+	$refresh_delay=1;
+	$refresh_loop_max=20;
+	$refresh_loop=0;
+	while (!file_exists($sfile)) {
+		sleep($refresh_delay);
+		$refresh_loop++;
+		flush();
+		if ($refresh_loop > $refresh_loop_max)  {
+			return false;
+		}
 	}
-	$resource->update_info($res_id, $resource_fields);
+	return true;
 }
-
-
 
 
 
@@ -136,66 +162,84 @@ if(htmlobject_request('redirect') != 'yes') {
 				case 'grab':
 					if (isset($_REQUEST['identifier'])) {
 						foreach($_REQUEST['identifier'] as $id) {
+							$step = 2;
 							show_progressbar();
 							$resource = new resource();
 							$resource->get_instance_by_id($id);
 							$redir_msg="Selected resource $id";
-							redirect_resource($redir_msg, $id);
+							redirect_resource($redir_msg, $id, $step);
 						}
 					}
 					break;
 
-				case 'transfer':
+				case 'storage':
 					if (isset($_REQUEST['identifier'])) {
 						foreach($_REQUEST['identifier'] as $id) {
+							$step = 3;
 							show_progressbar();
-							$image = new image();
-							$image->get_instance_by_id($id);
+							$storage = new storage();
+							$storage->get_instance_by_id($id);
+							$redir_msg="Selected storage $id";
+							// get a list of template exports
+							$storage_resource = new resource();
+							$storage_resource->get_instance_by_id($storage->resource_id);
+							$storage_resource_id = $storage_resource->id;
+							$ident_file = $StorageDir."/".$storage_resource_id.".lv.local-storage.ident";
+							if (file_exists($ident_file)) {
+								unlink($ident_file);
+							}
+							// send command
+							$resource_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/local-storage/bin/openqrm-local-storage post_identifier -u ".$OPENQRM_ADMIN->name." -p ".$OPENQRM_ADMIN->password;
+							$storage_resource->send_command($storage_resource->ip, $resource_command);
+							if (!wait_for_template_exports($ident_file)) {
+								$redir_msg="Timeout reached for getting the list of template exports from storage ".$id;
+								redirect_resource($redir_msg, $resource_id, 2);
+
+							}
+							redirect_storage($redir_msg, $resource_id, $id, $step);
+						}
+					}
+					break;
+
+
+				case 'put':
+					if (isset($_REQUEST['identifier'])) {
+						foreach($_REQUEST['identifier'] as $template_export) {
+							$step = 4;
+							show_progressbar();
+							// get storage, authenticate template export
+							$storage = new storage();
+							$storage->get_instance_by_id($storage_id);
+							$storage_resource = new resource();
+							$storage_resource->get_instance_by_id($storage->resource_id);
 							$resource = new resource();
 							$resource->get_instance_by_id($resource_id);
-							// create a token for the grab
-							$grab_token = $image->generatePassword(10);
-							set_res_capabilities($resource_id, "set", "LOCAL_STORAGE_GRAB", $grab_token);
-							// create a new grab appliance
-							$appliance_name = "grab-".$resource_id."-".$id."-x";
-							$appliance_id = openqrm_db_get_free_id('appliance_id', $APPLIANCE_INFO_TABLE);
-							// prepare array to add appliance
-							$ar_grab = array(
-								'appliance_id' => $appliance_id,
-								'appliance_resources' => $resource_id,
-								'appliance_name' => $appliance_name,
-								'appliance_kernelid' => 1,
-								'appliance_imageid' => $id,
-								'appliance_virtualization' => 1,
-								'appliance_cpunumber' => 0,
-								'appliance_memtotal' => 0,
-								'appliance_capabilities' => 'LOCAL_STORAGE_GRAB',
-								'appliance_comment' => "Local-storage grab-appliance",
-								'appliance_ssi' => 0,
-								'appliance_highavailable' => 0,
-							);
-
-							// create + start the appliance :)
-							$appliance = new appliance();
-							$appliance->add($ar_grab);
-							// wait for appliance being added
-							sleep(1);
-							$appliance->get_instance_by_id($appliance_id);
-							// add apppliance + token to db
-							$local_storage_state = new localstoragestate();
-							$local_storage_state_id = openqrm_db_get_free_id('ls_id', $local_storage_state->_db_table);
-							// prepare array to add appliance
-							$ar_ls_state = array(
-								'ls_id' => $local_storage_state_id,
-								'ls_appliance_id' => $appliance->id,
-								'ls_token' => $grab_token,
-								'ls_state' => 0,
-							);
-							$local_storage_state->add($ar_ls_state);
-							// finally start the appliance + grab phase
-							$appliance->start();
-							$redir_msg="Created temporary grab-appliance $appliance_name. Starting the grab-phase ...";
-							redirect_image($redir_msg, $resource_id, $id);
+							// authenticating the storage volume
+							$local_storage_auth_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/local-storage/bin/openqrm-local-storage auth -r ".$template_export." -i ".$resource->ip;
+							$storage_resource->send_command($storage_resource->ip, $local_storage_auth_command);
+							// we should create an authblocker here and wait until it is removed, anyway the image is existing in this case
+							// send grab command
+							$template_name=basename($template_export);
+							$local_storage_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/local-storage/bin/openqrm-local-storage-manager grab -m ".$resource->mac." -i ".$resource->ip." -n ".$template_name." -d ".$storage_resource->ip.":".$template_export;
+							$openqrm_server->send_command($local_storage_command);
+							sleep(4);
+							$resource->send_command($resource->ip, "reboot");
+							$resource_fields=array();
+							$resource_fields["resource_state"]="transition";
+							$resource->update_info($resource->id, $resource_fields);
+							sleep(4);
+							// creating an image-auth object to reset the storage auth when the system is idle again
+//							$image_authentication = new image_authentication();
+//							$ia_id = openqrm_db_get_free_id('ia_id', $IMAGE_AUTHENTICATION_TABLE);
+//							$image_auth_ar = array(
+//								'ia_id' => $ia_id,
+//								'ia_image_id' => $image->id,
+//								'ia_resource_id' => $resource->id,
+//								'ia_auth_type' => 0,
+//							);
+//							$image_authentication->add($image_auth_ar);
+							$redir_msg="Running 'grab' on resource ".$resource_id." transfering to storage ".$storage_id.":".$template_export." as ".$template_name;
+							redirect_template_export($redir_msg, $resource_id, $storage_id, $template_export, $step);
 						}
 					}
 					break;
@@ -242,7 +286,7 @@ function local_select_resource() {
 		$resource = new resource();
 		$resource->get_instance_by_id($resource_db["resource_id"]);
 		$resource_resource = new resource();
-		$resource_resource->get_instance_by_id($resource->resource_id);
+		$resource_resource->get_instance_by_id($resource->id);
 		$resource_icon_default="/openqrm/base/img/resource.png";
 		$resource_icon="/openqrm/base/plugins/local-resource/img/resource.png";
 		$state_icon="/openqrm/base/img/$resource->state.png";
@@ -291,47 +335,162 @@ function local_select_resource() {
 
 
 
-
-function local_select_image($resource_id) {
+function local_select_storage($resource_id) {
 	global $OPENQRM_USER;
 	global $thisfile;
 
-	$table = new htmlobject_table_builder('image_id', '', '', '', 'grab1');
+	$table = new htmlobject_table_builder('storage_id', '', '', '', 'grab2');
+
+	$arHead = array();
+	$arHead['storage_state'] = array();
+	$arHead['storage_state']['title'] ='';
+	$arHead['storage_state']['sortable'] = false;
+
+	$arHead['storage_icon'] = array();
+	$arHead['storage_icon']['title'] ='';
+	$arHead['storage_icon']['sortable'] = false;
+
+	$arHead['storage_id'] = array();
+	$arHead['storage_id']['title'] ='ID';
+
+	$arHead['storage_name'] = array();
+	$arHead['storage_name']['title'] ='Name';
+
+	$arHead['storage_resource_id'] = array();
+	$arHead['storage_resource_id']['title'] ='Res.ID';
+	$arHead['storage_resource_id']['sortable'] = false;
+
+	$arHead['storage_resource_ip'] = array();
+	$arHead['storage_resource_ip']['title'] ='Ip';
+	$arHead['storage_resource_ip']['sortable'] = false;
+
+	$arHead['storage_type'] = array();
+	$arHead['storage_type']['title'] ='Type';
+
+	$arHead['storage_comment'] = array();
+	$arHead['storage_comment']['title'] ='Comment';
+
+	$storage_count=0;
+	$arBody = array();
+	$t_deployment = new deployment();
+	$t_deployment->get_instance_by_type("local-storage");
+	$storage_tmp = new storage();
+	$storage_array = $storage_tmp->display_overview_per_type($t_deployment->id, $table->offset, $table->limit, $table->sort, $table->order);
+	foreach ($storage_array as $index => $storage_db) {
+		$storage = new storage();
+		$storage->get_instance_by_id($storage_db["storage_id"]);
+		$storage_resource = new resource();
+		$storage_resource->get_instance_by_id($storage->resource_id);
+		$deployment = new deployment();
+		$deployment->get_instance_by_id($storage->type);
+		$storage_count++;
+		$resource_icon_default="/openqrm/base/img/resource.png";
+		$storage_icon="/openqrm/base/plugins/nfs-storage/img/storage.png";
+		$state_icon="/openqrm/base/img/$storage_resource->state.png";
+		if (!file_exists($_SERVER["DOCUMENT_ROOT"]."/".$state_icon)) {
+			$state_icon="/openqrm/base/img/unknown.png";
+		}
+		if (file_exists($_SERVER["DOCUMENT_ROOT"]."/".$storage_icon)) {
+			$resource_icon_default=$storage_icon;
+		}
+		$arBody[] = array(
+			'storage_state' => "<img src=$state_icon>",
+			'storage_icon' => "<img width=24 height=24 src=".$resource_icon_default."><input type='hidden' name='resource_id' value=".$resource_id.">",
+			'storage_id' => $storage->id,
+			'storage_name' => $storage->name,
+			'storage_resource_id' => $storage->resource_id,
+			'storage_resource_ip' => $storage_resource->ip,
+			'storage_type' => "$deployment->storagedescription",
+			'storage_comment' => $storage->comment,
+		);
+	}
+
+	$table->id = 'Tabelle';
+	$table->css = 'htmlobject_table';
+	$table->border = 1;
+	$table->cellspacing = 0;
+	$table->cellpadding = 3;
+	$table->form_action = $thisfile;
+	$table->identifier_type = "radio";
+	$table->head = $arHead;
+	$table->body = $arBody;
+	if ($OPENQRM_USER->role == "administrator") {
+		$table->bottom = array('storage');
+		$table->identifier = 'storage_id';
+	}
+	$table->max = $storage_tmp->get_count_per_type($t_deployment->id);
+
+	// are there any storage server yet ?
+	if(count($arBody) > 0) {
+		$disp = $table->get_string();
+	} else {
+		$box = new htmlobject_box();
+		$box->id = 'htmlobject_box_add_storage';
+		$box->css = 'htmlobject_box';
+		$box->label = '<br><nobr><b>No storage configured yet!</b></nobr>';
+		$box_content = '<br><br><br><br>Please create a '.$t_deployment->storagedescription.' first!<br>';
+		$box_content .= '<a href="/openqrm/base/server/storage/storage-new.php?currenttab=tab1"><b>New storage</b></a><br>';
+		$box->content = $box_content;
+		$disp = $box->get_string();
+	}
+
+   // set template
+	$t = new Template_PHPLIB();
+	$t->debug = false;
+	$t->setFile('tplfile', './tpl/' . 'local-storage-grab2.tpl.php');
+	$t->setVar(array(
+		'formaction' => $thisfile,
+		'storage_table' => $disp,
+	));
+	$disp =  $t->parse('out', 'tplfile');
+	return $disp;
+}
+
+
+
+function local_select_template_export($resource_id, $storage_id) {
+	global $OPENQRM_USER;
+	global $thisfile;
+	global $StorageDir;
+
+	$storage = new storage();
+	$storage->get_instance_by_id($storage_id);
+	$storage_resource = new resource();
+	$storage_resource->get_instance_by_id($storage->resource_id);
+	$storage_resource_id = $storage_resource->id;
+	$ident_file = $StorageDir."/".$storage_resource_id.".lv.local-storage.ident";
+
+	$table = new htmlobject_table_builder('template_export', '', '', '', 'grab3');
 	$arHead = array();
 
-	$arHead['image_icon'] = array();
-	$arHead['image_icon']['title'] ='';
-	$arHead['image_icon']['sortable'] = false;
+	$arHead['template_icon'] = array();
+	$arHead['template_icon']['title'] ='';
+	$arHead['template_icon']['sortable'] = false;
 
-	$arHead['image_id'] = array();
-	$arHead['image_id']['title'] ='ID';
+	$arHead['template_name'] = array();
+	$arHead['template_name']['title'] ='Name';
 
-	$arHead['image_name'] = array();
-	$arHead['image_name']['title'] ='Name';
+	$arHead['template_export'] = array();
+	$arHead['template_export']['title'] ='Export';
 
-	$arHead['image_type'] = array();
-	$arHead['image_type']['title'] ='Type';
-
-	$arHead['image_rootdevice'] = array();
-	$arHead['image_rootdevice']['title'] ='Root-device';
-
-	$image_count=0;
-	$image_icon_default="/openqrm/base/img/image.png";
+	$template_count=0;
+	$template_icon_default="/openqrm/base/img/template.png";
 	$arBody = array();
-	$image_tmp = new image();
-	$image_array = $image_tmp->display_overview_per_type("local-storage", $table->offset, $table->limit, $table->sort, $table->order);
-	foreach ($image_array as $index => $image_db) {
-		$image = new image();
-		$image->get_instance_by_id($image_db["image_id"]);
-		$image_icon="/openqrm/base/plugins/local-image/img/storage.png";
-		$arBody[] = array(
-			'image_icon' => "<img width=24 height=24 src=$image_icon_default><input type='hidden' name='resource_id' value=$resource_id>",
-			'image_id' => $image->id,
-			'image_name' => $image->name,
-			'image_type' => $image->type,
-			'image_rootdevice' => "$image->rootdevice",
-		);
-		$image_count++;
+
+	if (file_exists($ident_file)) {
+		$fcontent = file($ident_file);
+		foreach($fcontent as $lun_info) {
+			$tpos = strpos($lun_info, ",");
+			$template_export = trim(substr($lun_info, $tpos+1));
+			$template_name = basename($template_export);
+
+			$arBody[] = array(
+				'template_icon' => "<img width=24 height=24 src=".$template_icon_default."><input type='hidden' name='resource_id' value=".$resource_id."><input type='hidden' name='storage_id' value=".$storage_id.">",
+				'template_name' => $template_name,
+				'template_export' => $template_export,
+			);
+			$template_count++;
+		}
 	}
 	$table->id = 'Tabelle';
 	$table->css = 'htmlobject_table';
@@ -343,34 +502,44 @@ function local_select_image($resource_id) {
 	$table->head = $arHead;
 	$table->body = $arBody;
 	if ($OPENQRM_USER->role == "administrator") {
-		$table->bottom = array('transfer');
-		$table->identifier = 'image_id';
+		$table->bottom = array('put');
+		$table->identifier = 'template_export';
 	}
-	$table->max = $image_tmp->get_count_per_type("local-storage");
+	$table->max = $template_count;
 
 	// set template
 	$t = new Template_PHPLIB();
 	$t->debug = false;
-	$t->setFile('tplfile', './tpl/' . 'local-storage-grab2.tpl.php');
+	$t->setFile('tplfile', './tpl/' . 'local-storage-grab3.tpl.php');
 	$t->setVar(array(
 		'formaction' => $thisfile,
-		'resource_id' => $resource_id,
-		'image_table' => $table->get_string(),
+		'template_table' => $table->get_string(),
 	));
 	$disp =  $t->parse('out', 'tplfile');
 	return $disp;
 }
 
 
-function local_transfer_disk($resource_id, $image_id) {
 
-// set template
+
+
+function local_transfer_disk($resource_id, $storage_id, $template_export) {
+
+	$storage = new storage();
+	$storage->get_instance_by_id($storage_id);
+	$storage_resource = new resource();
+	$storage_resource->get_instance_by_id($storage->resource_id);
+	$template_name = basename($template_export);
+	// set template
 	$t = new Template_PHPLIB();
 	$t->debug = false;
-	$t->setFile('tplfile', './tpl/' . 'local-storage-grab3.tpl.php');
+	$t->setFile('tplfile', './tpl/' . 'local-storage-grab4.tpl.php');
 	$t->setVar(array(
 		'resource_id' => $resource_id,
-		'image_id' => $image_id,
+		'storage_id' => $storage_id,
+		'storage_ip' => $storage_resource->ip,
+		'template_name' => $template_name,
+		'template_export' => $template_export,
 	));
 	$disp =  $t->parse('out', 'tplfile');
 	return $disp;
@@ -382,37 +551,31 @@ function local_transfer_disk($resource_id, $image_id) {
 
 $output = array();
 
-if(htmlobject_request('action') != '') {
-	switch (htmlobject_request('action')) {
-		case 'grab':
-			if (isset($_REQUEST['identifier'])) {
-				foreach($_REQUEST['identifier'] as $id) {
-					$output[] = array('label' => 'Grab disk', 'value' => local_select_image($id));
-				}
-			} else {
-				$output[] = array('label' => 'Select', 'value' => local_select_resource());
-			}
-			break;
+switch ($step) {
+	case '1':
+		$output[] = array('label' => 'Select resource', 'value' => local_select_resource());
+		break;
 
-		case 'transfer':
-			if (isset($_REQUEST['identifier'])) {
-				foreach($_REQUEST['identifier'] as $id) {
-					$output[] = array('label' => 'Grab disk', 'value' => local_transfer_disk($resource_id, $id));
-				}
-			} else {
-				$output[] = array('label' => 'Grab disk', 'value' => local_select_image($resource_id));
-			}
-			break;
+	case '2':
+		foreach($_REQUEST['identifier'] as $resource_id) {
+			$output[] = array('label' => 'Select storage', 'value' => local_select_storage($resource_id));
+		}
+		break;
 
+	case '3':
+		foreach($_REQUEST['identifier'] as $storage_id) {
+			$output[] = array('label' => 'Select template export', 'value' => local_select_template_export($resource_id, $storage_id));
+		}
+		break;
 
-	}
+	case '4':
+		foreach($_REQUEST['identifier'] as $template_export) {
+			$output[] = array('label' => 'Running grab phase', 'value' => local_transfer_disk($resource_id, $storage_id, $template_export));
+		}
+		break;
 
-
-} else if (strlen($resource_id)) {
-	$output[] = array('label' => 'Grab disk', 'value' => local_select_image($resource_id));
-} else  {
-	$output[] = array('label' => 'Select', 'value' => local_select_resource());
 }
+
 
 
 ?>
@@ -420,7 +583,6 @@ if(htmlobject_request('action') != '') {
 	$("#progressbar").remove();
 </script>
 <?php
-
 
 echo htmlobject_tabmenu($output);
 

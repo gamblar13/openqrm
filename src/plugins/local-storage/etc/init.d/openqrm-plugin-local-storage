@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
@@ -68,8 +68,10 @@ function openqrm_plugin_local_storage_uninstall() {
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/local-storage
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/root-mount.local-storage
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.local-storage.php
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/template.local-storage.php
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/local-storage-state.php
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-local-storage.tgz
+        rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/clonezilla
 }
 
 function openqrm_plugin_local_storage_init() {
@@ -97,8 +99,12 @@ function openqrm_plugin_local_storage_init() {
 	chmod +x $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/web/root-mount.local-storage
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/web/root-mount.local-storage $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/root-mount.local-storage
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/web/image.local-storage.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.local-storage.php
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/web/template.local-storage.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/template.local-storage.php
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/web/local-storage-state.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/local-storage-state.php
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/web/boot-service-local-storage.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-local-storage.tgz
+        # copying clonezilla dir to tftpboot/boot, tftp does not support symlinks
+        mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/clonezilla
+        /bin/cp -aR $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/clonezilla-live/live/* $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/clonezilla/
 	# create storage dir for stat files
 	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/web/storage
 	chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/web/storage

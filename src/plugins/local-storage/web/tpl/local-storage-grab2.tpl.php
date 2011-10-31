@@ -14,12 +14,10 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
 <form action="{formaction}" method="GET">
-<h1><img border=0 src="/openqrm/base/plugins/local-storage/img/grab.png"> Please select an empty local-storage image
-<br>
-to transfer the disk-content of resource {resource_id} to</h1>
-{image_table}
+<h1><img border=0 src="/openqrm/base/plugins/local-storage/img/grab.png"> Please select a storage for the template</h1>
+{storage_table}
 </form>

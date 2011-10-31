@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -44,11 +44,9 @@ global $event;
 class localstoragestate {
 
 var $id = '';
-var $appliance_id = '';
-var $token = '';
-var $state = '';
-	// state = 0	-> paused
-	// state = 1	-> active
+var $resource_id = '';
+var $install_start = '';
+var $timeout = '';
 
 //--------------------------------------------------
 /**
@@ -81,46 +79,39 @@ function init() {
 // ---------------------------------------------------------------------------------
 
 // returns an appliance from the db selected by id or name
-function get_instance($id, $appliance_id, $token) {
+function get_instance($id, $resource_id) {
 	global $LOCAL_STORAGE_STATE_TABLE;
 	global $event;
 	$db=openqrm_get_db_connection();
 	if ("$id" != "") {
-		$localstoragestate_array = &$db->Execute("select * from $LOCAL_STORAGE_STATE_TABLE where ls_id=$id");
-	} else if ("$appliance_id" != "") {
-		$localstoragestate_array = &$db->Execute("select * from $LOCAL_STORAGE_STATE_TABLE where ls_appliance_id=$appliance_id");
-	} else if ("$token" != "") {
-		$localstoragestate_array = &$db->Execute("select * from $LOCAL_STORAGE_STATE_TABLE where ls_token='$token'");
+		$localstoragestate_array = &$db->Execute("select * from ".$LOCAL_STORAGE_STATE_TABLE." where local_storage_id=".$id);
+	} else if ("$resource_id" != "") {
+		$localstoragestate_array = &$db->Execute("select * from ".$LOCAL_STORAGE_STATE_TABLE." where local_storage_resource_id=".$resource_id);
 	} else {
 		$event->log("get_instance", $_SERVER['REQUEST_TIME'], 2, "localstoragestate.class.php", "Could not create instance of event without data", "", "", 0, 0, 0);
 		return;
 	}
 	foreach ($localstoragestate_array as $index => $localstoragestate) {
-		$this->id = $localstoragestate["ls_id"];
-		$this->appliance_id = $localstoragestate["ls_appliance_id"];
-		$this->token = $localstoragestate["ls_token"];
-		$this->state = $localstoragestate["ls_state"];
+		$this->id = $localstoragestate["local_storage_id"];
+		$this->resource_id = $localstoragestate["local_storage_resource_id"];
+		$this->install_start = $localstoragestate["local_storage_install_start"];
+		$this->timeout = $localstoragestate["local_storage_timeout"];
 	}
 	return $this;
 }
 
 // returns an localstoragestate from the db selected by id
 function get_instance_by_id($id) {
-	$this->get_instance($id, "", "");
+	$this->get_instance($id, "");
 	return $this;
 }
 
-// returns an localstoragestate from the db selected by the appliance_id
-function get_instance_by_appliance_id($appliance_id) {
-	$this->get_instance("", $appliance_id, "");
+// returns an localstoragestate from the db selected by the resource_id
+function get_instance_by_resource_id($resource_id) {
+	$this->get_instance("", $resource_id);
 	return $this;
 }
 
-// returns an localstoragestate from the db selected by the token
-function get_instance_by_token($token) {
-	$this->get_instance("", "", $token);
-	return $this;
-}
 
 // ---------------------------------------------------------------------------------
 // general localstoragestate methods
@@ -134,7 +125,7 @@ function is_id_free($localstoragestate_id) {
 	global $LOCAL_STORAGE_STATE_TABLE;
 	global $event;
 	$db=openqrm_get_db_connection();
-	$rs = &$db->Execute("select ls_id from $LOCAL_STORAGE_STATE_TABLE where ls_id=$localstoragestate_id");
+	$rs = &$db->Execute("select local_storage_id from ".$LOCAL_STORAGE_STATE_TABLE." where local_storage_id=".$localstoragestate_id);
 	if (!$rs)
 		$event->log("is_id_free", $_SERVER['REQUEST_TIME'], 2, "localstoragestate.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
 	else
@@ -169,29 +160,15 @@ function add($localstoragestate_fields) {
 function remove($localstoragestate_id) {
 	global $LOCAL_STORAGE_STATE_TABLE;
 	$db=openqrm_get_db_connection();
-	$rs = $db->Execute("delete from $LOCAL_STORAGE_STATE_TABLE where ls_id=$localstoragestate_id");
+	$rs = $db->Execute("delete from ".$LOCAL_STORAGE_STATE_TABLE." where local_storage_id=".$localstoragestate_id);
 }
 
 
-
-// sets the state of a localstoragestate
-function set_state($localstoragestate_id, $state_str) {
+// removes localstoragestate from the database by resource id
+function remove_by_resource_id($localstoragestate_resource_id) {
 	global $LOCAL_STORAGE_STATE_TABLE;
-	global $event;
-	$localstoragestate_state = 0;
-	switch ($state_str) {
-		case "grab":
-			$localstoragestate_state = 0;
-			break;
-		case "restore":
-			$localstoragestate_state = 1;
-			break;
-	}
 	$db=openqrm_get_db_connection();
-	$localstoragestate_set = &$db->Execute("update $LOCAL_STORAGE_STATE_TABLE set ls_state=$localstoragestate_state where ls_id=$localstoragestate_id");
-	if (!$localstoragestate_set) {
-		$event->log("set_state", $_SERVER['REQUEST_TIME'], 2, "localstoragestate.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
-	}
+	$rs = $db->Execute("delete from ".$LOCAL_STORAGE_STATE_TABLE." where local_storage_resource_id=".$localstoragestate_resource_id);
 }
 
 
@@ -201,7 +178,7 @@ function get_count() {
 	global $LOCAL_STORAGE_STATE_TABLE;
 	$count=0;
 	$db=openqrm_get_db_connection();
-	$rs = $db->Execute("select count(ls_id) as num from $LOCAL_STORAGE_STATE_TABLE");
+	$rs = $db->Execute("select count(local_storage_id) as num from ".$LOCAL_STORAGE_STATE_TABLE);
 	if (!$rs) {
 		print $db->ErrorMsg();
 	} else {
@@ -212,22 +189,13 @@ function get_count() {
 
 
 
-// returns a list of all localstoragestate names
-function get_list() {
-	global $LOCAL_STORAGE_STATE_TABLE;
-	$query = "select ls_id, ls_appliance_id from $LOCAL_STORAGE_STATE_TABLE";
-	$localstoragestate_name_array = array();
-	$localstoragestate_name_array = openqrm_db_get_result_double ($query);
-	return $localstoragestate_name_array;
-}
-
 
 // returns a list of all localstoragestate ids
 function get_all_ids() {
 	global $LOCAL_STORAGE_STATE_TABLE;
 	global $event;
 	$localstoragestate_list = array();
-	$query = "select ls_id from $LOCAL_STORAGE_STATE_TABLE";
+	$query = "select local_storage_id from ".$LOCAL_STORAGE_STATE_TABLE;
 	$db=openqrm_get_db_connection();
 	$rs = $db->Execute($query);
 	if (!$rs)
@@ -242,26 +210,6 @@ function get_all_ids() {
 }
 
 
-
-
-// displays the localstoragestate-overview
-function display_overview($offset, $limit, $sort, $order) {
-	global $LOCAL_STORAGE_STATE_TABLE;
-	global $event;
-	$db=openqrm_get_db_connection();
-	$recordSet = &$db->SelectLimit("select * from $LOCAL_STORAGE_STATE_TABLE order by $sort $order", $limit, $offset);
-	$localstoragestate_array = array();
-	if (!$recordSet) {
-		$event->log("display_overview", $_SERVER['REQUEST_TIME'], 2, "localstoragestate.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
-	} else {
-		while (!$recordSet->EOF) {
-			array_push($localstoragestate_array, $recordSet->fields);
-			$recordSet->MoveNext();
-		}
-		$recordSet->Close();
-	}
-	return $localstoragestate_array;
-}
 
 
 

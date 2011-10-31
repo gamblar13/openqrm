@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -35,58 +35,16 @@ $event = new event();
 global $event;
 
 
-function wait_for_identfile($sfile) {
-	$refresh_delay=1;
-	$refresh_loop_max=20;
-	$refresh_loop=0;
-	while (!file_exists($sfile)) {
-		sleep($refresh_delay);
-		$refresh_loop++;
-		flush();
-		if ($refresh_loop > $refresh_loop_max)  {
-			return false;
-		}
-	}
-	return true;
-}
-
-
 function get_image_rootdevice_identifier($local_storage_storage_id) {
 	global $OPENQRM_SERVER_BASE_DIR;
 	global $OPENQRM_ADMIN;
 	global $event;
-
-	// place for the storage stat files
-	$StorageDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/plugins/local-storage/storage';
-	$rootdevice_identifier_array = array();
-	$storage = new storage();
-	$storage->get_instance_by_id($local_storage_storage_id);
-	$storage_resource = new resource();
-	$storage_resource->get_instance_by_id($storage->resource_id);
-	$storage_resource_id = $storage_resource->id;
-	$ident_file = "$StorageDir/$storage_resource_id.lv.local-storage.ident";
-	if (file_exists($ident_file)) {
-		unlink($ident_file);
-	}
-	// send command
-	$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/bin/openqrm-local-storage post_identifier -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
-	$storage_resource->send_command($storage_resource->ip, $resource_command);
-	if (!wait_for_identfile($ident_file)) {
-		$event->log("get_image_rootdevice_identifier", $_SERVER['REQUEST_TIME'], 2, "image.local-deployment", "Timeout while requesting image identifier from storage id $storage->id", "", "", 0, 0, 0);
-		return;
-	}
-	$fcontent = file($ident_file);
-	foreach($fcontent as $lun_info) {
-		$tpos = strpos($lun_info, ",");
-		$timage_name = trim(substr($lun_info, 0, $tpos));
-		$troot_device = trim(substr($lun_info, $tpos+1));
-		$rootdevice_identifier_array[] = array("value" => "$troot_device", "label" => "$timage_name");
-	}
+	$rootdevice_identifier_array[] = array("value" => "sda", "label" => "Local SCSI Disk 1");
 	return $rootdevice_identifier_array;
 }
 
 function get_image_default_rootfs() {
-	return "nfs";
+	return "local fileystem";
 }
 
 function get_rootfs_transfer_methods() {
@@ -99,6 +57,10 @@ function get_rootfs_set_password_method() {
 
 function get_is_network_deployment() {
 	return false;
+}
+
+function get_local_deployment_enabled() {
+	return true;
 }
 
 ?>

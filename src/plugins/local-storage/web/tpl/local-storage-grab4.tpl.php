@@ -17,8 +17,11 @@
     Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
-<form action="{formaction}" method="GET">
-<h1><img border=0 src="/openqrm/base/plugins/local-storage/img/volumes.png"> Select Local-Storage</h1>
-<h4>Please select an Local-Storage Server from the list below</h4>
-{storage_server_table}
-</form>
+<h1><img border=0 src="/openqrm/base/plugins/local-storage/img/grab.png"> Local-storage 'grab' phase started</h1>
+
+<h4>Transferring disk content of resource {resource_id} to template export {storage_ip}:{template_export}</h4>
+<br>
+The template {template_name} will be ready for deployment when resource {resource_id} is 'idle' again.
+<br>
+<br>
+

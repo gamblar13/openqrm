@@ -14,14 +14,10 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
-<h1><img border=0 src="/openqrm/base/plugins/local-storage/img/grab.png"> Local-storage 'grab' phase started</h1>
-
-<h4>Transferring disk content of resource {resource_id} to image {image_id}</h4>
-<br>
-The server-image {image_id} is ready for deployment when resource {resource_id} is 'idle' again.
-<br>
-<br>
-
+<form action="{formaction}" method="GET">
+<h1><img border=0 src="/openqrm/base/plugins/local-storage/img/grab.png"> Please select a template export</h1>
+{template_table}
+</form>

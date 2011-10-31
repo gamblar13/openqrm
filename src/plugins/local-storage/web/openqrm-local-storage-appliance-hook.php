@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -25,11 +25,18 @@ require_once "$RootDir/include/user.inc.php";
 require_once "$RootDir/class/event.class.php";
 require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/class/image.class.php";
+require_once "$RootDir/class/deployment.class.php";
+require_once "$RootDir/class/storage.class.php";
 require_once "$RootDir/class/appliance.class.php";
 require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/openqrm-server-config.php";
 // special local-storage classes
 require_once "$RootDir/plugins/local-storage/class/localstoragestate.class.php";
+require_once "$RootDir/plugins/local-storage/class/localstorageresource.class.php";
+
+$openqrm_server = new openqrm_server();
+$OPENQRM_SERVER_IP_ADDRESS=$openqrm_server->get_ip_address();
+global $OPENQRM_SERVER_IP_ADDRESS;
 
 $LOCAL_STORAGE_STATE_TABLE="local_storage_state";
 global $LOCAL_STORAGE_STATE_TABLE;
@@ -40,101 +47,117 @@ $event = new event();
 global $event;
 
 
-// function to set the resource capabilities
-function set_capabilities($res_id, $cmd, $key, $value) {
-	$resource = new resource();
-	$resource->get_instance_by_id($res_id);
-	switch ($cmd) {
-		case 'set':
-			$resource_fields["resource_capabilities"] = "$resource->capabilities $key='$value'";
-			break;
-	}
-	$resource->update_info($res_id, $resource_fields);
-}
-
-
 function openqrm_local_storage_appliance($cmd, $appliance_fields) {
 	global $event;
+	global $openqrm_server;
 	global $OPENQRM_SERVER_BASE_DIR;
 	global $OPENQRM_SERVER_IP_ADDRESS;
 	global $OPENQRM_EXEC_PORT;
 	global $LOCAL_STORAGE_STATE_TABLE;
-	$appliance_id=$appliance_fields["appliance_id"];
+	// timeout for setting the resource to localboot after an installation started
+	$local_storage_install_timeout=60;
 
-	$event->log("openqrm_new_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-local_storage-appliance-hook.php", "Handling $cmd event for appliance $appliance_id", "", "", 0, 0, $appliance_id);
+	$appliance_id=$appliance_fields["appliance_id"];
+	$appliance = new appliance();
+	$appliance->get_instance_by_id($appliance_id);
+	$resource = new resource();
+	$resource->get_instance_by_id($appliance->resources);
+	$image = new image();
+	$image->get_instance_by_id($appliance->imageid);
+
+	$event->log("openqrm-local-storage-appliance-hook.php", $_SERVER['REQUEST_TIME'], 5, "openqrm-local_storage-appliance-hook.php", "Handling $cmd event for appliance $appliance_id", "", "", 0, 0, $resource->id);
 	switch($cmd) {
 		case "start":
-			$appliance = new appliance();
-			$appliance->get_instance_by_id($appliance_id);
-			$image = new image();
-			$image->get_instance_by_id($appliance->imageid);
-			if (!strcmp($image->type, "local-storage")) {
-				$event->log("openqrm_new_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-local_storage-appliance-hook.php", "Detected local-storage deployment for appliance $appliance_id", "", "", 0, 0, $appliance_id);
-				$resource = new resource();
-				$resource->get_instance_by_id($appliance->resources);
-				// only if we are not in grab mode
-				if (!strstr($resource->capabilities, "LOCAL_STORAGE_GRAB")) {
-					// generate new token for deployment
-					$deployment_token = $image->generatePassword(10);
-					set_capabilities($resource->id, "set", "LOCAL_STORAGE_DEPLOYMENT", $deployment_token);
-					// add it to localstoragestate
-					$local_storage_state = new localstoragestate();
-					$local_storage_state_id = openqrm_db_get_free_id('ls_id', $LOCAL_STORAGE_STATE_TABLE);
-					// prepare array to add appliance
-					$ar_ls_state = array(
-						'ls_id' => $local_storage_state_id,
-						'ls_appliance_id' => $appliance_id,
-						'ls_token' => $deployment_token,
-						'ls_state' => 1,
-					);
-					$local_storage_state->add($ar_ls_state);
-					$event->log("openqrm_new_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-local_storage-appliance-hook.php", "Added appliance $appliance_id to localstoragestate id $local_storage_state_id", "", "", 0, 0, $appliance_id);
+
+			// local_storage configured in image deployment parameters ?
+			$local_storage_auto_install_enabled = false;
+			$local_storage_deployment_parameters = trim($image->get_deployment_parameter("INSTALL_CONFIG"));
+			if (strlen($local_storage_deployment_parameters)) {
+				$local_storage_deployment_parameter_arr = explode(":", $local_storage_deployment_parameters);
+				$local_deployment_persistent = $local_storage_deployment_parameter_arr[0];
+				$local_deployment_type = $local_storage_deployment_parameter_arr[1];
+				// deployment type local-storage ?
+				if (strcmp($local_deployment_type, "local-storage")) {
+					$event->log("start", $_SERVER['REQUEST_TIME'], 5, "openqrm-local-storage-appliance-hook.php", "Appliance ".$appliance_id."/".$appliance->name." image is not from type Local-Disk deployment", "", "", 0, 0, $resource->id);
+					return;
 				} else {
-					// grab mode
-					$event->log("openqrm_new_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-local_storage-appliance-hook.php", "Detected grab-phase for appliance $appliance_id", "", "", 0, 0, $appliance_id);
+					$local_storage_auto_install_enabled = true;
+					$local_storage_server_id = $local_storage_deployment_parameter_arr[2];
+					$local_storage_install_template = $local_storage_deployment_parameter_arr[3];
+				}
+			}
+
+			if ($local_storage_auto_install_enabled) {
+				$event->log("start", $_SERVER['REQUEST_TIME'], 5, "openqrm-local_storage-appliance-hook.php", "Detected local-storage deployment for appliance $appliance_id", "", "", 0, 0, $resource->id);
+				// get the storage from the local-storage template
+				$storage = new storage();
+				$storage->get_instance_by_id($local_storage_server_id);
+				$storage_resource = new resource();
+				$storage_resource->get_instance_by_id($storage->resource_id);
+
+				// authenticate the storage export of the clonezilla template
+				// TODO : This has to support multiple parallel deployments
+				$deployment = new deployment();
+				$deployment->get_instance_by_id($storage->type);
+				$deployment_type = $deployment->type;
+				$deployment_plugin_name = $deployment->storagetype;
+
+				$event->log("start", $_SERVER['REQUEST_TIME'], 5, "openqrm-local_storage-appliance-hook.php", "Local-Deployment: Authenticating ".$resource->ip." on storage id ".$storage->id.":".$storage_resource->ip.":".$local_storage_install_template.".", "", "", 0, 0, $resource->id);
+				$auth_auto_install_storage_auth_cmd = $OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/".$deployment_plugin_name."/bin/openqrm-".$deployment_plugin_name." auth -r ".$local_storage_install_template." -i ".$resource->ip." -t ".$deployment_type;
+				$storage_resource->send_command($storage_resource->ip, $auth_auto_install_storage_auth_cmd);
+				sleep(2);
+
+				// send deploy to openQRM to switch the pxe config to clonezilla
+				$local_storage_install_template_name = basename($local_storage_install_template);
+				$local_storage_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/local-storage/bin/openqrm-local-storage-manager deploy -m ".$resource->mac." -i ".$resource->ip." -x ".$resource->id." -n ".$local_storage_install_template_name." -d ".$storage_resource->ip.":".$local_storage_install_template;
+				$openqrm_server->send_command($local_storage_command);
+
+				// Remove image-deployment paramters, if auto-install is a single-shot actions
+				if (!strcmp($local_deployment_persistent, "0")) {
+					$image->set_deployment_parameters("INSTALL_CONFIG", "");
+				}
+
+				// create local-storage-state object to allow to run a late setboot to local command on the vm host
+				$local_storage_state = new localstoragestate();
+				$local_storage_state->remove_by_resource_id($resource->id);
+				$local_storage_state_fields=array();
+				$local_storage_state_fields["local_storage_id"]=openqrm_db_get_free_id('local_storage_id', $local_storage_state->_db_table);
+				$local_storage_state_fields["local_storage_resource_id"]=$resource->id;
+				$local_storage_state_fields["local_storage_install_start"]=$_SERVER['REQUEST_TIME'];
+				$local_storage_state_fields["local_storage_timeout"]=$local_storage_install_timeout;
+				$local_storage_state->add($local_storage_state_fields);
+
+			} else {
+				if (strcmp($image->type, "local-storage")) {
+					$event->log("start", $_SERVER['REQUEST_TIME'], 5, "openqrm-local-storage-appliance-hook.php", "Appliance ".$appliance_id."/".$appliance->name." image not from type local-storage", "", "", 0, 0, $resource->id);
+				} else {
+					$event->log("start", $_SERVER['REQUEST_TIME'], 5, "openqrm-local-storage-appliance-hook.php", "Appliance ".$appliance_id."/".$appliance->name." is installed already. Setting to local-boot", "", "", 0, 0, $resource->id);
+					// we have auto-installed already, if it is VM the localstorageresource object will care to set the boot-sequence on the VM Host to local boot
+					$localstorageresource = new localstorageresource();
+					$localstorageresource->set_boot($resource->id, 1);
+					// set pxe config to local-boot
+					$local_storage_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/local-storage/bin/openqrm-local-storage-manager set_client_to_local_boot -m ".$resource->mac;
+					$openqrm_server->send_command($local_storage_command);
 				}
 			}
 			break;
 
 
 		case "stop":
-			$appliance = new appliance();
-			$appliance->get_instance_by_id($appliance_id);
-			$image = new image();
-			$image->get_instance_by_id($appliance->imageid);
-			if (!strcmp($image->type, "local-storage")) {
-				$event->log("openqrm_new_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-local_storage-appliance-hook.php", "Detected local-storage deployment for appliance $appliance_id", "", "", 0, 0, $appliance_id);
-				$resource = new resource();
-				$resource->get_instance_by_id($appliance->resources);
-				// only if we are not in grab mode
-				if (strstr($resource->capabilities, "LOCAL_STORAGE_DEPLOYMENT")) {
-					$event->log("openqrm_new_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-local_storage-appliance-hook.php", "Detected deployment-complete phase after stopping appliance $appliance_id", "", "", 0, 0, $appliance_id);
-					// after deployment-complete mode + stopping appliance
-					// we need to check if the resource of the appliance is virtual
-					// if yes we need to re-set its boot-device from local to net and restart it
-					if ($resource->vtype != "0") {
-						$virtualization = new virtualization();
-						$virtualization->get_instance_by_id($resource->vtype);
-						$virtualization_plugin_name = str_replace("-vm", "", $virtualization->type);
-						$vlboot_cmd = $OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/".$virtualization_plugin_name."/bin/openqrm-".$virtualization_plugin_name." setboot -m ".$resource->mac." -b net";
-						// get the virtualization hosts resource
-						$virtualization_host = new resource();
-						$virtualization_host->get_instance_by_id($resource->vhostid);
-						$event->log("local-storage", $_SERVER['REQUEST_TIME'], 5, "local-storage-state.php", "Resource $resource->id is a vm on $resource->vhostid -> sending command to set it to netboot", "", "", 0, 0, 0);
-						// TODO
-						// not the best way yet to wait a bit until setting the bootdevice to netboot
-						sleep(10);
-						$virtualization_host->send_command($virtualization_host->ip, $vlboot_cmd);
-					} else {
-						// its a physical host, we have to send a regular reboot
-						$event->log("local-storage", $_SERVER['REQUEST_TIME'], 5, "local-storage-state.php", "Resource $resource->id is a physical system. No need to re-set boot-device", "", "", 0, 0, 0);
-					}
-				} else {
-					$event->log("openqrm_new_appliance", $_SERVER['REQUEST_TIME'], 5, "openqrm-local_storage-appliance-hook.php", "Appliance $appliance_id is not in deployment-complete phase", "", "", 0, 0, $appliance_id);
-				}
+
+			if (strcmp($image->type, "local-storage")) {
+				$event->log("stop", $_SERVER['REQUEST_TIME'], 5, "openqrm-local-storage-appliance-hook.php", "Appliance ".$appliance_id."/".$appliance->name." image not from type local-storage", "", "", 0, 0, $resource->id);
+			} else {
+				$event->log("stop", $_SERVER['REQUEST_TIME'], 5, "openqrm-local-storage-appliance-hook.php", "Stop event for appliance ".$appliance_id."/".$appliance->name.".", "", "", 0, 0, $resource->id);
+				// remove local-storage-state object if existing
+				$local_storage_state = new localstoragestate();
+				$local_storage_state->remove_by_resource_id($resource->id);
+				// if it is VM the localstorageresource object will care to set the boot-sequence on the VM Host to network boot
+				$localstorageresource = new localstorageresource();
+				$localstorageresource->set_boot($resource->id, 0);
+
 			}
 			break;
-
 
 	}
 }

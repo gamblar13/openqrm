@@ -29,7 +29,7 @@ $source_tab=$_REQUEST["source_tab"];
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -64,11 +64,13 @@ if ($OPENQRM_USER->role != "administrator") {
 	exit();
 }
 
-$local_storage_name = $_REQUEST["local_storage_name"];
-$local_storage_logcial_volume_size = $_REQUEST["local_storage_logcial_volume_size"];
-$local_storage_logcial_volume_name = $_REQUEST["local_storage_logcial_volume_name"];
-$local_storage_logcial_volume_snapshot_name = $_REQUEST["local_storage_logcial_volume_snapshot_name"];
-$local_storage_type = $_REQUEST["local_storage_type"];
+$local_storage_name = htmlobject_request('local_storage_name');
+$local_storage_logcial_volume_size = htmlobject_request('local_storage_logcial_volume_size');
+$local_storage_logcial_volume_name = htmlobject_request('local_storage_logcial_volume_name');
+$local_storage_logcial_volume_snapshot_name = htmlobject_request('local_storage_logcial_volume_snapshot_name');
+$local_storage_type = htmlobject_request('local_storage_type');
+
+
 $local_storage_fields = array();
 foreach ($_REQUEST as $key => $value) {
 	if (strncmp($key, "local_storage_", 11) == 0) {
@@ -119,17 +121,17 @@ unset($local_storage_fields["local_storage_command"]);
 			case 'init':
 				// create local_storage_state
 				// -> local_storage_state
-				// ls_id INT(5)
-				// ls_appliance_id INT(5)
-				// ls_token VARCHAR(50)
-				// ls_state INT(5)
-				$create_local_storage_state = "create table local_storage_state(ls_id INT(5), ls_appliance_id INT(5), ls_token VARCHAR(50), ls_state INT(5))";
+				// local_storage_id INT(5)
+				// local_storage_resource_id INT(5)
+				// local_storage_install_start VARCHAR(20)
+				// local_storage_timeout INT(5)
+				$create_local_storage_state = "create table local_storage_state(local_storage_id INT(5), local_storage_resource_id INT(5), local_storage_install_start VARCHAR(20), local_storage_timeout INT(5))";
 				$db=openqrm_get_db_connection();
 				$recordSet = &$db->Execute($create_local_storage_state);
 				break;
 
 			case 'uninstall':
-				// remove local_storage_state
+				// remove local_storage_resource
 				$remove_local_storage_state = "drop table local_storage_state;";
 				$db=openqrm_get_db_connection();
 				$recordSet = &$db->Execute($remove_local_storage_state);
