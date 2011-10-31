@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 if [ "$OPENQRM_SERVER_BASE_DIR" == "" ]; then
@@ -193,6 +193,12 @@ function openqrm_get_distro() {
 				;;
 			*CentOS*5*)
 				echo "centos5"
+				;;
+			*CentOS*6*)
+				echo "centos6"
+				;;
+			*CentOS*7*)
+				echo "centos7"
 				;;
 			*)
 				echo "rh"
