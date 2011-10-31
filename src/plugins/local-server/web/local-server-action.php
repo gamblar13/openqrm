@@ -20,7 +20,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -34,6 +34,7 @@ require_once "$RootDir/class/kernel.class.php";
 require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/class/appliance.class.php";
 require_once "$RootDir/class/deployment.class.php";
+require_once "$RootDir/class/plugin.class.php";
 require_once "$RootDir/class/event.class.php";
 require_once "$RootDir/class/openqrm_server.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
@@ -136,6 +137,56 @@ global $OPENQRM_SERVER_IP_ADDRESS;
 			$resource_fields["resource_capabilities"]='TYPE=local-server';
 			$resource->update_info($local_server_id, $resource_fields);
 
+			// add + start hook
+			$appliance->get_instance_by_id($next_appliance_id);
+			$now=$_SERVER['REQUEST_TIME'];
+			$appliance_fields = array();
+			$appliance_fields['appliance_stoptime']=$now;
+			$appliance_fields['appliance_state']='stopped';
+			// fill in the rest of the appliance info in the array for the plugin hook
+			$appliance_fields["appliance_id"]=$next_appliance_id;
+			$appliance_fields["appliance_name"]=$appliance->name;
+			$appliance_fields["appliance_kernelid"]=$appliance->kernelid;
+			$appliance_fields["appliance_imageid"]=$appliance->imageid;
+			$appliance_fields["appliance_cpunumber"]=$appliance->cpunumber;
+			$appliance_fields["appliance_cpuspeed"]=$appliance->cpuspeed;
+			$appliance_fields["appliance_cpumodel"]=$appliance->cpumodel;
+			$appliance_fields["appliance_memtotal"]=$appliance->memtotal;
+			$appliance_fields["appliance_swaptotal"]=$appliance->swaptotal;
+			$appliance_fields["appliance_nics"]=$appliance->nics;
+			$appliance_fields["appliance_capabilities"]=$appliance->capabilities;
+			$appliance_fields["appliance_cluster"]=$appliance->cluster;
+			$appliance_fields["appliance_ssi"]=$appliance->ssi;
+			$appliance_fields["appliance_resources"]=$appliance->resources;
+			$appliance_fields["appliance_highavailable"]=$appliance->highavailable;
+			$appliance_fields["appliance_virtual"]=$appliance->virtual;
+			$appliance_fields["appliance_virtualization"]=$appliance->virtualization;
+			$appliance_fields["appliance_virtualization_host"]=$appliance->virtualization_host;
+			$appliance_fields["appliance_comment"]=$appliance->comment;
+			$appliance_fields["appliance_event"]=$appliance->event;
+
+			$plugin = new plugin();
+			$enabled_plugins = $plugin->enabled();
+			foreach ($enabled_plugins as $index => $plugin_name) {
+				$plugin_start_appliance_hook = "$RootDir/plugins/$plugin_name/openqrm-$plugin_name-appliance-hook.php";
+				if (file_exists($plugin_start_appliance_hook)) {
+					$event->log("integrate", $_SERVER['REQUEST_TIME'], 5, "local-server-action", "Found plugin $plugin_name handling add-appliance event.", "", "", 0, 0, $appliance->resources);
+					require_once "$plugin_start_appliance_hook";
+					$appliance_function="openqrm_"."$plugin_name"."_appliance";
+					$appliance_function=str_replace("-", "_", $appliance_function);
+					// add
+					$appliance_function("add", $appliance_fields);
+					// start
+					$appliance_fields['appliance_stoptime']='';
+					$appliance_fields['appliance_starttime']=$now;
+					$appliance_fields['appliance_state']='active';
+					$appliance->update($next_appliance_id, $appliance_fields);
+					$appliance_function("start", $appliance_fields);
+
+				}
+			}
+
+
 			break;
 
 		case 'remove':
@@ -147,6 +198,51 @@ global $OPENQRM_SERVER_IP_ADDRESS;
 				$app_resource_remove_check = new appliance();
 				$app_resource_remove_check->get_instance_by_id($appliance_id);
 				if ($app_resource_remove_check->resources == $local_server_id) {
+
+					// stop + remove hooks
+					$now=$_SERVER['REQUEST_TIME'];
+					$appliance_fields = array();
+					$appliance_fields['appliance_stoptime']=$now;
+					$appliance_fields['appliance_state']='stopped';
+					// fill in the rest of the appliance info in the array for the plugin hook
+					$appliance_fields["appliance_id"]=$appliance_id;
+					$appliance_fields["appliance_name"]=$app_resource_remove_check->name;
+					$appliance_fields["appliance_kernelid"]=$app_resource_remove_check->kernelid;
+					$appliance_fields["appliance_imageid"]=$app_resource_remove_check->imageid;
+					$appliance_fields["appliance_cpunumber"]=$app_resource_remove_check->cpunumber;
+					$appliance_fields["appliance_cpuspeed"]=$app_resource_remove_check->cpuspeed;
+					$appliance_fields["appliance_cpumodel"]=$app_resource_remove_check->cpumodel;
+					$appliance_fields["appliance_memtotal"]=$app_resource_remove_check->memtotal;
+					$appliance_fields["appliance_swaptotal"]=$app_resource_remove_check->swaptotal;
+					$appliance_fields["appliance_nics"]=$app_resource_remove_check->nics;
+					$appliance_fields["appliance_capabilities"]=$app_resource_remove_check->capabilities;
+					$appliance_fields["appliance_cluster"]=$app_resource_remove_check->cluster;
+					$appliance_fields["appliance_ssi"]=$app_resource_remove_check->ssi;
+					$appliance_fields["appliance_resources"]=$app_resource_remove_check->resources;
+					$appliance_fields["appliance_highavailable"]=$app_resource_remove_check->highavailable;
+					$appliance_fields["appliance_virtual"]=$app_resource_remove_check->virtual;
+					$appliance_fields["appliance_virtualization"]=$app_resource_remove_check->virtualization;
+					$appliance_fields["appliance_virtualization_host"]=$app_resource_remove_check->virtualization_host;
+					$appliance_fields["appliance_comment"]=$app_resource_remove_check->comment;
+					$appliance_fields["appliance_event"]=$app_resource_remove_check->event;
+
+					$plugin = new plugin();
+					$enabled_plugins = $plugin->enabled();
+					foreach ($enabled_plugins as $index => $plugin_name) {
+						$plugin_start_appliance_hook = "$RootDir/plugins/$plugin_name/openqrm-$plugin_name-appliance-hook.php";
+						if (file_exists($plugin_start_appliance_hook)) {
+							$event->log("remove", $_SERVER['REQUEST_TIME'], 5, "local-server-action", "Found plugin $plugin_name handling add-appliance event.", "", "", 0, 0, $app_resource_remove_check->resources);
+							require_once "$plugin_start_appliance_hook";
+							$appliance_function="openqrm_"."$plugin_name"."_appliance";
+							$appliance_function=str_replace("-", "_", $appliance_function);
+							// stop
+							$appliance_function("stop", $appliance_fields);
+							// remove
+							$appliance_function("remove", $appliance_fields);
+
+						}
+					}
+					// remove appliance
 					$appliance->remove($appliance_id);
 				}
 			}

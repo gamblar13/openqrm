@@ -22,7 +22,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -94,6 +94,32 @@ function local_server_about() {
 
 	$disp = $disp."<br>";
 	$disp = $disp."<br>";
+
+	$disp = $disp."<b>openQRM client for local-VMs :</b>";
+	$disp = $disp."<br>";
+
+	$disp = $disp."<br>";
+	$disp = $disp."For local-installed Virtual Machines e.g. (kvm-storage, xen-storage, lxc-storage, openvz-storage)";
+	$disp = $disp." which have access to the openQRM network there is an 'openqrm-local-vm-client' available.";
+	$disp = $disp." This 'openqrm-local-vm-client' just starts and stops the plugin-boot-services to allow further management functionality.";
+	$disp = $disp." Monitoring and openQRM actions are still being run on behalf of the VM host.";
+
+
+	$disp = $disp."<ul>";
+	$disp = $disp."<li>";
+	$disp = $disp."Download/Copy the <a href='local-vm/openqrm-local-vm-client' target='_BLANK'>'openqrm-local-vm-client'</a> to a local installed VM";
+	$disp = $disp."</li><li>";
+	$disp = $disp."Execute the 'openqrm-local-vm-client' on the VM";
+	$disp = $disp."<br>";
+	$disp = $disp."<br>";
+	$disp = $disp."<i><b>openqrm-local-vm-client</b></i>";
+	$disp = $disp."<br>";
+	$disp = $disp."<br>";
+	$disp = $disp."</li><li>";
+	$disp = $disp."The 'openqrm-local-vm-client' fully automatically configures itself.";
+	$disp = $disp."</li>";
+	$disp = $disp."</ul>";
+
 	return $disp;
 }
 
