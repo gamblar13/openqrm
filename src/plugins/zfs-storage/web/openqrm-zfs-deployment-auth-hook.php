@@ -3,7 +3,7 @@
  * @package openQRM
  */
 /*
-  This file is part of openQRM.
+	This file is part of openQRM.
 
 	openQRM is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License version 2
@@ -17,7 +17,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 

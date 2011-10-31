@@ -17,8 +17,10 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# this is the functions file for the cloud-zones-plugin
 #
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
 
 # zfs-storage
 # Required defines in the image_deploy_paramters
