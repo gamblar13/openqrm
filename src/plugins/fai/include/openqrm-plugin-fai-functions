@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# this is the functions file for the fai-plugin
+#
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+FAI_LOCK_FILE=/var/run/fai/fai-plugin.lock
+FAI_LOCK_DELAY=5
+FAI_LOCK_RETRY=100
+FAI_LOCK_TIMEOUT=500
+################ common fai functions
+
+# logs for fai
+function fai_log() {
+	local COMPONENT=$1
+	shift
+	local MESSAGE=$@
+	logger -i -t "fai plug-in" "$COMPONENT : $MESSAGE"
+}
+
+
+# locking function
+function fai_lock() {
+	local COMMAND=$1
+	local RET=1
+
+	if [ ! -d `dirname $FAI_LOCK_FILE` ]; then
+		mkdir -p `dirname $FAI_LOCK_FILE`
+	fi
+	case "$COMMAND" in
+		aquire)
+				lockfile -s $FAI_LOCK_DELAY -r $FAI_LOCK_RETRY -l $FAI_LOCK_TIMEOUT $FAI_LOCK_FILE
+				RET=$?
+				fai_log fai_lock "Aquired the lock"
+				return $RET
+				;;
+		release)
+				/bin/rm -f $FAI_LOCK_FILE
+				RET=$?
+				fai_log fai_lock "Released the lock"
+				return $RET
+				;;
+		*)
+			fai_log fai_lock "No such command. Try 'aquire' or 'release'"
+			return 1
+			;;
+	esac
+}
+
+
+
+################ fai functions
+
+
