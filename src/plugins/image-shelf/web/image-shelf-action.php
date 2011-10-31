@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -67,8 +67,6 @@ switch ($image_shelf_command) {
 		// create the default configuration
 		$create_default_image_shelf_config = "insert into image_shelf_locations(imageshelf_id, imageshelf_name, imageshelf_username, imageshelf_protocol, imageshelf_uri, imageshelf_user, imageshelf_password) values (1, 'openqrm-enterprise', 'openqrm', 'http', 'http://image-shelf.openqrm-enterprise.org', '', '')";
 		$recordSet = &$db->Execute($create_default_image_shelf_config);
-		$create_default_image_shelf_config1 = "insert into image_shelf_locations(imageshelf_id, imageshelf_name, imageshelf_username, imageshelf_protocol, imageshelf_uri, imageshelf_user, imageshelf_password) values (2, 'www.openqrm-ng.net', 'openqrm', 'http', 'http://www.openqrm-ng.net/image-shelf', '', '')";
-		$recordSet = &$db->Execute($create_default_image_shelf_config1);
 
 		$db->Close();
 		break;
