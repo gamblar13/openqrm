@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
 . $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
@@ -163,9 +163,9 @@ EOF
 			echo >> /etc/apparmor.d/usr.sbin.named
 			if [ -x "/etc/init.d/apparmor" ]; then
 				if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-					invoke-rc.d apparmor reload || exit $?
+					invoke-rc.d apparmor reload
 				else
-					/etc/init.d/apparmor reload || exit $?
+					/etc/init.d/apparmor reload
 				fi
 			fi
 		fi
@@ -212,9 +212,9 @@ function openqrm_plugin_dns_uninstall() {
 		sed -i -e "s#.*openqrm.*##g" /etc/apparmor.d/usr.sbin.named
 		if [ -x "/etc/init.d/apparmor" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d apparmor reload || exit $?
+				invoke-rc.d apparmor reload
 			else
-				/etc/init.d/apparmor reload || exit $?
+				/etc/init.d/apparmor reload
 			fi
 		fi
 	fi
