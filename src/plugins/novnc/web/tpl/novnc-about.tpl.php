@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
 <style>
@@ -23,7 +23,7 @@
 }
 </style>
 
-<h1><img border=0 src="/openqrm/base/plugins/novnc/img/plugin.png"> Sshterm plugin</h1>
+<h1><img border=0 src="/openqrm/base/plugins/novnc/img/plugin.png"> NoVNC plugin</h1>
 <br>
 The novnc-plugin integrates 'NOVNC' into openQRM and provides remote console login to the managed resources through the Web-interface.
 <br>
@@ -31,3 +31,17 @@ The novnc-plugin integrates 'NOVNC' into openQRM and provides remote console log
 No manual configuration is needed for the novnc-plugin.
 <br>
 <br>
+<b>Please notice!</b>
+<br>
+NoVNC itself is still a bit browser-dependent. Here browser version which work fine with NoVNC :
+<br>
+Safari  5.1.1 on Mac OS
+<br>
+Safari  5.0.3 on WinXP
+<br>
+Firefox 3.6.9 on CentOS 6
+<br>
+Firefox 7.0.1 on WinXP
+<br>
+<br>
+
