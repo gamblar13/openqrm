@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
@@ -70,9 +70,9 @@ function puppet_stop() {
 	echo "Stopping the openQRM puppet-plugin"
 	if [ -x "/etc/init.d/puppet" ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d puppet stop || exit $?
+			invoke-rc.d puppet stop
 		else
-			/etc/init.d/puppet stop || exit $?
+			/etc/init.d/puppet stop
 		fi
 	fi
 	kill -9 `ps ax | grep puppetd | grep -v grep | awk {' print $1 '}` 2>/dev/null

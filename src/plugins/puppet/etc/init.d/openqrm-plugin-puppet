@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
@@ -44,8 +44,6 @@ function openqrm_plugin_puppet_start() {
 	fi
 	if which puppetd 1>/dev/null 2>&1; then
 		puppetd -v -d -D -l syslog
-	else
-		echo "ERROR: Cloud not find puppetd binary"
 	fi
 	touch $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/puppet/.running
 }
@@ -55,9 +53,9 @@ function openqrm_plugin_puppet_stop() {
 	echo "Stopping the openQRM puppet-plugin"
 	if [ -x "/etc/init.d/puppetmaster" ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d puppetmaster stop || exit $?
+			invoke-rc.d puppetmaster stop
 		else
-			/etc/init.d/puppetmaster stop || exit $?
+			/etc/init.d/puppetmaster stop
 		fi
 	fi
 	# be sure it is stopped
@@ -84,15 +82,15 @@ function openqrm_plugin_puppet_uninstall() {
 	rm -f /etc/cron.d/openqrm-puppetm-config
 	if [ -x "/etc/init.d/cron" ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d cron reload || exit $?
+			invoke-rc.d cron reload
 		else
-			/etc/init.d/cron reload || exit $?
+			/etc/init.d/cron reload
 		fi
 	elif [ -x /etc/init.d/crond ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d crond reload || exit $?
+			invoke-rc.d crond reload
 		else
-			/etc/init.d/crond reload || exit $?
+			/etc/init.d/crond reload
 		fi
 	else
 		echo "Could not find cron init script in /etc/init.d/. Please reload cron manually!"
@@ -185,15 +183,15 @@ function openqrm_plugin_puppet_init() {
 		sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" > /etc/cron.d/openqrm-puppetm-config
 	if [ -x "/etc/init.d/cron" ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d cron reload || exit $?
+			invoke-rc.d cron reload
 		else
-			/etc/init.d/cron reload || exit $?
+			/etc/init.d/cron reload
 		fi
 	elif [ -x /etc/init.d/crond ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d crond reload || exit $?
+			invoke-rc.d crond reload
 		else
-			/etc/init.d/crond reload || exit $?
+			/etc/init.d/crond reload
 		fi
 	else
 		echo "Could not find cron init script in /etc/init.d/. Please reload cron manually!"
