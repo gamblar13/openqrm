@@ -18,7 +18,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2010, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
