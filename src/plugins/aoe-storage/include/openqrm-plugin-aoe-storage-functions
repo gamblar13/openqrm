@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 # this is the functions file for the aoe-storage-plugin
 
@@ -153,8 +153,8 @@ function manage_aoe() {
 			AOE_SLOT=`echo $AOE_IMAGE_ROOTDEVICE | cut -d'.' -f2`
 			AOE_SHELF=`echo $AOE_IMAGE_ROOTDEVICE | cut -d'.' -f1 | sed -e "s#/dev/etherd/e##g"`
 			if grep "$AOE_SHELF $AOE_SLOT" $VBLADECONF 1>/dev/null; then
-				AOE_INTERFACE=`cat $VBLADECONF | grep -v "#" | grep "$AOE_SHELF $AOE_SLOT" | awk {' print $1'}`
-				AOE_IMAGE_ROOTDEVICE_PATH=`cat $VBLADECONF | grep "$AOE_SHELF $AOE_SLOT" | awk {' print $4 '}`
+				AOE_INTERFACE=`cat $VBLADECONF | grep -v "#" | grep -w "$AOE_SHELF $AOE_SLOT" | awk {' print $1'}`
+				AOE_IMAGE_ROOTDEVICE_PATH=`cat $VBLADECONF | grep -w "$AOE_SHELF $AOE_SLOT" | awk {' print $4 '}`
 				sed -i -e "s#$AOE_IMAGE_ROOTDEVICE_PATH .*#$AOE_IMAGE_ROOTDEVICE_PATH $AUTHENTICATED_MAC#g" $VBLADECONF
 				sed -i '/^$/d' $VBLADECONF
 				for VBLADE_PID in `ps ax | grep vblade | grep -w $AOE_IMAGE_ROOTDEVICE_PATH | awk {' print $1 '}`; do

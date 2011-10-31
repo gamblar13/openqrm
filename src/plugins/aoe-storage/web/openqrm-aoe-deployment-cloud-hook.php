@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -40,7 +40,7 @@ $openqrm_server = new openqrm_server();
 $OPENQRM_SERVER_IP_ADDRESS=$openqrm_server->get_ip_address();
 global $OPENQRM_SERVER_IP_ADDRESS;
 global $RESOURCE_INFO_TABLE;
-
+$BaseDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/';
 
 // ---------------------------------------------------------------------------------
 // general cloudstorage methods
@@ -54,6 +54,7 @@ function create_clone_aoe_deployment($cloud_image_id, $image_clone_name, $disk_s
 	global $OPENQRM_EXEC_PORT;
 	global $RESOURCE_INFO_TABLE;
 	global $event;
+	global $BaseDir;
 	$event->log("create_clone", $_SERVER['REQUEST_TIME'], 5, "aoe-deployment-cloud-hook", "Creating clone of image on storage", "", "", 0, 0, 0);
 
 	// we got the cloudimage id here, get the image out of it
