@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<isys_export>
+	<head>
+		<datetime>@@CURRENT_DATE@@</datetime>
+		<mandator language="" id="1">@@COMPANY_NAME@@</mandator>
+		<type>openQRM_auto_documentation</type>
+		<version>0.9.9-3</version>
+	</head>
+	<objects count="1">
+		<object>
+			<id>1</id>
+			<title>@@SYSTEM_NAME@@ (@@SYSTEM_MAC_ADDRESS@@)</title>
+			<sysid>SYSID_@@SYSTEM_ID@@</sysid>
+			<created by="admin">@@CURRENT_DATE@@</created>
+			<type id="5" const="C__OBJTYPE__SERVER" title_lang="LC__CMDB__OBJTYPE__SERVER">Server</type>
+			<status>2</status>
+
+			<data>
+				<category title="Allgemein" const="C__CATG__GLOBAL" category_type="0">
+					<cat_data data_id="14">
+						<category id="1" const="C__GLOBAL_CATEGORY__OTHER" title_lang="LC__UNIVERSAL__OTHER">Andere</category>
+						<description><![CDATA[@@SYSTEM_DESCRIPTION@@]]></description>
+					</cat_data>
+				</category>
+
+			</data>
+		</object>
+	</objects>
+</isys_export>

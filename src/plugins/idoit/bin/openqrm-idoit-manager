@@ -1,0 +1,406 @@
+#!/bin/bash
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+# add path when running from cron
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:$PATH
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/idoit/include/openqrm-plugin-idoit-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/idoit/etc/openqrm-plugin-idoit.conf
+openqrm_server_get_config
+
+SUBNETTMPDIR="/tmp/idoit"
+SUBNETFILE="$SUBNETTMPDIR/subnet.xml"
+CURRENTDIR=`pwd`
+export LANG=C
+export IDOIT_LOCATION="/var/www/idoit"
+export IDOIT_IMPORT_DIRECTORY="$IDOIT_LOCATION/imports"
+export COMPANY_NAME
+NEW_RESOURCE_BOOT_UP_DELAY=60
+
+# define wget to use with https
+if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
+	WGET="wget -q --no-check-certificate"
+else
+	WGET="wget -q"
+fi
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+
+if ! which screen 1>/dev/null; then
+	echo "ERROR: The 'screen' utility is not installed! Please install and try again."
+	image_shelf_log "ERROR: The 'screen' utility is not installed! Please install and try again."
+	exit 6
+fi
+
+
+function idoit_manager_usage() {
+	echo "Usage : $0 map"
+	echo "      : $0 map <-i hostname/ipaddress> <-s subnetmask> <-g default-gateway> [-m macaddress]"
+	echo "      : $0 map <-n network> <-s subnetmask> <-g default-gateway>"
+	echo "      : $0 automap <-t on/off>"
+}
+
+
+IDOIT_CMDLINE_PARAMS=$@
+IDOIT_CHECK_CMD=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			SYSTEM_NETWORK=$2
+			shift
+			;;
+		-i)
+			SYSTEM_IP_ADDRESS=$2
+			shift
+			;;
+		-m)
+			SYSTEM_MAC_ADDRESS=$2
+			shift
+			;;
+
+		-s)
+			SYSTEM_SUBNET_MASK=$2
+			shift
+			;;
+		-g)
+			SYSTEM_DEFAULT_GATEWAY=$2
+			shift
+			;;
+
+		-t)
+			IDOIT_AUTOMAP_TOGGLE=$2
+			shift
+			;;
+
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			idoit_manager_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+# parse subnet mask
+SYSTEM_SUBNET_MASK=${SYSTEM_SUBNET_MASK:-$OPENQRM_SERVER_SUBNET_MASK}
+case "$SYSTEM_SUBNET_MASK" in
+	255.255.255.0)
+		SYSTEM_NMAP_SUBNET_MASK=16
+		shift
+		;;
+	255.255.0.0)
+		SYSTEM_NMAP_SUBNET_MASK=24
+		shift
+		;;
+	255.0.0.0)
+		SYSTEM_NMAP_SUBNET_MASK=32
+		shift
+		;;
+	*)
+		echo "ERROR: Supported values for subnetmask are : 255.255.255.0, 255.255.0.0, 255.0.0.0"
+		exit 6
+		;;
+esac
+# prepare gateway
+SYSTEM_DEFAULT_GATEWAY=${SYSTEM_DEFAULT_GATEWAY:-$OPENQRM_SERVER_DEFAULT_GATEWAY}
+
+# decide what to do
+if [ "$SYSTEM_IP_ADDRESS" != "" ]; then
+	if [ "$SYSTEM_SUBNET_MASK" == "" ] || [ "$SYSTEM_DEFAULT_GATEWAY" == "" ]; then
+		idoit_manager_usage
+		exit 1
+	fi
+	echo "Mapping $SYSTEM_IP_ADDRESS"
+	IDOIT_MAP_PARAMETER="$SYSTEM_IP_ADDRESS"
+
+elif [ "$SYSTEM_NETWORK" != "" ]; then
+	if [ "$SYSTEM_SUBNET_MASK" == "" ] || [ "$SYSTEM_DEFAULT_GATEWAY" == "" ]; then
+		idoit_manager_usage
+		exit 1
+	fi
+	IDOIT_MAP_PARAMETER="$SYSTEM_NETWORK/$SYSTEM_NMAP_SUBNET_MASK"
+	echo "Mapping $SYSTEM_NETWORK/$SYSTEM_NMAP_SUBNET_MASK"
+else
+	# for now quite simple gathering of which network to map
+	OPENQRM_NETWORK=`echo $OPENQRM_SERVER_IP_ADDRESS | cut -d'.' -f1-3`".*"
+	SYSTEM_SUBNET_MASK=$OPENQRM_SERVER_SUBNET_MASK
+	SYSTEM_DEFAULT_GATEWAY=$OPENQRM_SERVER_DEFAULT_GATEWAY
+	IDOIT_MAP_PARAMETER="$OPENQRM_NETWORK"
+	echo "Mapping the openQRM network $OPENQRM_NETWORK"
+fi
+
+
+# main
+case "$IDOIT_CHECK_CMD" in
+	map)
+		# here we have everything togehter, e-run in background via screen
+		if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+			if [ -x /usr/bin/screen.real ]; then
+				RUNSCREEN="/usr/bin/screen.real"
+			else
+				RUNSCREEN=`which screen`
+			fi
+			export RUN_IN_BACKGROUND=true
+			SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+			$RUNSCREEN -dmS $SCREEN_NAME $0 $IDOIT_CMDLINE_PARAMS
+			exit
+		fi
+
+		mkdir -p $SUBNETTMPDIR
+		# in case the resource was just created it may not have an ip address yet
+		# wait until it has an ip
+		if [ "$SYSTEM_IP_ADDRESS" == "0.0.0.0" ]; then
+			unset SYSTEM_IP_ADDRESS
+			if [ "$SYSTEM_MAC_ADDRESS" == "" ]; then
+				echo "ERROR: Please provide a MAC-address to identify the new resource" | logger
+				exit 1
+			fi
+			while (true); do
+				if ! $WGET -t 1 -T 4 -O $SUBNETTMPDIR/openqrm-resource.conf "$OPENQRM_WEB_PROTOCOL://${OPENQRM_SERVER_IP_ADDRESS}/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$SYSTEM_MAC_ADDRESS"; then
+					echo "ERROR: Could not get resource-parameters!"  | logger
+					exit 1
+				else
+					. $SUBNETTMPDIR/openqrm-resource.conf
+					SYSTEM_IP_ADDRESS=$resource_ip
+				fi
+				if [ "$SYSTEM_IP_ADDRESS" != "" ]; then
+					echo "NOTICE Found ip-address $SYSTEM_IP_ADDRESS for resource with mac $SYSTEM_MAC_ADDRESS" | logger
+					sleep $NEW_RESOURCE_BOOT_UP_DELAY
+					break
+				fi
+				echo "NOTICE Resource with mac $SYSTEM_MAC_ADDRESS does not have a valid ip yet, waiting" | logger
+				sleep 2
+			done
+		fi
+
+		idoit_lock aquire
+		mkdir -p $SUBNETTMPDIR
+		openqrm_post_event 0 "map" 5 "openqrm-idoit-manager" "Starting to map the network"
+		# postevent sets resource_id 0 !!
+		unset resource_id
+		if ! nmap -sS -O -oX $SUBNETFILE $IDOIT_MAP_PARAMETER; then
+			idoit_log openqrm-idoit-manager "ERROR while running nmap !"
+			idoit_lock release
+			openqrm_post_event 0 "map" 3 "openqrm-idoit-manager" "Mapping the network failed!"
+			# postevent sets resource_id 0 !!
+			unset resource_id
+			exit 1
+		fi
+
+		# split the file into pieces per host
+		rm -f $SUBNETTMPDIR/openqrm-host*
+		awk "/<\/host>/{n++}{print >\"$SUBNETTMPDIR/openqrm-host.\" n \".txt\" }" $SUBNETFILE
+		# remove the last one since it is empty
+		LAST_ONE=`ls $SUBNETTMPDIR/openqrm-host.* | wc -l`
+		LAST_ONE=$(( $LAST_ONE - 1 ))
+		rm -f $SUBNETTMPDIR/openqrm-host.$LAST_ONE.txt
+		# loop over the hosts
+		for OPENQRM_HOST in `ls $SUBNETTMPDIR/openqrm-host.*`; do
+			# get data from nmap file
+			# ip + type
+			eval `grep "address addr" $OPENQRM_HOST | grep -v mac | sed -e "s#<##g" | sed -e "s#/>##g" | sed -e "s#address##g"`
+			if [ "$addr" != "" ]; then
+				SYSTEM_IP_ADDRESS=$addr
+				# addr is used for mac + ip
+				unset addr
+			fi
+			if [ "$addrtype" != "" ]; then
+				SYSTEM_NET_TYPE=$addrtype
+			fi
+
+			# mac
+			eval `grep "address addr" $OPENQRM_HOST | grep mac | grep -v ip | sed -e "s#<##g" | sed -e "s#/>##g" | sed -e "s#address##g"`
+			if [ "$addr" != "" ]; then
+				SYSTEM_MAC_ADDRESS=$(echo $addr | tr [:upper:] [:lower:])
+			fi
+			if [ "$vendor" != "" ]; then
+				SYSTEM_NET_VENDOR=$vendor
+			fi
+
+			# hostname
+			SYSTEM_HOSTNAME=`grep "hostname" $OPENQRM_HOST | sed -e "s#.*name=\"##g" | cut -d'"' -f1 | grep -v "<.*>"`
+			# if we do not find a hostname here we check the resource-parameter later
+
+			# ostype
+			SYSTEM_OS=`cat $OPENQRM_HOST | grep '<osclass type="general purpose"' | head -n1 | sed -e "s#.*vendor=\"##g" | cut -d'"' -f1`
+			if [ "$SYSTEM_OS" == "" ]; then
+				SYSTEM_OS=$SYSTEM_NET_VENDOR
+			fi
+
+			# apps
+			for SERVICE in `cat $OPENQRM_HOST | grep "service name"`; do
+				if echo $SERVICE | grep name 1>/dev/null; then
+					eval $SERVICE 1>/dev/null
+					SYSTEM_APPS="$SYSTEM_APPS $name"
+					unset name
+					unset SERVICE
+				fi
+			done
+
+
+			# get data from openQRM
+			if [ "$SYSTEM_MAC_ADDRESS" != "" ]; then
+				# get resource parameters
+				rm -f $SUBNETTMPDIR/openqrm-resource.conf
+				if ! $WGET -t 1 -T 4 -O $SUBNETTMPDIR/openqrm-resource.conf "$OPENQRM_WEB_PROTOCOL://${OPENQRM_SERVER_IP_ADDRESS}/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$SYSTEM_MAC_ADDRESS"; then
+					echo "ERROR: Could not get resource-parameters!"  | logger
+				else
+					. $SUBNETTMPDIR/openqrm-resource.conf
+					SYSTEM_ID=$resource_id
+					SYSTEM_DESCRIPTION="$appliance_comment"
+					# virtual or physical
+					if [ "$resource_vhostid" == "$resource_id" ]; then
+						SYSTEM_TYPE="Physical System"
+					else
+						SYSTEM_TYPE="Virtual Machine on Host Resource SYSID_$resource_vhostid"
+					fi
+				fi
+			fi
+			# check if we can find a hostname
+			if [ "$SYSTEM_HOSTNAME" == "" ]; then
+				if [ "$resource_hostname" != "" ]; then
+					SYSTEM_HOSTNAME=$resource_hostname
+				else
+					SYSTEM_HOSTNAME=$SYSTEM_IP_ADDRESS
+				fi
+			fi
+
+			# fix openqrm server system id
+			if [ "$SYSTEM_IP_ADDRESS" == "$OPENQRM_SERVER_IP_ADDRESS" ]; then
+				SYSTEM_ID=0
+				if [ "$SYSTEM_MAC_ADDRESS" == "" ]; then
+					SYSTEM_MAC_ADDRESS=`ifconfig | grep -B1 $OPENQRM_SERVER_IP_ADDRESS | awk '{ print $5 }' | tr [:upper:] [:lower:]`
+				fi
+			fi
+
+			# sanity
+			if [ "$SYSTEM_MAC_ADDRESS" == "" ]; then
+				SYSTEM_MAC_ADDRESS="x:x:x:x:x:x"
+			fi
+			if [ "$SYSTEM_ID" == "" ]; then
+				SYSTEM_ID=`echo $SYSTEM_MAC_ADDRESS | sed "s/[a-z:]//g"`
+				if [ "$SYSTEM_ID" == "" ]; then
+					SYSTEM_ID=`echo $SYSTEM_IP_ADDRESS | sed "s/[a-z:]//g"`
+				fi
+			fi
+
+			# be sure to have set defaults
+			SYSTEM_HOSTNAME=${SYSTEM_HOSTNAME:--}
+			SYSTEM_IP_ADDRESS=${SYSTEM_IP_ADDRESS:-0.0.0.0}
+			SYSTEM_SUBNET_MASK=${SYSTEM_SUBNET_MASK:-0.0.0.0}
+			SYSTEM_DEFAULT_GATEWAY=${SYSTEM_DEFAULT_GATEWAY:-0.0.0.0}
+			SYSTEM_NET_TYPE=${SYSTEM_NET_TYPE:--}
+			SYSTEM_NET_VENDOR=${SYSTEM_NET_VENDOR:--}
+			SYSTEM_OS=${SYSTEM_OS:--}
+			SYSTEM_APPS=${SYSTEM_APPS:--}
+			SYSTEM_DESCRIPTION=${SYSTEM_DESCRIPTION:--}
+			SYSTEM_TYPE=${SYSTEM_TYPE:--}
+
+			# bundle data
+			SYSTEM_FULL_DESCRIPTION="Description  : $SYSTEM_DESCRIPTION\n"
+			SYSTEM_FULL_DESCRIPTION=$SYSTEM_FULL_DESCRIPTION"System-Type : $SYSTEM_TYPE\n"
+			SYSTEM_FULL_DESCRIPTION=$SYSTEM_FULL_DESCRIPTION"OS-Type : $SYSTEM_OS\n"
+			SYSTEM_FULL_DESCRIPTION=$SYSTEM_FULL_DESCRIPTION"Applications : $SYSTEM_APPS\n"
+			SYSTEM_FULL_DESCRIPTION=$SYSTEM_FULL_DESCRIPTION"(Please do not edit this section. Content may get overwritten by automated updates)\n"
+
+			# import data
+			echo "-- SYSTEM_ID = $SYSTEM_ID" | logger
+			echo "-- SYSTEM_HOSTNAME = $SYSTEM_HOSTNAME" | logger
+			echo "-- SYSTEM_IP_ADDRESS = $SYSTEM_IP_ADDRESS" | logger
+			echo "-- SYSTEM_SUBNET_MASK = $SYSTEM_SUBNET_MASK" | logger
+			echo "-- SYSTEM_DEFAULT_GATEWAY = $SYSTEM_DEFAULT_GATEWAY" | logger
+			echo "-- SYSTEM_NET_TYPE = $SYSTEM_NET_TYPE" | logger
+			echo "-- SYSTEM_MAC_ADDRESS = $SYSTEM_MAC_ADDRESS" | logger
+			echo "-- SYSTEM_NET_VENDOR = $SYSTEM_NET_VENDOR" | logger
+			echo "-- SYSTEM_OS = $SYSTEM_OS" | logger
+			echo "-- SYSTEM_APPS = $SYSTEM_APPS" | logger
+			echo "-- SYSTEM_SUBNET_MASK = $SYSTEM_SUBNET_MASK" | logger
+			echo "-- SYSTEM_DEFAULT_GATEWAY = $SYSTEM_DEFAULT_GATEWAY" | logger
+			echo "-- SYSTEM_DESCRIPTION = $SYSTEM_FULL_DESCRIPTION" | logger
+
+			$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/idoit/bin/openqrm-idoitctl import -m "$SYSTEM_MAC_ADDRESS" -n "$SYSTEM_HOSTNAME" -i "$SYSTEM_IP_ADDRESS" -d "$SYSTEM_ID" -s "$SYSTEM_SUBNET_MASK" -g "$SYSTEM_DEFAULT_GATEWAY" -c "$SYSTEM_FULL_DESCRIPTION" -t "$SYSTEM_NET_TYPE" -v "$SYSTEM_NET_VENDOR" -o "$SYSTEM_OS" -a "$SYSTEM_APPS"
+
+			# unset
+			unset SYSTEM_MAC_ADDRESS SYSTEM_HOSTNAME SYSTEM_IP_ADDRESS SYSTEM_ID SYSTEM_FULL_DESCRIPTION SYSTEM_NET_TYPE SYSTEM_NET_VENDOR SYSTEM_OS SYSTEM_APPS SYSTEM_DESCRIPTION
+			unset addr addrtype name
+			unset SERVICE
+
+			echo
+			echo
+
+		done
+
+		rm -f $SUBNETTMPDIR/*
+		rmdir $SUBNETTMPDIR
+		idoit_lock release
+		openqrm_post_event 0 "map" 5 "openqrm-idoit-manager" "Finished to map network"
+		# postevent sets resource_id 0 !!
+		unset resource_id
+		exit 0
+		;;
+
+	automap)
+		echo "openqrm-idoit-manager->automap"
+		case "$IDOIT_AUTOMAP_TOGGLE" in
+			on)
+				# for the web-status
+				touch $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/idoit/web/.automap
+				# create cron job which will update the svn repo with files which were added by the web gui
+				cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/idoit/etc/cron.d/openqrm-idoit-automap.cron | \
+					sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" > /etc/cron.d/openqrm-idoit-automap
+				if [ -x /etc/init.d/cron ]; then
+					/etc/init.d/cron reload
+				elif [ -x /etc/init.d/crond ]; then
+					/etc/init.d/crond reload
+				else
+					echo "Could not find cron init script in /etc/init.d/. Please reload cron manually!" | logger
+				fi
+				;;
+
+			off)
+				rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/idoit/web/.automap
+				rm -f /etc/cron.d/openqrm-idoit-automap
+				if [ -x /etc/init.d/cron ]; then
+					/etc/init.d/cron reload
+				elif [ -x /etc/init.d/crond ]; then
+					/etc/init.d/crond reload
+				else
+					echo "Could not find cron init script in /etc/init.d/. Please reload cron manually!" | logger
+				fi
+				;;
+		esac
+		exit 0
+		;;
+
+
+	*)
+		idoit_manager_usage
+		exit 1
+		;;
+esac
