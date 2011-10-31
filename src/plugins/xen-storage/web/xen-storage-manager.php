@@ -32,7 +32,7 @@
 
 <?php
 /*
-  This file is part of openQRM.
+	This file is part of openQRM.
 
 	openQRM is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License version 2
@@ -46,7 +46,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -62,47 +62,47 @@ require_once "$RootDir/class/resource.class.php";
 require_once "$RootDir/include/htmlobject.inc.php";
 
 
-$lvm_storage_id = htmlobject_request('lvm_storage_id');
-$lvm_volume_group = htmlobject_request('lvm_volume_group');
-$lvm_lun_name=htmlobject_request('lvm_lun_name');
-$lvm_lun_snap_name=htmlobject_request('lvm_lun_snap_name');
-$lvm_lun_snap_size=htmlobject_request('lvm_lun_snap_size');
-$lvm_lun_resize=htmlobject_request('lvm_lun_resize');
+$xen_storage_id = htmlobject_request('xen_storage_id');
+$xen_storage_location = htmlobject_request('xen_storage_location');
+$xen_volume_name=htmlobject_request('xen_volume_name');
+$xen_volume_snap_name=htmlobject_request('xen_volume_snap_name');
+$xen_volume_snap_size=htmlobject_request('xen_volume_snap_size');
+$xen_volume_resize=htmlobject_request('xen_volume_resize');
 // to gather one of the deployment types within xen-storage
-$lvm_storage_type=htmlobject_request('type');
+$xen_storage_type=htmlobject_request('type');
 
 $action=htmlobject_request('action');
-global $lvm_storage_id;
-global $lvm_volume_group;
-global $lvm_lun_name;
-global $lvm_lun_snap_name;
-global $lvm_lun_resize;
-global $lvm_storage_type;
+global $xen_storage_id;
+global $xen_storage_location;
+global $xen_volume_name;
+global $xen_volume_snap_name;
+global $xen_volume_resize;
+global $xen_storage_type;
 
 $refresh_delay=1;
 $refresh_loop_max=20;
 
 
-function redirect_vg($strMsg, $lvm_storage_id) {
+function redirect_vg($strMsg, $xen_storage_id) {
 	global $thisfile;
 	global $action;
-	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&identifier[]='.$lvm_storage_id;
+	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&identifier[]='.$xen_storage_id;
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
 
-function redirect_lv($strMsg, $lvm_storage_id, $lvm_volume_group) {
+function redirect_lv($strMsg, $xen_storage_id, $xen_storage_location) {
 	global $thisfile;
 	global $action;
-	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&lvm_storage_id='.$lvm_storage_id.'&identifier[]='.$lvm_volume_group;
+	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&xen_storage_id='.$xen_storage_id.'&identifier[]='.$xen_storage_location;
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
 
-function redirect_lvmgmt($strMsg, $lvm_storage_id, $lvm_volume_group) {
+function redirect_lvmgmt($strMsg, $xen_storage_id, $xen_storage_location) {
 	global $thisfile;
 	global $action;
-	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&lvm_storage_id='.$lvm_storage_id.'&lvm_volume_group='.$lvm_volume_group;
+	$url = $thisfile.'?strMsg='.urlencode($strMsg).'&currenttab=tab0&redirect=yes&action='.$action.'&xen_storage_id='.$xen_storage_id.'&xen_storage_location='.$xen_storage_location;
 	echo "<meta http-equiv=\"refresh\" content=\"0; URL=$url\">";
 	exit;
 }
@@ -183,7 +183,7 @@ if(htmlobject_request('redirect') != 'yes') {
 							$storage_resource = new resource();
 							$storage_resource->get_instance_by_id($storage->resource_id);
 							// post vg status
-							$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage post_vg -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
+							$resource_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/xen-storage/bin/openqrm-xen-storage post_vg -u ".$OPENQRM_ADMIN->name." -p ".$OPENQRM_ADMIN->password." -t ".$deployment->type;
 							// remove current stat file
 							$storage_resource_id = $storage_resource->id;
 							$statfile="storage/".$storage_resource_id.".vg.stat";
@@ -194,9 +194,9 @@ if(htmlobject_request('redirect') != 'yes') {
 							$storage_resource->send_command($storage_resource->ip, $resource_command);
 							// and wait for the resulting statfile
 							if (!wait_for_statfile($statfile)) {
-								$redir_msg = "Error during selecting volume group ! Please check the Event-Log";
+								$redir_msg = "Error during selecting storage location ! Please check the Event-Log";
 							} else {
-								$redir_msg = "Displaying volume groups on storage id $id";
+								$redir_msg = "Displaying storage locations on storage id ".$id;
 							}
 							redirect_vg($redir_msg, $id);
 						}
@@ -205,19 +205,19 @@ if(htmlobject_request('redirect') != 'yes') {
 
 				case 'select-vg':
 					if (isset($_REQUEST['identifier'])) {
-						foreach($_REQUEST['identifier'] as $lvm_volume_group) {
+						foreach($_REQUEST['identifier'] as $xen_storage_location) {
 							show_progressbar();
 							$storage = new storage();
-							$storage->get_instance_by_id($lvm_storage_id);
+							$storage->get_instance_by_id($xen_storage_id);
 							$deployment = new deployment();
 							$deployment->get_instance_by_id($storage->type);
 							$storage_resource = new resource();
 							$storage_resource->get_instance_by_id($storage->resource_id);
 							// post lv status
-							$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage post_lv -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password -v $lvm_volume_group";
+							$resource_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/xen-storage/bin/openqrm-xen-storage post_lv -u ".$OPENQRM_ADMIN->name." -p ".$OPENQRM_ADMIN->password." -v ".$xen_storage_location." -t ".$deployment->type;
 							// remove current stat file
 							$storage_resource_id = $storage_resource->id;
-							$statfile="storage/".$storage_resource_id.".".$lvm_volume_group.".lv.stat";
+							$statfile="storage/".$storage_resource_id.".".$xen_storage_location.".lv.stat";
 							if (file_exists($statfile)) {
 								unlink($statfile);
 							}
@@ -225,54 +225,46 @@ if(htmlobject_request('redirect') != 'yes') {
 							$storage_resource->send_command($storage_resource->ip, $resource_command);
 							// and wait for the resulting statfile
 							if (!wait_for_statfile($statfile)) {
-								$redir_msg = "Error during selecting volume group ! Please check the Event-Log";
+								$redir_msg = "Error during selecting storage location ! Please check the Event-Log";
 							} else {
-								$redir_msg = "Displaying volume groups on storage id $lvm_storage_id";
+								$redir_msg = "Displaying storage locations on storage id ".$xen_storage_id;
 							}
-							redirect_lv($redir_msg, $lvm_storage_id, $lvm_volume_group);
+							redirect_lv($redir_msg, $xen_storage_id, $xen_storage_location);
 						}
 					}
 					break;
 
 
 				case 'add':
-					$lvm_lun_name = htmlobject_request('lvm_lun_name');
+					$xen_volume_name = htmlobject_request('xen_volume_name');
 					show_progressbar();
-					if (!strlen($lvm_lun_name)) {
-						$redir_msg = "Got emtpy logical volume name. Not adding ...";
-						redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+					if (!strlen($xen_volume_name)) {
+						$redir_msg = "Got emtpy volume name. Not adding ...";
+						redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 						exit(0);
-					} else if (!validate_input($lvm_lun_name, 'string')) {
-						$redir_msg = "Got invalid logical volume name. Not adding ...<br>(allowed characters are [a-z][A-z][0-9].-_)";
-						redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+					} else if (!validate_input($xen_volume_name, 'string')) {
+						$redir_msg = "Got invalid volume name. Not adding ...<br>(allowed characters are [a-z][A-z][0-9].-_)";
+						redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 						exit(0);
 					}
-					$lvm_lun_size = htmlobject_request('lvm_lun_size');
-					if (!strlen($lvm_lun_size)) {
-						$lvm_lun_size=2000;
-					} else if (!validate_input($lvm_lun_size, 'number')) {
-						$redir_msg = "Got invalid logical volume size. Not adding ...";
-						redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+					$xen_volume_size = htmlobject_request('xen_volume_size');
+					if (!strlen($xen_volume_size)) {
+						$xen_volume_size=2000;
+					} else if (!validate_input($xen_volume_size, 'number')) {
+						$redir_msg = "Got invalid volume size. Not adding ...";
+						redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 						exit(0);
 					}
 					$storage = new storage();
-					$storage->get_instance_by_id($lvm_storage_id);
+					$storage->get_instance_by_id($xen_storage_id);
 					$storage_resource = new resource();
 					$storage_resource->get_instance_by_id($storage->resource_id);
 					$storage_deployment = new deployment();
 					$storage_deployment->get_instance_by_id($storage->type);
-					// in case of lvm-iscsi we have to send a password when adding a lun
-					if (!strcmp($storage_deployment->type, "lvm-iscsi-deployment")) {
-						$image = new image();
-						// generate a password for the image
-						$image_password = $image->generatePassword(12);
-						$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage add -n $lvm_lun_name -v $lvm_volume_group -m $lvm_lun_size -i $image_password -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
-					} else {
-						$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage add -n $lvm_lun_name -v $lvm_volume_group -m $lvm_lun_size -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
-					}
+					$resource_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/xen-storage/bin/openqrm-xen-storage add -n ".$xen_volume_name." -v ".$xen_storage_location." -m ".$xen_volume_size." -u ".$OPENQRM_ADMIN->name." -p ".$OPENQRM_ADMIN->password." -t ".$storage_deployment->type;
 					// remove current stat file
 					$storage_resource_id = $storage_resource->id;
-					$statfile="storage/".$storage_resource_id.".".$lvm_volume_group.".lv.stat";
+					$statfile="storage/".$storage_resource_id.".".$xen_storage_location.".lv.stat";
 					if (file_exists($statfile)) {
 						unlink($statfile);
 					}
@@ -280,27 +272,27 @@ if(htmlobject_request('redirect') != 'yes') {
 					$storage_resource->send_command($storage_resource->ip, $resource_command);
 					// and wait for the resulting statfile
 					if (!wait_for_statfile($statfile)) {
-						$redir_msg = "Error during adding logical volume $lvm_lun_name to Volume group $lvm_volume_group ! Please check the Event-Log";
+						$redir_msg = "Error during adding volume ".$xen_volume_name." to storage location ".$xen_storage_location." ! Please check the Event-Log";
 					} else {
-						$redir_msg = "Added volume $lvm_lun_name to Volume group $lvm_volume_group";
+						$redir_msg = "Added volume ".$xen_volume_name." to storage location ".$xen_storage_location;
 					}
-					redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+					redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 					break;
 
 				case 'remove':
 					if (isset($_REQUEST['identifier'])) {
 						show_progressbar();
-						foreach($_REQUEST['identifier'] as $lvm_lun_name) {
+						foreach($_REQUEST['identifier'] as $xen_volume_name) {
 							$storage = new storage();
-							$storage->get_instance_by_id($lvm_storage_id);
+							$storage->get_instance_by_id($xen_storage_id);
 							$storage_resource = new resource();
 							$storage_resource->get_instance_by_id($storage->resource_id);
 							$storage_deployment = new deployment();
 							$storage_deployment->get_instance_by_id($storage->type);
-							$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage remove -n $lvm_lun_name -v $lvm_volume_group -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
+							$resource_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/xen-storage/bin/openqrm-xen-storage remove -n ".$xen_volume_name." -v ".$xen_storage_location." -u ".$OPENQRM_ADMIN->name." -p ".$OPENQRM_ADMIN->password." -t ".$storage_deployment->type;
 							// remove current stat file
 							$storage_resource_id = $storage_resource->id;
-							$statfile="storage/".$storage_resource_id.".".$lvm_volume_group.".lv.stat";
+							$statfile="storage/".$storage_resource_id.".".$xen_storage_location.".lv.stat";
 							if (file_exists($statfile)) {
 								unlink($statfile);
 							}
@@ -308,15 +300,15 @@ if(htmlobject_request('redirect') != 'yes') {
 							$storage_resource->send_command($storage_resource->ip, $resource_command);
 							// and wait for the resulting statfile
 							if (!wait_for_statfile($statfile)) {
-								$redir_msg .= "Error during removing volume $lvm_lun_name from Volume group $lvm_volume_group ! Please check the Event-Log<br>";
+								$redir_msg .= "Error during removing volume ".$xen_volume_name." from storage location ".$xen_storage_location." ! Please check the Event-Log<br>";
 							} else {
-								$redir_msg .= "Removed volume $lvm_lun_name from Volume group $lvm_volume_group<br>";
+								$redir_msg .= "Removed volume ".$xen_volume_name." from storage location ".$xen_storage_location."<br>";
 							}
 						}
-						redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+						redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 					} else {
 						$redir_msg = "No LVM location selected. Skipping removal !";
-						redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+						redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 					}
 					break;
 
@@ -324,16 +316,16 @@ if(htmlobject_request('redirect') != 'yes') {
 				case 'reload':
 					show_progressbar();
 					$storage = new storage();
-					$storage->get_instance_by_id($lvm_storage_id);
+					$storage->get_instance_by_id($xen_storage_id);
 					$deployment = new deployment();
 					$deployment->get_instance_by_id($storage->type);
 					$storage_resource = new resource();
 					$storage_resource->get_instance_by_id($storage->resource_id);
 					// post lv status
-					$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage post_lv -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password -v $lvm_volume_group";
+					$resource_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/xen-storage/bin/openqrm-xen-storage post_lv -u ".$OPENQRM_ADMIN->name." -p ".$OPENQRM_ADMIN->password." -v ".$xen_storage_location." -t ".$deployment->type;
 					// remove current stat file
 					$storage_resource_id = $storage_resource->id;
-					$statfile="storage/".$storage_resource_id.".".$lvm_volume_group.".lv.stat";
+					$statfile="storage/".$storage_resource_id.".".$xen_storage_location.".lv.stat";
 					if (file_exists($statfile)) {
 						unlink($statfile);
 					}
@@ -341,65 +333,57 @@ if(htmlobject_request('redirect') != 'yes') {
 					$storage_resource->send_command($storage_resource->ip, $resource_command);
 					// and wait for the resulting statfile
 					if (!wait_for_statfile($statfile)) {
-						$redir_msg = "Error during displaying logical volumes on Volume group $lvm_volume_group ! Please check the Event-Log";
+						$redir_msg = "Error during displaying volumes on storage location ".$xen_storage_location." ! Please check the Event-Log";
 					} else {
-						$redir_msg = "Displaying logical volumes on Volume group $lvm_volume_group";
+						$redir_msg = "Displaying volumes on storage location ".$xen_storage_location;
 					}
-					redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+					redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 					break;
 
 
 				case 'snap':
 				case 'clone':
-					$lvm_action = htmlobject_request('action');
-					if (strlen($lvm_lun_snap_name)) {
+					$xen_action = htmlobject_request('action');
+					if (strlen($xen_volume_snap_name)) {
 						show_progressbar();
-						if (!strlen($lvm_lun_name)) {
-							$redir_msg = "Got emtpy logical volume name. Not adding ...";
-							redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+						if (!strlen($xen_volume_name)) {
+							$redir_msg = "Got emtpy volume name. Not adding ...";
+							redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 							exit(0);
-						} else if (!validate_input($lvm_lun_name, 'string')) {
-							$redir_msg = "Got invalid logical volume name. Not adding ...<br>(allowed characters are [a-z][A-z][0-9].-_)";
-							redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
-							exit(0);
-						}
-
-						if (!strlen($lvm_lun_snap_name)) {
-							$redir_msg = "Got emtpy logical volume clone name. Not adding ...";
-							redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
-							exit(0);
-						} else if (!validate_input($lvm_lun_snap_name, 'string')) {
-							$redir_msg = "Got invalid logical volume clone name. Not adding ...<br>(allowed characters are [a-z][A-z][0-9].-_)";
-							redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+						} else if (!validate_input($xen_volume_name, 'string')) {
+							$redir_msg = "Got invalid volume name. Not adding ...<br>(allowed characters are [a-z][A-z][0-9].-_)";
+							redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 							exit(0);
 						}
 
-						if (!strlen($lvm_lun_snap_size)) {
-							$lvm_lun_snap_size=5000;
-						} else if (!validate_input($lvm_lun_snap_size, 'number')) {
-							$redir_msg = "Got invalid logical volume clone size. Not adding ...";
-							redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+						if (!strlen($xen_volume_snap_name)) {
+							$redir_msg = "Got emtpy volume clone name. Not adding ...";
+							redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
+							exit(0);
+						} else if (!validate_input($xen_volume_snap_name, 'string')) {
+							$redir_msg = "Got invalid volume clone name. Not adding ...<br>(allowed characters are [a-z][A-z][0-9].-_)";
+							redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
+							exit(0);
+						}
+
+						if (!strlen($xen_volume_snap_size)) {
+							$xen_volume_snap_size=5000;
+						} else if (!validate_input($xen_volume_snap_size, 'number')) {
+							$redir_msg = "Got invalid volume clone size. Not adding ...";
+							redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 							exit(0);
 						}
 						// snap/clone
 						$storage = new storage();
-						$storage->get_instance_by_id($lvm_storage_id);
+						$storage->get_instance_by_id($xen_storage_id);
 						$storage_resource = new resource();
 						$storage_resource->get_instance_by_id($storage->resource_id);
 						$deployment = new deployment();
 						$deployment->get_instance_by_id($storage->type);
-						// in case of lvm-iscsi we have to send a password when adding a lun
-						if (!strcmp($deployment->type, "lvm-iscsi-deployment")) {
-							$image = new image();
-							// generate a password for the image
-							$image_password = $image->generatePassword(12);
-							$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage $lvm_action -n $lvm_lun_name -v $lvm_volume_group -s $lvm_lun_snap_name -m $lvm_lun_snap_size -i $image_password -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
-						} else {
-							$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage $lvm_action -n $lvm_lun_name -v $lvm_volume_group -s $lvm_lun_snap_name -m $lvm_lun_snap_size -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
-						}
+						$resource_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/xen-storage/bin/openqrm-xen-storage ".$xen_action." -n ".$xen_volume_name." -v ".$xen_storage_location." -s ".$xen_volume_snap_name." -m ".$xen_volume_snap_size." -u ".$OPENQRM_ADMIN->name." -p ".$OPENQRM_ADMIN->password." -t ".$deployment->type;
 						// remove current stat file
 						$storage_resource_id = $storage_resource->id;
-						$statfile="storage/".$storage_resource_id.".".$lvm_volume_group.".lv.stat";
+						$statfile="storage/".$storage_resource_id.".".$xen_storage_location.".lv.stat";
 						if (file_exists($statfile)) {
 							unlink($statfile);
 						}
@@ -407,14 +391,14 @@ if(htmlobject_request('redirect') != 'yes') {
 						$storage_resource->send_command($storage_resource->ip, $resource_command);
 						// and wait for the resulting statfile
 						if (!wait_for_statfile($statfile)) {
-							$redir_msg = "Error during snapshotting volume $lvm_lun_name -> $lvm_lun_snap_name on Volume Group $lvm_volume_group ! Please check the Event-Log";
+							$redir_msg = "Error during snapshotting volume ".$xen_volume_name." -> ".$xen_volume_snap_name." on storage location ".$xen_storage_location." ! Please check the Event-Log";
 						} else {
-							$redir_msg = "Created snapshot of volume $lvm_lun_name -> $lvm_lun_snap_name on Volume Group $lvm_volume_group";
+							$redir_msg = "Created snapshot of volume ".$xen_volume_name." -> ".$xen_volume_snap_name." on storage location ".$xen_storage_location;
 						}
-						redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+						redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 					} else {
 						$redir_msg = "Got empty name. Skipping snapshot procedure !";
-						redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+						redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 					}
 					break;
 
@@ -423,41 +407,33 @@ if(htmlobject_request('redirect') != 'yes') {
 
 				case 'resize':
 					show_progressbar();
-					if (!strlen($lvm_lun_name)) {
-						$redir_msg = "Got emtpy logical volume name. Not resizing ...";
-						redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+					if (!strlen($xen_volume_name)) {
+						$redir_msg = "Got emtpy volume name. Not resizing ...";
+						redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 						exit(0);
-					} else if (!validate_input($lvm_lun_name, 'string')) {
-						$redir_msg = "Got invalid logical volume name. Not resizing ...<br>(allowed characters are [a-z][A-z][0-9].-_)";
-						redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+					} else if (!validate_input($xen_volume_name, 'string')) {
+						$redir_msg = "Got invalid volume name. Not resizing ...<br>(allowed characters are [a-z][A-z][0-9].-_)";
+						redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 						exit(0);
 					}
-					if (!strlen($lvm_lun_resize)) {
-						$lvm_lun_resize=5000;
-					} else if (!validate_input($lvm_lun_resize, 'number')) {
-						$redir_msg = "Got invalid logical volume resize value. Not resizing ...";
-						redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+					if (!strlen($xen_volume_resize)) {
+						$xen_volume_resize=5000;
+					} else if (!validate_input($xen_volume_resize, 'number')) {
+						$redir_msg = "Got invalid volume resize value. Not resizing ...";
+						redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 						exit(0);
 					}
 					// snap
 					$storage = new storage();
-					$storage->get_instance_by_id($lvm_storage_id);
+					$storage->get_instance_by_id($xen_storage_id);
 					$storage_resource = new resource();
 					$storage_resource->get_instance_by_id($storage->resource_id);
 					$deployment = new deployment();
 					$deployment->get_instance_by_id($storage->type);
-					// in case of lvm-iscsi we have to send a password when adding a lun
-					if (!strcmp($deployment->type, "lvm-iscsi-deployment")) {
-						$image = new image();
-						// generate a password for the image
-						$image_password = $image->generatePassword(12);
-						$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage resize -n $lvm_lun_name -v $lvm_volume_group -m $lvm_lun_resize -i $image_password -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
-					} else {
-						$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/bin/openqrm-xen-storage resize -n $lvm_lun_name -v $lvm_volume_group -m $lvm_lun_resize -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
-					}
+					$resource_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/xen-storage/bin/openqrm-xen-storage resize -n ".$xen_volume_name." -v ".$xen_storage_location." -m ".$xen_volume_resize." -u ".$OPENQRM_ADMIN->name." -p ".$OPENQRM_ADMIN->password." -t ".$deployment->type;
 					// remove current stat file
 					$storage_resource_id = $storage_resource->id;
-					$statfile="storage/".$storage_resource_id.".".$lvm_volume_group.".lv.stat";
+					$statfile="storage/".$storage_resource_id.".".$xen_storage_location.".lv.stat";
 					if (file_exists($statfile)) {
 						unlink($statfile);
 					}
@@ -465,11 +441,11 @@ if(htmlobject_request('redirect') != 'yes') {
 					$storage_resource->send_command($storage_resource->ip, $resource_command);
 					// and wait for the resulting statfile
 					if (!wait_for_statfile($statfile)) {
-						$redir_msg = "Error during resizing volume $lvm_lun_name on Volume Group $lvm_volume_group ! Please check the Event-Log";
+						$redir_msg = "Error during resizing volume ".$xen_volume_name." on storage location ".$xen_storage_location." ! Please check the Event-Log";
 					} else {
-						$redir_msg = "Resized volume $lvm_lun_name on Volume Group $lvm_volume_group";
+						$redir_msg = "Resized volume ".$xen_volume_name." on storage location ".$xen_storage_location;
 					}
-					redirect_lvmgmt($redir_msg, $lvm_storage_id, $lvm_volume_group);
+					redirect_lvmgmt($redir_msg, $xen_storage_id, $xen_storage_location);
 					break;
 
 			}
@@ -480,10 +456,10 @@ if(htmlobject_request('redirect') != 'yes') {
 
 
 
-function lvm_select_storage() {
+function xen_select_storage() {
 	global $OPENQRM_USER;
 	global $thisfile;
-	global $lvm_storage_type;
+	global $xen_storage_type;
 
 	$table = new htmlobject_table_builder('storage_id', '', '', '', 'select');
 
@@ -519,8 +495,11 @@ function lvm_select_storage() {
 	$storage_count=0;
 	$arBody = array();
 	$t_deployment = new deployment();
+	$b_deployment = new deployment();
 	$t_deployment->get_instance_by_type("xen-lvm-deployment");
+	$b_deployment->get_instance_by_type("xen-bf-deployment");
 	$storage_tmp = new storage();
+	// lvm
 	$storage_array = $storage_tmp->display_overview_per_type($t_deployment->id, $table->offset, $table->limit, $table->sort, $table->order);
 	foreach ($storage_array as $index => $storage_db) {
 		$storage = new storage();
@@ -552,6 +531,38 @@ function lvm_select_storage() {
 		$storage_count++;
 	}
 
+	$storage_array = $storage_tmp->display_overview_per_type($b_deployment->id, $table->offset, $table->limit, $table->sort, $table->order);
+	foreach ($storage_array as $index => $storage_db) {
+		$storage = new storage();
+		$storage->get_instance_by_id($storage_db["storage_id"]);
+		$storage_resource = new resource();
+		$storage_resource->get_instance_by_id($storage->resource_id);
+		$deployment = new deployment();
+		$deployment->get_instance_by_id($storage->type);
+		$storage_count++;
+		$resource_icon_default="/openqrm/base/img/resource.png";
+		$storage_icon="/openqrm/base/plugins/xen-storage/img/storage.png";
+		$state_icon="/openqrm/base/img/$storage_resource->state.png";
+		if (!file_exists($_SERVER["DOCUMENT_ROOT"]."/".$state_icon)) {
+			$state_icon="/openqrm/base/img/unknown.png";
+		}
+		if (file_exists($_SERVER["DOCUMENT_ROOT"]."/".$storage_icon)) {
+			$resource_icon_default=$storage_icon;
+		}
+		$arBody[] = array(
+			'storage_state' => "<img src=$state_icon>",
+			'storage_icon' => "<img width=24 height=24 src=$resource_icon_default>",
+			'storage_id' => $storage->id,
+			'storage_name' => $storage->name,
+			'storage_resource_id' => $storage->resource_id,
+			'storage_resource_ip' => $storage_resource->ip,
+			'storage_type' => "$deployment->storagedescription",
+			'storage_comment' => $storage->comment,
+		);
+		$storage_count++;
+	}
+
+
 	$table->id = 'Tabelle';
 	$table->css = 'htmlobject_table';
 	$table->border = 1;
@@ -561,7 +572,7 @@ function lvm_select_storage() {
 	$table->form_action = $thisfile;
 	$table->head = $arHead;
 	$table->body = $arBody;
-	$table->add_headrow("<input type='hidden' name='type' value=$lvm_storage_type>");
+	$table->add_headrow("<input type='hidden' name='type' value=$xen_storage_type>");
 
 	if ($OPENQRM_USER->role == "administrator") {
 		$table->bottom = array('select');
@@ -596,12 +607,12 @@ function lvm_select_storage() {
 }
 
 
-function lvm_storage_display($lvm_storage_id) {
+function xen_storage_display($xen_storage_id) {
 	global $OPENQRM_USER;
 	global $thisfile;
 
 	$storage = new storage();
-	$storage->get_instance_by_id($lvm_storage_id);
+	$storage->get_instance_by_id($xen_storage_id);
 	$storage_resource = new resource();
 	$storage_resource->get_instance_by_id($storage->resource_id);
 	$deployment = new deployment();
@@ -746,7 +757,7 @@ function lvm_storage_display($lvm_storage_id) {
 			$vg_count++;
 		}
 	}
-	$table1->add_headrow("<input type='hidden' name='lvm_storage_id' value=$lvm_storage_id>");
+	$table1->add_headrow("<input type='hidden' name='xen_storage_id' value=$xen_storage_id>");
 	$table1->id = 'Tabelle';
 	$table1->css = 'htmlobject_table';
 	$table1->border = 1;
@@ -782,116 +793,116 @@ function lvm_storage_display($lvm_storage_id) {
 
 
 
-function lvm_storage_lv_display($lvm_storage_id, $lvm_volume_group) {
+function xen_storage_lv_display($xen_storage_id, $xen_storage_location) {
 	global $OPENQRM_USER;
 	global $thisfile;
 	global $RootDir;
 
 	$storage = new storage();
-	$storage->get_instance_by_id($lvm_storage_id);
+	$storage->get_instance_by_id($xen_storage_id);
 	$storage_resource = new resource();
 	$storage_resource->get_instance_by_id($storage->resource_id);
 	$deployment = new deployment();
 	$deployment->get_instance_by_id($storage->type);
 
 	// lvm table
-	$table = new htmlobject_table_builder('lvm_lun_name', '', '', '', 'luns');
+	$table = new htmlobject_table_builder('xen_volume_name', '', '', '', 'luns');
 	$arHead = array();
-	$arHead['lvm_lun_icon'] = array();
-	$arHead['lvm_lun_icon']['title'] ='';
-	$arHead['lvm_lun_icon']['sortable'] = false;
+	$arHead['xen_volume_icon'] = array();
+	$arHead['xen_volume_icon']['title'] ='';
+	$arHead['xen_volume_icon']['sortable'] = false;
 
-	$arHead['lvm_lun_name'] = array();
-	$arHead['lvm_lun_name']['title'] ='Lun';
+	$arHead['xen_volume_name'] = array();
+	$arHead['xen_volume_name']['title'] ='Volume';
 
-	$arHead['lvm_lun_attr'] = array();
-	$arHead['lvm_lun_attr']['title'] ='Attr';
+	$arHead['xen_volume_attr'] = array();
+	$arHead['xen_volume_attr']['title'] ='Attr';
 
-	$arHead['lvm_lun_lsize'] = array();
-	$arHead['lvm_lun_lsize']['title'] ='LSize';
+	$arHead['xen_volume_lsize'] = array();
+	$arHead['xen_volume_lsize']['title'] ='LSize';
 
-	$arHead['lvm_lun_rsize'] = array();
-	$arHead['lvm_lun_rsize']['title'] ='Resize (+ MB)';
-	$arHead['lvm_lun_rsize']['sortable'] = false;
+	$arHead['xen_volume_rsize'] = array();
+	$arHead['xen_volume_rsize']['title'] ='Resize (+ MB)';
+	$arHead['xen_volume_rsize']['sortable'] = false;
 
-	$arHead['lvm_lun_snap'] = array();
-	$arHead['lvm_lun_snap']['title'] ='Snap/Clone (name + size)';
-	$arHead['lvm_lun_snap']['sortable'] = false;
+	$arHead['xen_volume_snap'] = array();
+	$arHead['xen_volume_snap']['title'] ='Snap/Clone (name + size)';
+	$arHead['xen_volume_snap']['sortable'] = false;
 
 	$arBody = array();
-	$lvm_lun_count=0;
+	$xen_volume_count=0;
 	$storage_icon="/openqrm/base/plugins/xen-storage/img/storage.png";
-	$storage_export_list="storage/".$storage->resource_id.".".$lvm_volume_group.".lv.stat";
+	$storage_export_list="storage/".$storage->resource_id.".".$xen_storage_location.".lv.stat";
 	if (file_exists($storage_export_list)) {
 		$storage_vg_content=file($storage_export_list);
 		foreach ($storage_vg_content as $index => $lvm) {
-			$lvm_line = trim($lvm);
+			$xen_line = trim($lvm);
 
-			$first_at_pos = strpos($lvm_line, "@");
+			$first_at_pos = strpos($xen_line, "@");
 			$first_at_pos++;
-			$lvm_line_first_at_removed = substr($lvm_line, $first_at_pos, strlen($lvm_line)-$first_at_pos);
-			$second_at_pos = strpos($lvm_line_first_at_removed, "@");
+			$xen_line_first_at_removed = substr($xen_line, $first_at_pos, strlen($xen_line)-$first_at_pos);
+			$second_at_pos = strpos($xen_line_first_at_removed, "@");
 			$second_at_pos++;
-			$lvm_line_second_at_removed = substr($lvm_line_first_at_removed, $second_at_pos, strlen($lvm_line_first_at_removed)-$second_at_pos);
-			$third_at_pos = strpos($lvm_line_second_at_removed, "@");
+			$xen_line_second_at_removed = substr($xen_line_first_at_removed, $second_at_pos, strlen($xen_line_first_at_removed)-$second_at_pos);
+			$third_at_pos = strpos($xen_line_second_at_removed, "@");
 			$third_at_pos++;
-			$lvm_line_third_at_removed = substr($lvm_line_second_at_removed, $third_at_pos, strlen($lvm_line_second_at_removed)-$third_at_pos);
-			$fourth_at_pos = strpos($lvm_line_third_at_removed, "@");
+			$xen_line_third_at_removed = substr($xen_line_second_at_removed, $third_at_pos, strlen($xen_line_second_at_removed)-$third_at_pos);
+			$fourth_at_pos = strpos($xen_line_third_at_removed, "@");
 			$fourth_at_pos++;
-			$lvm_line_fourth_at_removed = substr($lvm_line_third_at_removed, $fourth_at_pos, strlen($lvm_line_third_at_removed)-$fourth_at_pos);
-			$fivth_at_pos = strpos($lvm_line_fourth_at_removed, "@");
+			$xen_line_fourth_at_removed = substr($xen_line_third_at_removed, $fourth_at_pos, strlen($xen_line_third_at_removed)-$fourth_at_pos);
+			$fivth_at_pos = strpos($xen_line_fourth_at_removed, "@");
 			$fivth_at_pos++;
-			$lvm_line_fivth_at_removed = substr($lvm_line_fourth_at_removed, $fivth_at_pos, strlen($lvm_line_fourth_at_removed)-$fivth_at_pos);
-			$sixth_at_pos = strpos($lvm_line_fivth_at_removed, "@");
+			$xen_line_fivth_at_removed = substr($xen_line_fourth_at_removed, $fivth_at_pos, strlen($xen_line_fourth_at_removed)-$fivth_at_pos);
+			$sixth_at_pos = strpos($xen_line_fivth_at_removed, "@");
 			$sixth_at_pos++;
-			$lvm_line_sixth_at_removed = substr($lvm_line_fivth_at_removed, $sixth_at_pos, strlen($lvm_line_fivth_at_removed)-$sixth_at_pos);
-			$seventh_at_pos = strpos($lvm_line_sixth_at_removed, "@");
+			$xen_line_sixth_at_removed = substr($xen_line_fivth_at_removed, $sixth_at_pos, strlen($xen_line_fivth_at_removed)-$sixth_at_pos);
+			$seventh_at_pos = strpos($xen_line_sixth_at_removed, "@");
 			$seventh_at_pos++;
 
-			$lvm_lun_name = trim(substr($lvm_line, 0, $first_at_pos-1));
-			$lvm_lun_vol = trim(substr($lvm_line_first_at_removed, 0, $second_at_pos-1));
-			$lvm_lun_attr = trim(substr($lvm_line_second_at_removed, 0, $third_at_pos-1));
-			$lvm_lun_lsize = trim(substr($lvm_line_third_at_removed, 0, $fourth_at_pos-1));
+			$xen_volume_name = trim(substr($xen_line, 0, $first_at_pos-1));
+			$xen_volume_vol = trim(substr($xen_line_first_at_removed, 0, $second_at_pos-1));
+			$xen_volume_attr = trim(substr($xen_line_second_at_removed, 0, $third_at_pos-1));
+			$xen_volume_lsize = trim(substr($xen_line_third_at_removed, 0, $fourth_at_pos-1));
 
 			// build the resize input
-			$lvm_lun_rsize = "<form action=\"$thisfile\" method=\"GET\">";
-			$lvm_lun_rsize .= "<input type='hidden' name='lvm_storage_id' value=$lvm_storage_id>";
-			$lvm_lun_rsize .= "<input type='hidden' name='lvm_volume_group' value=$lvm_volume_group>";
-			$lvm_lun_rsize .= "<input type='hidden' name='lvm_lun_name' value=$lvm_lun_name>";
-			$lvm_lun_rsize .= "<input type='text' name='lvm_lun_resize' value='' size='5' maxlength='10'> MB ";
-			$lvm_lun_rsize .= "<input type='submit' name='action' value='resize'>";
-			$lvm_lun_rsize .= "</form>";
+			$xen_volume_rsize = "<form action=\"$thisfile\" method=\"GET\">";
+			$xen_volume_rsize .= "<input type='hidden' name='xen_storage_id' value=$xen_storage_id>";
+			$xen_volume_rsize .= "<input type='hidden' name='xen_storage_location' value=$xen_storage_location>";
+			$xen_volume_rsize .= "<input type='hidden' name='xen_volume_name' value=$xen_volume_name>";
+			$xen_volume_rsize .= "<input type='text' name='xen_volume_resize' value='' size='5' maxlength='10'> MB ";
+			$xen_volume_rsize .= "<input type='submit' name='action' value='resize'>";
+			$xen_volume_rsize .= "</form>";
 
 			// build the snap-shot input
-			$lvm_lun_snap = "<form action=\"$thisfile\" method=\"GET\">";
-			$lvm_lun_snap .= "<input type='hidden' name='lvm_storage_id' value=$lvm_storage_id>";
-			$lvm_lun_snap .= "<input type='hidden' name='lvm_volume_group' value=$lvm_volume_group>";
-			$lvm_lun_snap .= "<input type='hidden' name='lvm_lun_name' value=$lvm_lun_name>";
-			$lvm_lun_snap .= "<input type='text' name='lvm_lun_snap_name' value='' size='10' maxlength='20'>";
-			$lvm_lun_snap .= "<input type='text' name='lvm_lun_snap_size' value='' size='5' maxlength='10'> MB ";
+			$xen_volume_snap = "<form action=\"$thisfile\" method=\"GET\">";
+			$xen_volume_snap .= "<input type='hidden' name='xen_storage_id' value=$xen_storage_id>";
+			$xen_volume_snap .= "<input type='hidden' name='xen_storage_location' value=$xen_storage_location>";
+			$xen_volume_snap .= "<input type='hidden' name='xen_volume_name' value=$xen_volume_name>";
+			$xen_volume_snap .= "<input type='text' name='xen_volume_snap_name' value='' size='10' maxlength='20'>";
+			$xen_volume_snap .= "<input type='text' name='xen_volume_snap_size' value='' size='5' maxlength='10'> MB ";
 			// check if to show the snap button
-			if (!strstr($lvm_lun_attr, "swi")) {
-				$lvm_lun_snap .= "<input type='submit' name='action' value='snap'>";
+			if (!strstr($xen_volume_attr, "swi")) {
+				$xen_volume_snap .= "<input type='submit' name='action' value='snap'>";
 			} else {
-				$lvm_lun_snap .= "<input type='submit' name='action' value='snap' disabled='true'>";
+				$xen_volume_snap .= "<input type='submit' name='action' value='snap' disabled='true'>";
 			}
-			$lvm_lun_snap .= "<input type='submit' name='action' value='clone'>";
-			$lvm_lun_snap .= "</form>";
+			$xen_volume_snap .= "<input type='submit' name='action' value='clone'>";
+			$xen_volume_snap .= "</form>";
 
 
 			$arBody[] = array(
-				'lvm_lun_icon' => "<img width=24 height=24 src=$storage_icon>",
-				'lvm_lun_name' => $lvm_lun_name,
-				'lvm_lun_attr' => $lvm_lun_attr,
-				'lvm_lun_lsize' => $lvm_lun_lsize,
-				'lvm_lun_rsize' => "<nobr>".$lvm_lun_rsize."</nobr>",
-				'lvm_lun_snap' => "<nobr>".$lvm_lun_snap."</nobr>",
+				'xen_volume_icon' => "<img width=24 height=24 src=$storage_icon>",
+				'xen_volume_name' => $xen_volume_name,
+				'xen_volume_attr' => $xen_volume_attr,
+				'xen_volume_lsize' => $xen_volume_lsize,
+				'xen_volume_rsize' => "<nobr>".$xen_volume_rsize."</nobr>",
+				'xen_volume_snap' => "<nobr>".$xen_volume_snap."</nobr>",
 			);
-			$lvm_lun_count++;
+			$xen_volume_count++;
 		}
 	}
 
-	$table->add_headrow("<input type='hidden' name='lvm_storage_id' value=$lvm_storage_id><input type='hidden' name='lvm_volume_group' value=$lvm_volume_group>");
+	$table->add_headrow("<input type='hidden' name='xen_storage_id' value=$xen_storage_id><input type='hidden' name='xen_storage_location' value=$xen_storage_location>");
 	$table->id = 'Tabelle';
 	$table->css = 'htmlobject_table';
 	$table->border = 1;
@@ -904,9 +915,9 @@ function lvm_storage_lv_display($lvm_storage_id, $lvm_volume_group) {
 	$table->body = $arBody;
 	if ($OPENQRM_USER->role == "administrator") {
 		$table->bottom = array('reload', 'remove');
-		$table->identifier = 'lvm_lun_name';
+		$table->identifier = 'xen_volume_name';
 	}
-	$table->max = $lvm_lun_count;
+	$table->max = $xen_volume_count;
 
 
 	// set template
@@ -916,12 +927,12 @@ function lvm_storage_lv_display($lvm_storage_id, $lvm_volume_group) {
 	$t->setVar(array(
 		'formaction' => $thisfile,
 		'storage_name' => $storage->name,
-		'lvm_volume_group' => $lvm_volume_group,
+		'xen_storage_location' => $xen_storage_location,
 		'lun_table' => $table->get_string(),
-		'lvm_lun_name' => htmlobject_input('lvm_lun_name', array("value" => '', "label" => 'Lun Name'), 'text', 20),
-		'lvm_lun_size' => htmlobject_input('lvm_lun_size', array("value" => '2000', "label" => 'Lun Size (MB)'), 'text', 20),
-		'hidden_lvm_volume_group' => "<input type='hidden' name='lvm_volume_group' value=$lvm_volume_group>",
-		'hidden_lvm_storage_id' => "<input type='hidden' name='lvm_storage_id' value=$lvm_storage_id>",
+		'xen_volume_name' => htmlobject_input('xen_volume_name', array("value" => '', "label" => 'Volume Name'), 'text', 20),
+		'xen_volume_size' => htmlobject_input('xen_volume_size', array("value" => '2000', "label" => 'Volume Size (MB)'), 'text', 20),
+		'hidden_xen_storage_location' => "<input type='hidden' name='xen_storage_location' value=$xen_storage_location>",
+		'hidden_xen_storage_id' => "<input type='hidden' name='xen_storage_id' value=$xen_storage_id>",
 		'submit' => htmlobject_input('action', array("value" => 'add', "label" => 'Add'), 'submit'),
 	));
 	$disp =  $t->parse('out', 'tplfile');
@@ -942,52 +953,52 @@ if(htmlobject_request('action') != '') {
 		case 'select':
 			if (isset($_REQUEST['identifier'])) {
 				foreach($_REQUEST['identifier'] as $id) {
-					$output[] = array('label' => 'Lvm Storage Admin', 'value' => lvm_storage_display($id));
+					$output[] = array('label' => 'Storage Admin', 'value' => xen_storage_display($id));
 				}
 			} else {
-				$output[] = array('label' => 'Select', 'value' => lvm_select_storage());
+				$output[] = array('label' => 'Select', 'value' => xen_select_storage());
 			}
 			break;
 
 		case 'select-vg':
 			if (isset($_REQUEST['identifier'])) {
-				foreach($_REQUEST['identifier'] as $lvm_volume_group) {
-					$output[] = array('label' => $lvm_volume_group, 'value' => lvm_storage_lv_display($lvm_storage_id, $lvm_volume_group));
+				foreach($_REQUEST['identifier'] as $xen_storage_location) {
+					$output[] = array('label' => $xen_storage_location, 'value' => xen_storage_lv_display($xen_storage_id, $xen_storage_location));
 				}
 			} else {
-				$output[] = array('label' => 'Lvm Storage Admin', 'value' => lvm_storage_display($lvm_storage_id));
+				$output[] = array('label' => 'Storage Admin', 'value' => xen_storage_display($xen_storage_id));
 			}
 			break;
 
 		case 'add':
-			$output[] = array('label' => $lvm_volume_group, 'value' => lvm_storage_lv_display($lvm_storage_id, $lvm_volume_group));
+			$output[] = array('label' => $xen_storage_location, 'value' => xen_storage_lv_display($xen_storage_id, $xen_storage_location));
 			break;
 
 		case 'remove':
-			$output[] = array('label' => $lvm_volume_group, 'value' => lvm_storage_lv_display($lvm_storage_id, $lvm_volume_group));
+			$output[] = array('label' => $xen_storage_location, 'value' => xen_storage_lv_display($xen_storage_id, $xen_storage_location));
 			break;
 
 		case 'reload':
-			$output[] = array('label' => $lvm_volume_group, 'value' => lvm_storage_lv_display($lvm_storage_id, $lvm_volume_group));
+			$output[] = array('label' => $xen_storage_location, 'value' => xen_storage_lv_display($xen_storage_id, $xen_storage_location));
 			break;
 
 		case 'snap':
-			$output[] = array('label' => $lvm_volume_group, 'value' => lvm_storage_lv_display($lvm_storage_id, $lvm_volume_group));
+			$output[] = array('label' => $xen_storage_location, 'value' => xen_storage_lv_display($xen_storage_id, $xen_storage_location));
 			break;
 
 		case 'resize':
-			$output[] = array('label' => $lvm_volume_group, 'value' => lvm_storage_lv_display($lvm_storage_id, $lvm_volume_group));
+			$output[] = array('label' => $xen_storage_location, 'value' => xen_storage_lv_display($xen_storage_id, $xen_storage_location));
 			break;
 
 
 	}
 
-} else if (strlen($lvm_volume_group)) {
-	$output[] = array('label' => 'Logical Volume Admin', 'value' => lvm_storage_lv_display($lvm_storage_id, $lvm_volume_group));
-} else if (strlen($lvm_storage_id)) {
-	$output[] = array('label' => 'Lvm Storage Admin', 'value' => lvm_storage_display($lvm_storage_id));
+} else if (strlen($xen_storage_location)) {
+	$output[] = array('label' => 'Volume Admin', 'value' => xen_storage_lv_display($xen_storage_id, $xen_storage_location));
+} else if (strlen($xen_storage_id)) {
+	$output[] = array('label' => 'Storage Admin', 'value' => xen_storage_display($xen_storage_id));
 } else  {
-	$output[] = array('label' => 'Select', 'value' => lvm_select_storage());
+	$output[] = array('label' => 'Select', 'value' => xen_select_storage());
 }
 
 

@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
@@ -42,6 +42,8 @@ OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
 # the directory to keep the vm files for vms created by openQRM
 OPENQRM_VM_DIR="/var/lib/xen-storage/openqrm/"
 VM_XEN_CONFIG=/var/run/xen-vm-config.conf
+XEN_REMOVE_MAX_WAIT=30
+
 # which directory to use for the xen vms -> set by the plugin config file
 if [ -d "$OPENQRM_PLUGIN_XEN_STORAGE_VM_CONFIG_DIR" ]; then
 	mkdir -p $OPENQRM_PLUGIN_XEN_STORAGE_VM_CONFIG_DIR
@@ -483,11 +485,16 @@ case "$XEN_STORAGE_COMMAND" in
 		XEN_STORAGE_VM_ROOT_DISK=`cat $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME/disk1 2>/dev/null`
 		XEN_STORAGE_VM_MAC=`cat $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME/mac1 2>/dev/null`
 		if [ "$XEN_STORAGE_VM_ROOT_DISK" != "" ]; then
-			# get the lvm device
-			XEN_STORAGE_VM_DISK=`echo $XEN_STORAGE_VM_ROOT_DISK | cut -d':' -f2 | cut -d',' -f1`
-			lvscan >/dev/null
-			# activate the lvol
-			lvchange -ay $XEN_STORAGE_VM_DISK
+			# lvol or blockfile ?
+			if echo $XEN_STORAGE_VM_ROOT_DISK | grep ^/dev 1>/dev/null; then
+				# get the lvm device
+				XEN_STORAGE_VM_DISK=`echo $XEN_STORAGE_VM_ROOT_DISK | cut -d':' -f2 | cut -d',' -f1`
+				pvscan >/dev/null
+				vgscan >/dev/null
+				lvscan >/dev/null
+				# activate the lvol
+				lvchange -ay $XEN_STORAGE_VM_DISK
+			fi
 			# creating the cfg
 			xen_storage_generate_vm_config $XEN_STORAGE_VM_NAME
 			SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
@@ -531,9 +538,14 @@ case "$XEN_STORAGE_COMMAND" in
 		# start only if we have a root-disk
 		if [ "$XEN_STORAGE_VM_DISK" != "" ]; then
 			if [ "$XEN_STORAGE_VM_DISK" != "noop" ]; then
-				# rescan all lvols + activate the lvol
-				lvscan >/dev/null
-				lvchange -ay $XEN_STORAGE_VM_DISK
+				# lvol or blockfile ?
+				if echo $XEN_STORAGE_VM_DISK | grep ^/dev 1>/dev/null; then
+					# rescan all lvols + activate the lvol
+					pvscan >/dev/null
+					vgscan >/dev/null
+					lvscan >/dev/null
+					lvchange -ay $XEN_STORAGE_VM_DISK
+				fi
 				echo "phy:$XEN_STORAGE_VM_DISK,hda,w" > $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME/disk1
 			fi
 			# creating the cfg
@@ -637,9 +649,14 @@ case "$XEN_STORAGE_COMMAND" in
 			# creating the cfg
 			xen_storage_generate_vm_config $XEN_STORAGE_VM_NAME
 		elif [ "$XEN_STORAGE_VM_DISK" != "noop" ]; then
-			# rescan all lvols + activate the lvol
-			lvscan >/dev/null
-			lvchange -ay $XEN_STORAGE_VM_DISK
+			# lvol or blockfile ?
+			if echo $XEN_STORAGE_VM_DISK | grep ^/dev 1>/dev/null; then
+				# rescan all lvols + activate the lvol
+				pvscan >/dev/null
+				vgscan >/dev/null
+				lvscan >/dev/null
+				lvchange -ay $XEN_STORAGE_VM_DISK
+			fi
 			echo "phy:$XEN_STORAGE_VM_DISK,hda,w" > $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME/disk1
 			# creating the cfg
 			xen_storage_generate_vm_config $XEN_STORAGE_VM_NAME
@@ -706,13 +723,25 @@ case "$XEN_STORAGE_COMMAND" in
 		XEN_STORAGE_VM_MAC=`cat $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME/mac1 2>/dev/null`
 		xm destroy $XEN_STORAGE_VM_NAME 1>/dev/null 2>&1
 		rm -f $OPENQRM_PLUGIN_XEN_STORAGE_VM_CONFIG_DIR/$XEN_STORAGE_VM_NAME.*
-		if rm -rf $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME; then
-			openqrm_post_event 0 "delete" 5 "openqrm-xen-storage" "Deleted Xen-Storage vm $XEN_STORAGE_VM_NAME"
-		else
-			openqrm_post_event 0 "delete" 3 "openqrm-xen-storage" "Could not delete Xen-Storage vm $XEN_STORAGE_VM_NAME"
-			xen_storage_lock release
-			exit 1
-		fi
+		rm -rf $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME
+		# we have to wait here because when having a shared config dir
+		# nfs can still have files in use/lock
+		XEN_REMOVE_WAIT=0
+		while (:); do
+			if [ -d "$OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME" ]; then
+				openqrm_post_event 0 "remove" 5 "openqrm-xen-storage-vm" "Delete Xen VM $XEN_STORAGE_VM_NAME failed, retrying."
+			else
+				openqrm_post_event 0 "remove" 5 "openqrm-xen-storage-vm" "Delete Xen VM $XEN_STORAGE_VM_NAME success."
+				break
+			fi
+			if [ "$XEN_REMOVE_WAIT" == "$XEN_REMOVE_MAX_WAIT" ]; then
+				openqrm_post_event 0 "remove" 3 "openqrm-xen-storage-vm" "Delete Xen VM $XEN_STORAGE_VM_NAME failed, giving up!"
+				break
+			fi
+			XEN_REMOVE_WAIT=$(( XEN_REMOVE_WAIT + 1 ))
+			rm -rf $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME
+			sleep 1
+		done
 		# stop the vm monitord
 		kill `ps ax | grep openqrm-xen-storage-monitord | grep -v grep | grep -i $XEN_STORAGE_VM_MAC | awk {' print $1 '}` 2>/dev/null
 		if [ "$XEN_STORAGE_OPENQRM_USERNAME" != "" ] && [ "$XEN_STORAGE_OPENQRM_PASSWORD" != "" ]; then
@@ -735,13 +764,20 @@ case "$XEN_STORAGE_COMMAND" in
                 # activate lvol if we have a disk parameter
 		XEN_STORAGE_VM_ROOT_DISK=`cat $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME/disk1 2>/dev/null`
 		if [ "$XEN_STORAGE_VM_ROOT_DISK" != "" ]; then
-                    # get the lvm device
-                    XEN_STORAGE_VM_DISK=`echo $XEN_STORAGE_VM_ROOT_DISK | cut -d':' -f2 | cut -d',' -f1`
-                    lvscan >/dev/null
-                    # activate the lvol
-                    xen_storage_log create_vm_config "Activating logical volume $XEN_STORAGE_VM_DISK for VM $XEN_STORAGE_VM_NAME"
-                    lvchange -ay $XEN_STORAGE_VM_DISK
-                fi
+			# get the lvm device
+			XEN_STORAGE_VM_DISK=`echo $XEN_STORAGE_VM_ROOT_DISK | cut -d':' -f2 | cut -d',' -f1`
+			if echo $XEN_STORAGE_VM_DISK | grep ^/dev 1>/dev/null; then
+				# activate the lvol
+				pvscan >/dev/null
+				vgscan >/dev/null
+				lvscan >/dev/null
+			fi
+			xen_storage_log create_vm_config "Activating logical volume $XEN_STORAGE_VM_DISK for VM $XEN_STORAGE_VM_NAME"
+			# lvol or blockfile ?
+			if echo $XEN_STORAGE_VM_DISK | grep ^/dev 1>/dev/null; then
+				lvchange -ay $XEN_STORAGE_VM_DISK
+			fi
+		fi
 		;;
 
 	remove_vm_config)
@@ -751,7 +787,7 @@ case "$XEN_STORAGE_COMMAND" in
 		echo "Removing vm config for $XEN_STORAGE_VM_NAME" | logger
 		# creating the cfg
 		rm -f $OPENQRM_PLUGIN_XEN_STORAGE_VM_CONFIG_DIR/$XEN_STORAGE_VM_NAME.*
-                rm -f $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME/autostart.$resource_id
+		rm -f $OPENQRM_VM_DIR/$XEN_STORAGE_VM_NAME/autostart.$resource_id
 		;;
 
 	restart_vm_client)

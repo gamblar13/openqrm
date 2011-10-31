@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
@@ -123,11 +123,13 @@ function openqrm_plugin_xen_storage_uninstall() {
 	echo "Uninstalling the openQRM xen-storage-plugin"
 	openqrm_plugin_xen_storage_stop
 	openqrm_server_remove_deployment_type $USERNAME $PASSWORD xen-lvm-deployment
+	openqrm_server_remove_deployment_type $USERNAME $PASSWORD xen-bf-deployment
 	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD xen-storage
 	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD xen-storage-vm
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/xen-storage
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-xen-storage.tgz
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.xen-lvm-deployment.php
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.xen-bf-deployment.php
 
 }
 
@@ -144,6 +146,7 @@ function openqrm_plugin_xen_storage_init() {
 	fi
 	echo "Initializing the openQRM xen-storage-plugin"
 	openqrm_server_add_deployment_type $USERNAME $PASSWORD xen-lvm-deployment xen-lvm-deployment "LVM deployment for Xen" xen-storage "Xen LVM Storage"
+	openqrm_server_add_deployment_type $USERNAME $PASSWORD xen-bf-deployment xen-bf-deployment "Blockfile deployment for Xen" xen-storage "Xen Blockfile Storage"
 	openqrm_server_add_virtualization_type $USERNAME $PASSWORD xen-storage "Xen-Storage Host"
 	openqrm_server_add_virtualization_type $USERNAME $PASSWORD xen-storage-vm "Xen-Storage VM"
 
@@ -153,6 +156,7 @@ function openqrm_plugin_xen_storage_init() {
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/web/boot-service-xen-storage.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-xen-storage.tgz
 	# linking the image deployment parameters menu
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/web/image.xen-lvm-deployment.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.xen-lvm-deployment.php
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/web/image.xen-bf-deployment.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.xen-bf-deployment.php
 	# create storage dir for stat files
 	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/web/storage
 	chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen-storage/web/storage

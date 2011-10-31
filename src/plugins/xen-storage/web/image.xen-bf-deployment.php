@@ -67,7 +67,7 @@ function get_image_rootdevice_identifier($lvm_nfs_storage_id) {
 	$storage_resource = new resource();
 	$storage_resource->get_instance_by_id($storage->resource_id);
 	$storage_resource_id = $storage_resource->id;
-	$ident_file = $StorageDir."/".$storage_resource_id.".lv.xen-lvm-deployment.ident";
+	$ident_file = $StorageDir."/".$storage_resource_id.".lv.xen-bf-deployment.ident";
 	if (file_exists($ident_file)) {
 		unlink($ident_file);
 	}
@@ -80,9 +80,9 @@ function get_image_rootdevice_identifier($lvm_nfs_storage_id) {
 	}
 	$fcontent = file($ident_file);
 	foreach($fcontent as $lun_info) {
-		$tpos = strpos($lun_info, ":");
-		$timage_name = trim(substr($lun_info, 0, $tpos));
-		$troot_device = trim(substr($lun_info, $tpos+1));
+		$ident_params = explode(":", $lun_info);
+		$timage_name = trim($ident_params[0]);
+		$troot_device = trim($ident_params[1]);
 		$rootdevice_identifier_array[] = array("value" => "$troot_device", "label" => "$timage_name");
 	}
 	return $rootdevice_identifier_array;
