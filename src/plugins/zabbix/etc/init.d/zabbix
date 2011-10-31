@@ -2,6 +2,8 @@
 #
 # This file is part of openQRM.
 #
+# This file is part of openQRM.
+#
 # openQRM is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2
 # as published by the Free Software Foundation.
@@ -14,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 export `eval cat /proc/cmdline`	
@@ -58,9 +60,9 @@ function zabbix_start() {
 	# start agent
 	if [ -x "/etc/init.d/zabbix-agent" ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d zabbix-agent start || exit $?
+			invoke-rc.d zabbix-agent start
 		else
-			/etc/init.d/zabbix-agent start || exit $?
+			/etc/init.d/zabbix-agent start
 		fi
 	else
 		echo "ERROR: Cloud not start the Zabbix-agent !"
@@ -74,9 +76,9 @@ function zabbix_stop() {
 	# stop agent
 	if [ -x "/etc/init.d/zabbix-agent" ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d zabbix-agent stop || exit $?
+			invoke-rc.d zabbix-agent stop
 		else
-			/etc/init.d/zabbix-agent stop || exit $?
+			/etc/init.d/zabbix-agent stop
 		fi
 	else
 		echo "ERROR: Cloud not stop the Zabbix-agent !"
