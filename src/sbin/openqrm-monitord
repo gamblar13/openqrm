@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 OPENQRM_SBIN_DIR=`dirname $0`
@@ -119,7 +119,7 @@ function find_cpu_model() {
 
 # how many nics we have
 function find_nics() {
-	current_nic_count=`ifconfig -a | grep ^eth | awk {' print $5 '} | uniq | wc -l`
+	current_nic_count=`ifconfig -a | grep ^eth | awk {' print $1 '} | grep -v : | wc -l`
 	if [ -z "$current_nic_count" ]; then
 		current_nic_count=0
 	fi
