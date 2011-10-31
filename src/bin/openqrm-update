@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/X11R6/bin
@@ -307,6 +307,10 @@ function base_update() {
 	# link the tftpboot/boot dir to the boot-services
 	rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/boot
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/ $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/boot
+
+	# custom update actions for various plugins
+	$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/bin/openqrm-cloud-manager update-soap
+
 
 }
 
