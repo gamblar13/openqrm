@@ -1,0 +1,7 @@
+host @@@@PARAM_RESOURCE_NAME@@@@ {
+	# cobbler
+	hardware ethernet @@@@PARAM_RESOURCE_MAC@@@@;
+	fixed-address @@@@PARAM_RESOURCE_IP@@@@;
+	next-server @@@@PARAM_COBBLER_SERVER_IP@@@@;
+	filename "/pxelinux.0";
+}

@@ -1,0 +1,150 @@
+#!/bin/bash
+# this script manages the linuxcoe profiles
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+# some defines
+OPENQRM_RESOURCE_PARAMETER_FILE="/var/openqrm/openqrm-resource.conf"
+# be sure cmd output is english
+export LANGUAGE=C
+export LANG=C
+export LC_ALL=C
+# cmdline params
+OPENQRM_SERVER_IP=$1
+RESOURCE_MAC=$2
+
+function try_to_get_resource_parameters() {
+	local RES_MAC=$1
+	# gather resource parameters, try http first
+	mkdir -p `dirname $OPENQRM_RESOURCE_PARAMETER_FILE`
+	rm -f $OPENQRM_RESOURCE_PARAMETER_FILE
+	if ! wget -O $OPENQRM_RESOURCE_PARAMETER_FILE "http://$OPENQRM_SERVER_IP/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$RES_MAC"; then
+		if ! wget --no-check-certificate -O $OPENQRM_RESOURCE_PARAMETER_FILE "https://$OPENQRM_SERVER_IP/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$RES_MAC"; then
+			echo "ERROR: Could not get the resource parameters from openQRM Server at $OPENQRM_SERVER_IP!"
+			return 1
+		else
+			# wget returned ok but are the parameters valid ?
+			unset resource_id
+			. $OPENQRM_RESOURCE_PARAMETER_FILE
+			if [ "$resource_id" != "" ]; then
+				return 0
+			else
+				return 1
+			fi
+		fi
+	else
+		# wget returned ok but are the parameters valid ?
+		unset resource_id
+		. $OPENQRM_RESOURCE_PARAMETER_FILE
+		if [ "$resource_id" != "" ]; then
+			return 0
+		else
+			return 1
+		fi
+	fi
+}
+
+
+# checks
+if [ "$OPENQRM_SERVER_IP" == "" ]; then
+	echo "This tool automatically install the openQRM Client on a Linux system"
+	echo "Usage: $0 <OPENQRM_SERVER_IP> [RESOURCE_MAC]"
+	exit 1
+fi
+# are we running from kickstart post ?
+if [ "$RESOURCE_MAC" != "" ]; then
+	if ! ifconfig -a | grep -i $RESOURCE_MAC &>/dev/null; then
+		echo "ERROR: Mac address $RESOURCE_MAC not found on this system!"
+		exit 1
+	fi
+else
+	# we build a list of all available mac addresses
+	for MAC in `ifconfig -a | grep ^eth | awk '{ print $5 }'`; do
+		RESOURCE_MAC="$RESOURCE_MAC $MAC"
+	done
+fi
+# try to find the right nic
+FOUND_OPENQRM_NIC=false
+for AVAILABLE_MAC in `echo $RESOURCE_MAC`; do
+	if try_to_get_resource_parameters $AVAILABLE_MAC; then
+		FOUND_OPENQRM_NIC=true
+		break
+	fi
+done
+if [ "$FOUND_OPENQRM_NIC" == "false" ]; then
+	echo "ERROR: Could not find out which Network card to use!"
+	exit 1
+fi
+# here we have valid resource-parameter config file
+. $OPENQRM_RESOURCE_PARAMETER_FILE
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+echo "Getting openqrm-client package"
+# run default openqrm-client boot-service
+KERNEL_ARCH=`uname -m`
+if echo $KERNEL_ARCH | grep i.*86 1>/dev/null; then
+	# i386
+	OPENQRM_CLIENT_ARCH=i386
+else
+	OPENQRM_CLIENT_ARCH=$KERNEL_ARCH
+fi
+# find out the short distri name
+if [ -f /etc/debian_version ]; then
+	# debian or ubuntu, try to find out without lsb-release which may not be installed
+	if grep -i ubuntu /etc/apt/sources.list 1>/dev/null; then
+		OPENQRM_SHORT_DISTRI_NAME="ubuntu"
+	else
+		OPENQRM_SHORT_DISTRI_NAME="debian"
+	fi
+elif [ -f /etc/redhat-release ]; then
+	OPENQRM_SHORT_DISTRI_NAME="centos"
+fi
+
+cd /
+if [ "$OPENQRM_SHORT_DISTRI_NAME" == "" ]; then
+	echo "ERROR: Could not find out Distribution name!"
+	exit
+fi
+
+echo "Getting openqrm-client package $OPENQRM_SHORT_DISTRI_NAME/$OPENQRM_CLIENT_ARCH"
+if ! wget $WGET_NO_CERT_CHECK -O openqrm-client.tgz "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/boot-service/openqrm-client.$OPENQRM_SHORT_DISTRI_NAME.$OPENQRM_CLIENT_ARCH.tgz"; then
+	rm -f openqrm-client.tgz
+	echo "WARNING: Failed to get the openqrm-client package arch $OPENQRM_CLIENT_ARCH ! Using default one fitting $OPENQRM_CLIENT_ARCH"
+	if ! wget $WGET_NO_CERT_CHECK -O openqrm-client.tgz "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/boot-service/openqrm-client.$OPENQRM_CLIENT_ARCH.tgz"; then
+		rm -f openqrm-client.tgz
+		echo "WARNING: Failed to get the openqrm-client package arch $OPENQRM_CLIENT_ARCH ! Using default one ..."
+		if ! wget $WGET_NO_CERT_CHECK -O openqrm-client.tgz "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/boot-service/openqrm-client.tgz"; then
+			echo "ERROR: Could not download the openqrm-client package from openQRM Server $OPENQRM_SERVER_IP!"
+			exit 1
+		fi
+	fi
+fi
+
+tar -xzf openqrm-client.tgz
+rm -f openqrm-client.tgz
+ln -sf $resource_basedir/openqrm/etc/init.d/openqrm-client /etc/init.d/openqrm-client
+export OPENQRM_SERVER_BASE_DIR=$resource_basedir
+. $resource_basedir/openqrm/include/openqrm-functions
+openqrm_chkconfig add openqrm-client
+
+
+
+
+
+
