@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
 . $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
@@ -113,24 +113,30 @@ function openqrm_plugin_dhcpd_init() {
 		> $OPENQRM_PLUGIN_DHCPD_CONF
 
 	# enable apparmor if needed
+	APPARMOR_DHCPD=""
 	if [ -f /etc/apparmor.d/usr.sbin.dhcpd3 ]; then
-		if ! grep openQRM /etc/apparmor.d/usr.sbin.dhcpd3 1>/dev/null; then
-			cat /etc/apparmor.d/usr.sbin.dhcpd3 |
-			sed -i -e "s#}##g" /etc/apparmor.d/usr.sbin.dhcpd3
-			echo "  # openQRM" >> /etc/apparmor.d/usr.sbin.dhcpd3
-			echo "  $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/** rw," >> /etc/apparmor.d/usr.sbin.dhcpd3
+		APPARMOR_DHCPD="/etc/apparmor.d/usr.sbin.dhcpd3"
+	elif [ -f /etc/apparmor.d/usr.sbin.dhcpd ]; then
+		APPARMOR_DHCPD="/etc/apparmor.d/usr.sbin.dhcpd"
+	fi
+	if [ "$APPARMOR_DHCPD" != "" ]; then
+		if ! grep openQRM $APPARMOR_DHCPD 1>/dev/null; then
+			cat $APPARMOR_DHCPD |
+			sed -i -e "s#}##g" $APPARMOR_DHCPD
+			echo "  # openQRM" >> $APPARMOR_DHCPD
+			echo "  $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/** rw," >> $APPARMOR_DHCPD
 			if [ -d /etc/openqrm/plugins/dhcpd/ ]; then
-				echo "  /etc/openqrm/plugins/dhcpd/** rw," >> /etc/apparmor.d/usr.sbin.dhcpd3
+				echo "  /etc/openqrm/plugins/dhcpd/** rw," >> $APPARMOR_DHCPD
 			fi
-			echo "  /var/run/dhcpd.pid rw," >> /etc/apparmor.d/usr.sbin.dhcpd3
-			echo "  /usr/share/openqrm/plugins/dhcpd/var/state/dhcp/** lrw," >> /etc/apparmor.d/usr.sbin.dhcpd3
-			echo "}" >> /etc/apparmor.d/usr.sbin.dhcpd3
-			echo >> /etc/apparmor.d/usr.sbin.dhcpd3
+			echo "  /var/run/dhcpd.pid rw," >> $APPARMOR_DHCPD
+			echo "  /usr/share/openqrm/plugins/dhcpd/var/state/dhcp/** lrw," >> $APPARMOR_DHCPD
+			echo "}" >> $APPARMOR_DHCPD
+			echo >> $APPARMOR_DHCPD
 			if [ -x "/etc/init.d/apparmor" ]; then
 				if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-					invoke-rc.d apparmor reload || exit $?
+					invoke-rc.d apparmor reload
 				else
-					/etc/init.d/apparmor reload || exit $?
+					/etc/init.d/apparmor reload
 				fi
 			fi
 			# create pid file
@@ -151,15 +157,21 @@ function openqrm_plugin_dhcpd_uninstall() {
 	openqrm_plugin_dhcpd_stop
 
 	# remove apparmor setup
+	APPARMOR_DHCPD=""
 	if [ -f /etc/apparmor.d/usr.sbin.dhcpd3 ]; then
-		sed -i -e "s#.*openQRM.*##g" /etc/apparmor.d/usr.sbin.dhcpd3
-		sed -i -e "s#.*openqrm.*##g" /etc/apparmor.d/usr.sbin.dhcpd3
-		sed -i -e "s#/var/run/dhcpd.pid rw,##g" /etc/apparmor.d/usr.sbin.dhcpd3
+		APPARMOR_DHCPD="/etc/apparmor.d/usr.sbin.dhcpd3"
+	elif [ -f /etc/apparmor.d/usr.sbin.dhcpd ]; then
+		APPARMOR_DHCPD="/etc/apparmor.d/usr.sbin.dhcpd"
+	fi
+	if [ "$APPARMOR_DHCPD" != "" ]; then
+		sed -i -e "s#.*openQRM.*##g" $APPARMOR_DHCPD
+		sed -i -e "s#.*openqrm.*##g" $APPARMOR_DHCPD
+		sed -i -e "s#/var/run/dhcpd.pid rw,##g" $APPARMOR_DHCPD
 		if [ -x "/etc/init.d/apparmor" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d apparmor reload || exit $?
+				invoke-rc.d apparmor reload
 			else
-				/etc/init.d/apparmor reload || exit $?
+				/etc/init.d/apparmor reload
 			fi
 		fi
 	fi
