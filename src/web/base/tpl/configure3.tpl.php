@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
 <style>
@@ -85,7 +85,7 @@ a {
 
 	<div id="openqrm_logo">
 		<a href="http://www.openqrm.com" target="_BLANK">
-		&nbsp;&nbsp;&nbsp;<img src="/openqrm/base/img/logo.png" width="100" height="48" border="0" alt="Your open-source Cloud computing platform"/>
+		&nbsp;&nbsp;&nbsp;<img src="/openqrm/base/img/logo.png" border="0" alt="Your open-source Cloud computing platform"/>
 		<br>
 		The openQRM Project
 		</a>
