@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
 . $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
@@ -44,24 +44,24 @@ function openqrm_plugin_nagios3_start() {
 	if [ -f /etc/debian_version ]; then
 		if [ -x "/etc/init.d/ndoutils" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d ndoutils start || exit $?
+				invoke-rc.d ndoutils start
 			else
-				/etc/init.d/ndoutils start || exit $?
+				/etc/init.d/ndoutils start
 			fi
 		fi
 	fi
 
 	if [ -x "/etc/init.d/nagios3" ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d nagios3 start || exit $?
+			invoke-rc.d nagios3 start
 		else
-			/etc/init.d/nagios3 start || exit $?
+			/etc/init.d/nagios3 start
 		fi
 	elif [ -x /etc/init.d/nagios ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d nagios start || exit $?
+			invoke-rc.d nagios start
 		else
-			/etc/init.d/nagios start || exit $?
+			/etc/init.d/nagios start
 		fi
 	else
 		nagios_manager_lock release
@@ -79,24 +79,24 @@ function openqrm_plugin_nagios3_stop() {
 	if [ -f /etc/debian_version ]; then
 		if [ -x "/etc/init.d/ndoutils" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d ndoutils stop || exit $?
+				invoke-rc.d ndoutils stop
 			else
-				/etc/init.d/ndoutils stop || exit $?
+				/etc/init.d/ndoutils stop
 			fi
 		fi
 	fi
 
 	if [ -x "/etc/init.d/nagios3" ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d nagios3 stop || exit $?
+			invoke-rc.d nagios3 stop
 		else
-			/etc/init.d/nagios3 stop || exit $?
+			/etc/init.d/nagios3 stop
 		fi
 	elif [ -x /etc/init.d/nagios ]; then
 		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-			invoke-rc.d nagios stop || exit $?
+			invoke-rc.d nagios stop
 		else
-			/etc/init.d/nagios stop || exit $?
+			/etc/init.d/nagios stop
 		fi
 	else
 		nagios_manager_lock release
