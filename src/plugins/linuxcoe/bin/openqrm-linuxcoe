@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 # get the openQRM functions
@@ -32,7 +32,7 @@ LCOE_SUB_VERSION="3"
 SD_BASE_VERSION="4"
 LCOE_BASE="linuxcoe-sd-$LCOE_BASE_VERSION.$LCOE_SUB_VERSION.tar.gz"
 LCOE_DOCS="linuxcoe-sd-docs-$LCOE_BASE_VERSION.$LCOE_SUB_VERSION.tar.gz"
-LCOE_DISTRIBUTIONS="centos debian fedora ubuntu"
+LCOE_DISTRIBUTIONS="centos debian ubuntu"
 LCOE_INSTALL_DIR="/usr/local/linuxcoe-sd"
 LCOE_DOWNLOAD="http://www.instalinux.com/snapshots/"
 LCOE_INSTALL_TMP="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/lcoe-install"
@@ -43,33 +43,23 @@ LCOE_ISO_IMAGES="CentOS-4-i386-iso.tar	\
 	CentOS-5-x86_64-iso.tar	\
 	Debian-Lenny-i386-iso.tar	\
 	Debian-Lenny-x86_64-iso.tar	\
-	Ubuntu-Hardy-i386-iso.tar	\
-	Ubuntu-Hardy-x86_64-iso.tar	\
-	Ubuntu-Jaunty-i386-iso.tar	\
-	Ubuntu-Jaunty-x86_64-iso.tar"
+	Debian-Squeeze-i386-iso.tar	\
+	Debian-Squeeze-x86_64-iso.tar	\
+	Ubuntu-Natty-i386-iso.tar	\
+	Ubuntu-Natty-x86_64-iso.tar"
 
-# disabled for now
-#OpenSUSE-10.2-i386-iso.tar
-#OpenSUSE-10.2-x86_64-iso.tar
-#OpenSUSE-10.3-i386-iso.tar
-#OpenSUSE-10.3-x86_64-iso.tar
-#OpenSUSE-11.0-i386-iso.tar
-#OpenSUSE-11.0-x86_64-iso.tar
-#Scientific-4x-i386-iso.tar
-#Scientific-4x-x86_64-iso.tar
-#Scientific-5x-i386-iso.tar
-#Scientific-5x-x86_64-iso.tar
 
 
 # for debian we need the netinstaller images
 DEB_NETINSTALLER_I386_LENNY="http://http.us.debian.org/debian/dists/lenny/main/installer-i386/current/images/netboot/netboot.tar.gz"
 DEB_NETINSTALLER_X86_64_LENNY="http://http.us.debian.org/debian/dists/lenny/main/installer-amd64/current/images/netboot/netboot.tar.gz"
 
+DEB_NETINSTALLER_I386_SQUEEZE="http://http.us.debian.org/debian/dists/squeeze/main/installer-i386/current/images/netboot/netboot.tar.gz"
+DEB_NETINSTALLER_X86_64_SQUEEZE="http://http.us.debian.org/debian/dists/squeeze/main/installer-amd64/current/images/netboot/netboot.tar.gz"
+
 # for ubuntu we need the netinstaller images too
-UBUNTU_NETINSTALLER_I386_HARDY="http://de.archive.ubuntu.com/ubuntu/dists/hardy/main/installer-i386/current/images/netboot/netboot.tar.gz"
-UBUNTU_NETINSTALLER_X86_64_HARDY="http://de.archive.ubuntu.com/ubuntu/dists/hardy/main/installer-amd64/current/images/netboot/netboot.tar.gz"
-UBUNTU_NETINSTALLER_I386_JAUNTY="http://de.archive.ubuntu.com/ubuntu/dists/jaunty/main/installer-i386/current/images/netboot/netboot.tar.gz"
-UBUNTU_NETINSTALLER_X86_64_JAUNTY="http://de.archive.ubuntu.com/ubuntu/dists/jaunty/main/installer-amd64/current/images/netboot/netboot.tar.gz"
+UBUNTU_NETINSTALLER_I386_NATTY="http://de.archive.ubuntu.com/ubuntu/dists/natty/main/installer-i386/current/images/netboot/netboot.tar.gz"
+UBUNTU_NETINSTALLER_X86_64_NATTY="http://de.archive.ubuntu.com/ubuntu/dists/natty/main/installer-amd64/current/images/netboot/netboot.tar.gz"
 
 # for centos we need the pxeboot images
 CENTOS4_NETINSTALLER_I386_KERNEL="http://mirror.fraunhofer.de/centos.org/4/os/i386/images/pxeboot/vmlinuz"
@@ -162,28 +152,28 @@ function lco_prepare() {
 		lcoe_download_if_needed $ISO_URL
 	done
 
-	# debian netinstallers
+	# debian netinstallers lenny
 	lcoe_download_if_needed $DEB_NETINSTALLER_I386_LENNY netboot-i386-lenny.tar.gz
 	lcoe_download_if_needed $DEB_NETINSTALLER_X86_64_LENNY netboot-x86_64-lenny.tar.gz
 	mkdir -p $LCOE_INSTALL_TMP/install/debian/lenny/i386
 	tar -C  $LCOE_INSTALL_TMP/install/debian/lenny/i386 -xzf $LCOE_INSTALL_TMP/download/netboot-i386-lenny.tar.gz
 	mkdir -p $LCOE_INSTALL_TMP/install/debian/lenny/x86_64
 	tar -C  $LCOE_INSTALL_TMP/install/debian/lenny/x86_64 -xzf $LCOE_INSTALL_TMP/download/netboot-x86_64-lenny.tar.gz
+	# debian netinstallers squeeze
+	lcoe_download_if_needed $DEB_NETINSTALLER_I386_SQUEEZE netboot-i386-squeeze.tar.gz
+	lcoe_download_if_needed $DEB_NETINSTALLER_X86_64_SQUEEZE netboot-x86_64-squeeze.tar.gz
+	mkdir -p $LCOE_INSTALL_TMP/install/debian/squeeze/i386
+	tar -C  $LCOE_INSTALL_TMP/install/debian/squeeze/i386 -xzf $LCOE_INSTALL_TMP/download/netboot-i386-squeeze.tar.gz
+	mkdir -p $LCOE_INSTALL_TMP/install/debian/squeeze/x86_64
+	tar -C  $LCOE_INSTALL_TMP/install/debian/squeeze/x86_64 -xzf $LCOE_INSTALL_TMP/download/netboot-x86_64-squeeze.tar.gz
 	/bin/cp -aR $LCOE_INSTALL_TMP/install/debian $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/
 
 	# ubuntu netinstallers
-	lcoe_download_if_needed $UBUNTU_NETINSTALLER_I386_HARDY netboot-i386-hardy.tar.gz
-	lcoe_download_if_needed $UBUNTU_NETINSTALLER_X86_64_HARDY netboot-x86_64-hardy.tar.gz
-	mkdir -p $LCOE_INSTALL_TMP/install/ubuntu/hardy/i386 $LCOE_INSTALL_TMP/install/ubuntu/hardy/x86_64
-	tar -C  $LCOE_INSTALL_TMP/install/ubuntu/hardy/i386 -xzf $LCOE_INSTALL_TMP/download/netboot-i386-hardy.tar.gz
-	tar -C  $LCOE_INSTALL_TMP/install/ubuntu/hardy/x86_64 -xzf $LCOE_INSTALL_TMP/download/netboot-x86_64-hardy.tar.gz
-
-	lcoe_download_if_needed $UBUNTU_NETINSTALLER_I386_JAUNTY netboot-i386-jaunty.tar.gz
-	lcoe_download_if_needed $UBUNTU_NETINSTALLER_X86_64_JAUNTY netboot-x86_64-jaunty.tar.gz
-	mkdir -p $LCOE_INSTALL_TMP/install/ubuntu/jaunty/i386 $LCOE_INSTALL_TMP/install/ubuntu/jaunty/x86_64
-	tar -C  $LCOE_INSTALL_TMP/install/ubuntu/jaunty/i386 -xzf $LCOE_INSTALL_TMP/download/netboot-i386-jaunty.tar.gz
-	tar -C  $LCOE_INSTALL_TMP/install/ubuntu/jaunty/x86_64 -xzf $LCOE_INSTALL_TMP/download/netboot-x86_64-jaunty.tar.gz
-
+	lcoe_download_if_needed $UBUNTU_NETINSTALLER_I386_NATTY netboot-i386-natty.tar.gz
+	lcoe_download_if_needed $UBUNTU_NETINSTALLER_X86_64_NATTY netboot-x86_64-natty.tar.gz
+	mkdir -p $LCOE_INSTALL_TMP/install/ubuntu/natty/i386 $LCOE_INSTALL_TMP/install/ubuntu/natty/x86_64
+	tar -C  $LCOE_INSTALL_TMP/install/ubuntu/natty/i386 -xzf $LCOE_INSTALL_TMP/download/netboot-i386-natty.tar.gz
+	tar -C  $LCOE_INSTALL_TMP/install/ubuntu/natty/x86_64 -xzf $LCOE_INSTALL_TMP/download/netboot-x86_64-natty.tar.gz
 	/bin/cp -aR $LCOE_INSTALL_TMP/install/ubuntu $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/
 
 	# centos pxeboot images

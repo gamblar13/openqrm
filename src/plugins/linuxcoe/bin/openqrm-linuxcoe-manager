@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 # get the openQRM functions
@@ -32,7 +32,8 @@ CURRENT_DIR=`pwd`
 AUTO_INSTALL_PXE_TEMPLATE_PRESEED="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/templates/linuxcoe-pxe.preseed"
 AUTO_INSTALL_PXE_TEMPLATE_KICKSTART="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/templates/linuxcoe-pxe.kickstart"
 AUTO_INSTALL_PXE_TEMPLATE_AUTOYAST="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/templates/linuxcoe-pxe.autoyast"
-LINUXCOE_INSTALL_LANGUAGE="en";
+LINUXCOE_INSTALL_LANGUAGE="en"
+LINUXCOE_INSTALL_START_DELAY="60"
 
 # get the full openQRM-server config
 openqrm_server_get_config
@@ -41,6 +42,16 @@ if ! which screen 1>/dev/null; then
 	linuxcoe_log "ERROR: The 'screen' utility is not installed! Please install and try again."
 	exit 6
 fi
+
+# functions running on the linuxcoe-server
+function linuxcoe_usage() {
+	echo "Usage : $0 transfer_to_linuxcoe -i <resource-ip> -m <resource-mac> -x <resource-id> -n <profile-name>"
+	echo "        $0 take_over_from_linuxcoe -i <resource-ip> -m <resource-mac> -x <resource-id> -n <profile-name>"
+	echo "        $0 set_linuxcoe_client_to_local_boot -m <resource-mac>"
+	echo "        $0 check"
+	exit 1
+}
+
 
 # re-run in background via screen
 if [ "$RUN_IN_BACKGROUND" != "true" ]; then
@@ -56,415 +67,452 @@ if [ "$RUN_IN_BACKGROUND" != "true" ]; then
 fi
 
 
-function lcoe_check() {
 
-	linuxcoe_log "Checking for unpacked profiles ..."
-	for FILE in `file $LINUXCOE_SYSTEMDESIGNER_DIR/* | grep ISO | cut -d':' -f1`; do
-		FILENAME=`basename $FILE`
-		if [ ! -d $LINUXCOE_PROFILE_DIR/$FILENAME ]; then
-			linuxcoe_log "Unpacking $FILE..."
-			MOUNTPOINT=`mktemp -d /tmp/$FILENAME.XXXXXXXXXX` || exit 1
-			if ! mount -o loop $FILE $MOUNTPOINT; then
-				linuxcoe_log "ERROR: Could not loop mount $FILE at $MOUNTPOINT"
-				linuxcoe_lock release
-				return 1
-			fi
-			mkdir -p $LINUXCOE_PROFILE_DIR/$FILENAME
-			/bin/cp -aRv $MOUNTPOINT/* $LINUXCOE_PROFILE_DIR/$FILENAME/
-			# create the info file for the comments
-			touch $LINUXCOE_PROFILE_DIR/$FILENAME/openqrm.info
-			chmod 777 $LINUXCOE_PROFILE_DIR/$FILENAME/openqrm.info
-			umount $MOUNTPOINT
-		fi
-	done
+LINUXCOE_COMMAND=$1
+shift
 
-
-}
-
-
-function lcoe_remove_profile() {
-	PROFILE_NAME=$1
-	if [ "$PROFILE_NAME" == "" ]; then
-		linuxcoe_lock release
-		return
-	fi
-	linuxcoe_log "Removing profile $PROFILE_NAME"
-	if [ -d $LINUXCOE_PROFILE_DIR/$PROFILE_NAME ]; then
-		rm -rf $LINUXCOE_PROFILE_DIR/$PROFILE_NAME
-	fi
-	if [ -f $LINUXCOE_SYSTEMDESIGNER_DIR/$PROFILE_NAME ]; then
-		rm -f $LINUXCOE_SYSTEMDESIGNER_DIR/$PROFILE_NAME
-	fi
-}
-
-
-
-
-function lcoe_apply_profile() {
-	local PROFILE_NAME=$1
-	local RESOURCE_ID=$2
-	local RESOURCE_IP=$3
-	local RESOURCE_MAC=$4
-	if [ "$PROFILE_NAME" == "" ]; then
-		linuxcoe_lock release
-		return
-	fi
-	if [ "$RESOURCE_ID" == "" ]; then
-		linuxcoe_lock release
-		return
-	fi
-	if [ "$RESOURCE_IP" == "" ]; then
-		linuxcoe_lock release
-		return
-	fi
-	if [ "$RESOURCE_MAC" == "" ]; then
-		linuxcoe_lock release
-		return
-	fi
-
-	linuxcoe_log "Applying profile $PROFILE_NAME to resource $RESOURCE_ID ($RESOURCE_IP/$RESOURCE_MAC)"
-	local RESOURCE_PXELINUXCFG_FILE=`echo 01-$RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
-	/bin/cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.lcoe-$PROFILE_NAME
-
-	# check which auto-install method to use
-	if [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/preseed ]; then
-		AUTO_INSTALL_METHOD="preseed"
-	elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/ks.cfg ]; then
-		AUTO_INSTALL_METHOD="kickstart"
-	elif grep autoyast $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/isolinux.cfg 1>/dev/null; then
-		AUTO_INSTALL_METHOD="autoyast"
-	else
-		linuxcoe_log "ERROR: Could not find out which Auto-install method to use. Exiting."
-		linuxcoe_lock release
-		return
-	fi
-
-	case "$AUTO_INSTALL_METHOD" in
-		preseed)
-				linuxcoe_log "Using Automatic installation method $AUTO_INSTALL_METHOD."
-
-				# debian or ubuntu ?
-				if grep ubuntu $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/preseed 1>/dev/null; then
-					# ubuntu
-
-					# find out which debian version to install
-					if grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/preseed | grep intrepid 1>/dev/null; then
-						UBUNTU_VERSION="intrepid"
-					elif grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/preseed | grep hardy 1>/dev/null; then
-						UBUNTU_VERSION="hardy"
-					elif grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/preseed | grep gutsy 1>/dev/null; then
-						UBUNTU_VERSION="gutsy"
-					elif grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/preseed | grep jaunty 1>/dev/null; then
-						UBUNTU_VERSION="jaunty"
-					else
-						linuxcoe_log "ERROR: Could not find out the Ubuntu version to install or Ubuntu version too old and not supported."
-						linuxcoe_lock release
-						return
-					fi
-
-					# find the architecture
-					if grep -i x86_64 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/boot.msg 1>/dev/null; then
-						UBUNTU_ARCH="x86_64"
-						DEBIAN_NETINSTALL_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/ubuntu/$UBUNTU_VERSION/$UBUNTU_ARCH/ubuntu-installer/amd64/linux"
-						DEBIAN_NETINSTALL_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/ubuntu/$UBUNTU_VERSION/$UBUNTU_ARCH/ubuntu-installer/amd64/initrd.gz"
-					elif grep -i i386 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/boot.msg 1>/dev/null; then
-						UBUNTU_ARCH="i386"
-						DEBIAN_NETINSTALL_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/ubuntu/$UBUNTU_VERSION/$UBUNTU_ARCH/ubuntu-installer/$UBUNTU_ARCH/linux"
-						DEBIAN_NETINSTALL_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/ubuntu/$UBUNTU_VERSION/$UBUNTU_ARCH/ubuntu-installer/$UBUNTU_ARCH/initrd.gz"
-					else
-						linuxcoe_log "ERROR: Unsupported architecture. Supported are x86_64 and i386."
-						linuxcoe_lock release
-						return
-					fi
-					linuxcoe_log "NOTICE: Detected Ubuntu $UBUNTU_VERSION architecture $UBUNTU_ARCH."
-
-
-				else
-					# debian
-
-					# find out which debian version to install
-					if grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/preseed | grep "3.1" 1>/dev/null; then
-						linuxcoe_log "ERROR: Debian version 3.1 is deprecated and not supported any more."
-						linuxcoe_lock release
-						return
-					elif grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/preseed | grep etch 1>/dev/null; then
-						DEBIAN_VERSION="etch"
-					elif grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/preseed | grep lenny 1>/dev/null; then
-						DEBIAN_VERSION="lenny"
-					else
-						linuxcoe_log "ERROR: Could not find out the Debian version to install."
-						linuxcoe_lock release
-						return
-					fi
-
-					# find the architecture
-					if grep -i x86_64 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/boot.msg 1>/dev/null; then
-						DEBIAN_ARCH="x86_64"
-						DEBIAN_NETINSTALL_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/debian/$DEBIAN_VERSION/$DEBIAN_ARCH/debian-installer/amd64/linux"
-						DEBIAN_NETINSTALL_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/debian/$DEBIAN_VERSION/$DEBIAN_ARCH/debian-installer/amd64/initrd.gz"
-					elif grep -i i386 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/boot.msg 1>/dev/null; then
-						DEBIAN_ARCH="i386"
-						DEBIAN_NETINSTALL_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/debian/$DEBIAN_VERSION/$DEBIAN_ARCH/debian-installer/$DEBIAN_ARCH/linux"
-						DEBIAN_NETINSTALL_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/debian/$DEBIAN_VERSION/$DEBIAN_ARCH/debian-installer/$DEBIAN_ARCH/initrd.gz"
-					else
-						linuxcoe_log "ERROR: Unsupported architecture. Supported are x86_64 and i386."
-						linuxcoe_lock release
-						return
-					fi
-					linuxcoe_log "NOTICE: Detected Debian $DEBIAN_VERSION architecture $DEBIAN_ARCH."
-
-				fi
-
-
-				# prepare kernel + initrd for the aut-install
-				if [ ! -f $DEBIAN_NETINSTALL_KERNEL ]; then
-					linuxcoe_log "ERROR: Could not find Debian auto-install kernel $DEBIAN_NETINSTALL_KERNEL"
-					linuxcoe_lock release
-					return
-				fi
-				if [ ! -f $DEBIAN_NETINSTALL_INITRD ]; then
-					linuxcoe_log "ERROR: Could not find Debian auto-install initrd $DEBIAN_NETINSTALL_INITRD"
-					linuxcoe_lock release
-					return
-				fi
-				/bin/cp -f $DEBIAN_NETINSTALL_KERNEL $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-$RESOURCE_ID-$PROFILE_NAME
-				/bin/cp -f $DEBIAN_NETINSTALL_INITRD $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-$RESOURCE_ID-$PROFILE_NAME.img
-
-				# prepare the auto-install pxe boot
-				cat $AUTO_INSTALL_PXE_TEMPLATE_PRESEED | \
-					sed -e "s#@@OPENQRM_BOOTIMAGE_KERNEL@@#vmlinuz-$RESOURCE_ID-$PROFILE_NAME#g"	| \
-					sed -e "s#@@OPENQRM_BOOTIMAGE_INITRD@@#initrd-$RESOURCE_ID-$PROFILE_NAME.img#g"	| \
-					sed -e "s#@@LINUXCOE_INSTALL_LANGUAGE@@#$LINUXCOE_INSTALL_LANGUAGE#g"	| \
-					sed -e "s#@@OPENQRM_SERVER_IP_ADDRESS@@#$OPENQRM_SERVER_IP_ADDRESS#g"	| \
-					sed -e "s#@@LINUXCOE_PROFILE_NAME@@#$PROFILE_NAME#g"	| \
-					sed -e "s#@@OPENQRM_RESOURCE_ID@@#$RESOURCE_ID#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
-
-				linuxcoe_log "Prepared resources pxe-configuration for the automatic installation ($OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE)"
-				# copy the preseed config to the boot-service dir
-				mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe
-				/bin/cp -f $LINUXCOE_PROFILE_DIR/$PROFILE_NAME/preseed $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/preseed.$RESOURCE_ID-$PROFILE_NAME.cfg
-				sed -i -e "s#.*late_command.*##g" $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/preseed.$RESOURCE_ID-$PROFILE_NAME.cfg
-
-				;;
-
-
-		kickstart)
-				linuxcoe_log "Using Automatic installation method $AUTO_INSTALL_METHOD."
-
-
-				# copy the kickstart config to the boot-service dir early
-				mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe
-				/bin/cp -f $LINUXCOE_PROFILE_DIR/$PROFILE_NAME/ks.cfg $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/ks.$RESOURCE_ID-$PROFILE_NAME.cfg
-
-				# prepare kernel + initrd for the aut-install
-				# check for os version
-
-				if grep ^os $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/ks.cfg | grep -i centos 1>/dev/null; then
-					# centos
-					# check for centos version
-					CENTOS_VERSION=`grep "\-\-url" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/ks.cfg | grep centos | sed -e "s#.*centos/##g" | cut -d'/' -f1`
-					CENTOS_ARCH=`grep ^arch $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/ks.cfg | cut -d'=' -f2`
-					linuxcoe_log "NOTICE: Dected CentOS $CENTOS_VERSION architecture $CENTOS_ARCH."
-					if echo $CENTOS_VERSION | grep ^4 1>/dev/null; then
-						# centos 4
-						KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/centos/4/$CENTOS_ARCH/vmlinuz-$CENTOS_ARCH-centos4"
-						KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/centos/4/$CENTOS_ARCH/initrd-$CENTOS_ARCH-centos4.img"
-						# adapt version numbering (e.g. 5.1 is deprecated, 5 should be used
-						sed -i -e "s#/centos/.*/os#/centos/4/os#" $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/ks.$RESOURCE_ID-$PROFILE_NAME.cfg
-
-					elif echo $CENTOS_VERSION | grep ^5 1>/dev/null; then
-						# centos 5
-						KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/centos/5/$CENTOS_ARCH/vmlinuz-$CENTOS_ARCH-centos5"
-						KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/centos/5/$CENTOS_ARCH/initrd-$CENTOS_ARCH-centos5.img"
-						sed -i -e "s#/centos/.*/os#/centos/5/os#" $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/ks.$RESOURCE_ID-$PROFILE_NAME.cfg
-
-					else
-						linuxcoe_log "ERROR: CentOS $CENTOS_VERSION not yet supported."
-						linuxcoe_lock release
-						return
-					fi
-
-
-
-				elif grep ^os $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/ks.cfg | grep -i fedora 1>/dev/null; then
-					# fedora
-
-					FEDORA_VERSION=`grep "\-\-url" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/ks.cfg | grep fedora | sed -e "s#.*/releases/##g" | cut -d'/' -f1`
-					FEDORA_ARCH=`grep ^arch $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/ks.cfg | cut -d'=' -f2`
-					linuxcoe_log "NOTICE: Detected Fedora $FEDORA_VERSION architecture $FEDORA_ARCH."
-					if echo $FEDORA_VERSION | grep ^7 1>/dev/null; then
-						# fedora 7
-						KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/7/$FEDORA_ARCH/vmlinuz-$FEDORA_ARCH-fedora7"
-						KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/7/$FEDORA_ARCH/initrd-$FEDORA_ARCH-fedora7.img"
-					elif echo $FEDORA_VERSION | grep ^8 1>/dev/null; then
-						# fedora 8
-						KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/8/$FEDORA_ARCH/vmlinuz-$FEDORA_ARCH-fedora8"
-						KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/8/$FEDORA_ARCH/initrd-$FEDORA_ARCH-fedora8.img"
-					elif echo $FEDORA_VERSION | grep ^9 1>/dev/null; then
-						# fedora 9
-						KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/9/$FEDORA_ARCH/vmlinuz-$FEDORA_ARCH-fedora9"
-						KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/9/$FEDORA_ARCH/initrd-$FEDORA_ARCH-fedora9.img"
-					elif echo $FEDORA_VERSION | grep ^10 1>/dev/null; then
-						# fedora 10
-						KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/10/$FEDORA_ARCH/vmlinuz-$FEDORA_ARCH-fedora10"
-						KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/10/$FEDORA_ARCH/initrd-$FEDORA_ARCH-fedora10.img"
-					else
-						linuxcoe_log "ERROR: Fedora $FEDORA_VERSION not yet supported."
-						linuxcoe_lock release
-						return
-					fi
-
-
-				else
-					linuxcoe_log "ERROR: OS Verstion not yet supported."
-					linuxcoe_lock release
-					return
-				fi
-
-
-
-				if [ ! -f $KICKSTART_KERNEL ]; then
-					linuxcoe_log "ERROR: Could not find kickstart auto-install kernel $KICKSTART_KERNEL"
-					linuxcoe_lock release
-					return
-				fi
-				if [ ! -f $KICKSTART_INITRD ]; then
-					linuxcoe_log "ERROR: Could not find kickstart auto-install initrd $KICKSTART_INITRD"
-					linuxcoe_lock release
-					return
-				fi
-				/bin/cp -f $KICKSTART_KERNEL $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-$RESOURCE_ID-$PROFILE_NAME
-				/bin/cp -f $KICKSTART_INITRD $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-$RESOURCE_ID-$PROFILE_NAME.img
-
-				# prepare the auto-install pxe boot
-				cat $AUTO_INSTALL_PXE_TEMPLATE_KICKSTART | \
-					sed -e "s#@@OPENQRM_BOOTIMAGE_KERNEL@@#vmlinuz-$RESOURCE_ID-$PROFILE_NAME#g"	| \
-					sed -e "s#@@OPENQRM_BOOTIMAGE_INITRD@@#initrd-$RESOURCE_ID-$PROFILE_NAME.img#g"	| \
-					sed -e "s#@@LINUXCOE_INSTALL_LANGUAGE@@#$LINUXCOE_INSTALL_LANGUAGE#g"	| \
-					sed -e "s#@@OPENQRM_SERVER_IP_ADDRESS@@#$OPENQRM_SERVER_IP_ADDRESS#g"	| \
-					sed -e "s#@@LINUXCOE_PROFILE_NAME@@#$PROFILE_NAME#g"	| \
-					sed -e "s#@@OPENQRM_RESOURCE_ID@@#$RESOURCE_ID#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
-
-				linuxcoe_log "Prepared resources pxe-configuration for the automatic installation ($OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE)"
-
-
-				;;
-
-		autoyast)
-
-				linuxcoe_log "Automatic installation method $AUTO_INSTALL_METHOD not supported yet."
-
-				;;
-
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-i)
+			PARAM_RESOURCE_IP=$2
+			shift
+			;;
+		-x)
+			PARAM_RESOURCE_ID=$2
+			shift
+			;;
+		-m)
+			PARAM_RESOURCE_MAC=$2
+			shift
+			;;
+		-n)
+			PARAM_PROFILE_NAME=$2
+			shift
+			;;
 		*)
-				linuxcoe_log "Automatic installation method $AUTO_INSTALL_METHOD not supported yet."
-				linuxcoe_lock release
-				return 1
-				;;
-	esac
-
-
-
-
-}
-
-
-
-
-
-function lcoe_revert_profile() {
-	local PROFILE_NAME=$1
-	local RESOURCE_ID=$2
-	local RESOURCE_IP=$3
-	local RESOURCE_MAC=$4
-	if [ "$PROFILE_NAME" == "" ]; then
-		linuxcoe_lock release
-		return
-	fi
-	if [ "$RESOURCE_ID" == "" ]; then
-		linuxcoe_lock release
-		return
-	fi
-	if [ "$RESOURCE_IP" == "" ]; then
-		linuxcoe_lock release
-		return
-	fi
-	if [ "$RESOURCE_MAC" == "" ]; then
-		linuxcoe_lock release
-		return
-	fi
-
-	linuxcoe_log "Reverting profile $PROFILE_NAME to resource $RESOURCE_ID ($RESOURCE_IP/$RESOURCE_MAC)"
-	local RESOURCE_PXELINUXCFG_FILE=`echo 01-$RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
-	/bin/mv -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.lcoe-$PROFILE_NAME $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
-	# clean-up kernel + initrd
-	rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-$RESOURCE_ID-$PROFILE_NAME
-	rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-$RESOURCE_ID-$PROFILE_NAME.img
-
-	# check which auto-install method was used
-	if [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/preseed ]; then
-		AUTO_INSTALL_METHOD="preseed"
-	elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/ks.cfg ]; then
-		AUTO_INSTALL_METHOD="kickstart"
-	elif grep autoyast $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PROFILE_NAME/isolinux.cfg 1>/dev/null; then
-		AUTO_INSTALL_METHOD="autoyast"
-	else
-		linuxcoe_log "ERROR: Could not find out which Auto-install method to use. Exiting."
-		linuxcoe_lock release
-		return
-	fi
-	case "$AUTO_INSTALL_METHOD" in
-		preseed)
-			rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/preseed.$RESOURCE_ID-$PROFILE_NAME.cfg
-			;;
-		kickstart)
-			rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/ks.$RESOURCE_ID-$PROFILE_NAME.cfg
-			;;
-		autoyast)
-			linuxcoe_log "Automatic installation method $AUTO_INSTALL_METHOD not supported yet."
-			;;
-
-		*)
-			linuxcoe_log "Automatic installation method $AUTO_INSTALL_METHOD not supported yet."
-			linuxcoe_lock release
-			return 1
+			echo "ERROR: Free commandline arguments are not allowed"
+			linuxcoe_usage
+			exit 6
 			;;
 	esac
+	shift
+done
+
+# checks
+if [ "$LINUXCOE_COMMAND" == "" ]; then
+	linuxcoe_usage
+fi
 
 
-
-}			
-
-
-
-PROFILE_NAME=$2
-RESOURCE_ID=$3
-RESOURCE_IP=$4
-RESOURCE_MAC=$5
-case "$1" in
+# main
+case "$LINUXCOE_COMMAND" in
 	check)
+		linuxcoe_log "Checking for unpacked profiles ..."
 		linuxcoe_lock aquire
-		lcoe_check
+		for FILE in `file $LINUXCOE_SYSTEMDESIGNER_DIR/* | grep ISO | cut -d':' -f1`; do
+			FILENAME=`basename $FILE`
+			if [ ! -d $LINUXCOE_PROFILE_DIR/$FILENAME ]; then
+				linuxcoe_log "Unpacking $FILE..."
+				MOUNTPOINT=`mktemp -d /tmp/$FILENAME.XXXXXXXXXX` || exit 1
+				if ! mount -o loop $FILE $MOUNTPOINT; then
+					linuxcoe_log "ERROR: Could not loop mount $FILE at $MOUNTPOINT"
+					linuxcoe_lock release
+					return 1
+				fi
+				mkdir -p $LINUXCOE_PROFILE_DIR/$FILENAME
+				/bin/cp -aRv $MOUNTPOINT/* $LINUXCOE_PROFILE_DIR/$FILENAME/
+				# create the info file for the comments
+				touch $LINUXCOE_PROFILE_DIR/$FILENAME/openqrm.info
+				chmod 777 $LINUXCOE_PROFILE_DIR/$FILENAME/openqrm.info
+				umount $MOUNTPOINT
+			fi
+		done
 		linuxcoe_lock release
 		;;
+
 	remove)
+		if [ "$PARAM_PROFILE_NAME" == "" ]; then
+			linuxcoe_lock release
+			return
+		fi
+		linuxcoe_log "Removing profile $PARAM_PROFILE_NAME"
 		linuxcoe_lock aquire
-		lcoe_remove_profile $PROFILE_NAME
+		if [ -d $LINUXCOE_PROFILE_DIR/$PARAM_PROFILE_NAME ]; then
+			rm -rf $LINUXCOE_PROFILE_DIR/$PARAM_PROFILE_NAME
+		fi
+		if [ -f $LINUXCOE_SYSTEMDESIGNER_DIR/$PARAM_PROFILE_NAME ]; then
+			rm -f $LINUXCOE_SYSTEMDESIGNER_DIR/$PARAM_PROFILE_NAME
+		fi
 		linuxcoe_lock release
 		;;
-	apply)
+
+	transfer_to_linuxcoe)
+		if [ "$PARAM_PROFILE_NAME" == "" ]; then
+			return
+		fi
+		if [ "$PARAM_RESOURCE_ID" == "" ]; then
+			return
+		fi
+		if [ "$PARAM_RESOURCE_IP" == "" ]; then
+			return
+		fi
+		if [ "$PARAM_RESOURCE_MAC" == "" ]; then
+			return
+		fi
+
+		linuxcoe_log "Applying profile $PARAM_PROFILE_NAME to resource $PARAM_RESOURCE_ID ($PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC)"
 		linuxcoe_lock aquire
-		lcoe_apply_profile $PROFILE_NAME $RESOURCE_ID $RESOURCE_IP $RESOURCE_MAC
+		RESOURCE_PXELINUXCFG_FILE=`echo 01-$PARAM_RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
+		/bin/cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.lcoe-$PARAM_PROFILE_NAME
+
+		# check which auto-install method to use
+		if [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/preseed ]; then
+			AUTO_INSTALL_METHOD="preseed"
+		elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/ks.cfg ]; then
+			AUTO_INSTALL_METHOD="kickstart"
+		elif grep autoyast $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/isolinux.cfg 1>/dev/null; then
+			AUTO_INSTALL_METHOD="autoyast"
+		else
+			linuxcoe_log "ERROR: Could not find out which Auto-install method to use. Exiting."
+			linuxcoe_lock release
+			return
+		fi
+
+		case "$AUTO_INSTALL_METHOD" in
+			preseed)
+					linuxcoe_log "Using Automatic installation method $AUTO_INSTALL_METHOD."
+
+					# debian or ubuntu ?
+					if grep ubuntu $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/preseed 1>/dev/null; then
+						# ubuntu
+
+						# find out which debian version to install
+						if grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/preseed | grep intrepid 1>/dev/null; then
+							UBUNTU_VERSION="intrepid"
+						elif grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/preseed | grep hardy 1>/dev/null; then
+							UBUNTU_VERSION="hardy"
+						elif grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/preseed | grep gutsy 1>/dev/null; then
+							UBUNTU_VERSION="gutsy"
+						elif grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/preseed | grep jaunty 1>/dev/null; then
+							UBUNTU_VERSION="jaunty"
+						else
+							linuxcoe_log "ERROR: Could not find out the Ubuntu version to install or Ubuntu version too old and not supported."
+							linuxcoe_lock release
+							return
+						fi
+
+						# find the architecture
+						if grep -i x86_64 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/boot.msg 1>/dev/null; then
+							UBUNTU_ARCH="x86_64"
+							DEBIAN_NETINSTALL_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/ubuntu/$UBUNTU_VERSION/$UBUNTU_ARCH/ubuntu-installer/amd64/linux"
+							DEBIAN_NETINSTALL_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/ubuntu/$UBUNTU_VERSION/$UBUNTU_ARCH/ubuntu-installer/amd64/initrd.gz"
+						elif grep -i i386 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/boot.msg 1>/dev/null; then
+							UBUNTU_ARCH="i386"
+							DEBIAN_NETINSTALL_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/ubuntu/$UBUNTU_VERSION/$UBUNTU_ARCH/ubuntu-installer/$UBUNTU_ARCH/linux"
+							DEBIAN_NETINSTALL_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/ubuntu/$UBUNTU_VERSION/$UBUNTU_ARCH/ubuntu-installer/$UBUNTU_ARCH/initrd.gz"
+						else
+							linuxcoe_log "ERROR: Unsupported architecture. Supported are x86_64 and i386."
+							linuxcoe_lock release
+							return
+						fi
+						linuxcoe_log "NOTICE: Detected Ubuntu $UBUNTU_VERSION architecture $UBUNTU_ARCH."
+
+
+					else
+						# debian
+
+						# find out which debian version to install
+						if grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/preseed | grep "3.1" 1>/dev/null; then
+							linuxcoe_log "ERROR: Debian version 3.1 is deprecated and not supported any more."
+							linuxcoe_lock release
+							return
+						elif grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/preseed | grep etch 1>/dev/null; then
+							DEBIAN_VERSION="etch"
+						elif grep "mirror/suite" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/preseed | grep lenny 1>/dev/null; then
+							DEBIAN_VERSION="lenny"
+						else
+							linuxcoe_log "ERROR: Could not find out the Debian version to install."
+							linuxcoe_lock release
+							return
+						fi
+
+						# find the architecture
+						if grep -i x86_64 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/boot.msg 1>/dev/null; then
+							DEBIAN_ARCH="x86_64"
+							DEBIAN_NETINSTALL_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/debian/$DEBIAN_VERSION/$DEBIAN_ARCH/debian-installer/amd64/linux"
+							DEBIAN_NETINSTALL_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/debian/$DEBIAN_VERSION/$DEBIAN_ARCH/debian-installer/amd64/initrd.gz"
+						elif grep -i i386 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/boot.msg 1>/dev/null; then
+							DEBIAN_ARCH="i386"
+							DEBIAN_NETINSTALL_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/debian/$DEBIAN_VERSION/$DEBIAN_ARCH/debian-installer/$DEBIAN_ARCH/linux"
+							DEBIAN_NETINSTALL_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/debian/$DEBIAN_VERSION/$DEBIAN_ARCH/debian-installer/$DEBIAN_ARCH/initrd.gz"
+						else
+							linuxcoe_log "ERROR: Unsupported architecture. Supported are x86_64 and i386."
+							linuxcoe_lock release
+							return
+						fi
+						linuxcoe_log "NOTICE: Detected Debian $DEBIAN_VERSION architecture $DEBIAN_ARCH."
+
+					fi
+
+
+					# prepare kernel + initrd for the aut-install
+					if [ ! -f $DEBIAN_NETINSTALL_KERNEL ]; then
+						linuxcoe_log "ERROR: Could not find Debian auto-install kernel $DEBIAN_NETINSTALL_KERNEL"
+						linuxcoe_lock release
+						return
+					fi
+					if [ ! -f $DEBIAN_NETINSTALL_INITRD ]; then
+						linuxcoe_log "ERROR: Could not find Debian auto-install initrd $DEBIAN_NETINSTALL_INITRD"
+						linuxcoe_lock release
+						return
+					fi
+					/bin/cp -f $DEBIAN_NETINSTALL_KERNEL $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME
+					/bin/cp -f $DEBIAN_NETINSTALL_INITRD $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.img
+
+					# prepare the auto-install pxe boot
+					cat $AUTO_INSTALL_PXE_TEMPLATE_PRESEED | \
+						sed -e "s#@@OPENQRM_BOOTIMAGE_KERNEL@@#vmlinuz-$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME#g"	| \
+						sed -e "s#@@OPENQRM_BOOTIMAGE_INITRD@@#initrd-$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.img#g"	| \
+						sed -e "s#@@LINUXCOE_INSTALL_LANGUAGE@@#$LINUXCOE_INSTALL_LANGUAGE#g"	| \
+						sed -e "s#@@OPENQRM_SERVER_IP_ADDRESS@@#$OPENQRM_SERVER_IP_ADDRESS#g"	| \
+						sed -e "s#@@LINUXCOE_PROFILE_NAME@@#$PARAM_PROFILE_NAME#g"	| \
+						sed -e "s#@@OPENQRM_RESOURCE_ID@@#$PARAM_RESOURCE_ID#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+
+					linuxcoe_log "Prepared resources pxe-configuration for the automatic installation ($OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE)"
+					# copy the preseed config to the boot-service dir
+					mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe
+					/bin/cp -f $LINUXCOE_PROFILE_DIR/$PARAM_PROFILE_NAME/preseed $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/preseed.$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.cfg
+					# add custom late_command for preseed to auto-install openQRM client
+					sed -i -e "s#.*late_command.*##g" $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/preseed.$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.cfg
+					echo "d-i preseed/late_command string wget http://$OPENQRM_SERVER_IP_ADDRESS/openqrm/boot-service/lcoe/openqrm-linuxcoe-autoinstall-client && chmod +x ./openqrm-linuxcoe-autoinstall-client && mv -f openqrm-linuxcoe-autoinstall-client /target && mount -t proc proc /target/proc && chroot /target ./openqrm-linuxcoe-autoinstall-client $OPENQRM_SERVER_IP_ADDRESS $PARAM_RESOURCE_ID $PARAM_RESOURCE_MAC $OPENQRM_SERVER_BASE_DIR $OPENQRM_WEB_PROTOCOL && umount /target/proc" >> $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/preseed.$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.cfg
+					;;
+
+
+			kickstart)
+					linuxcoe_log "Using Automatic installation method $AUTO_INSTALL_METHOD."
+					# copy the kickstart config to the boot-service dir early
+					mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe
+					PKS="$OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/ks.$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.cfg"
+					/bin/cp -f $LINUXCOE_PROFILE_DIR/$PARAM_PROFILE_NAME/ks.cfg $PKS
+
+					# adapt ks, remove motd msg + add post
+					cat $PKS | grep useradd > $PKS.useradd
+					sed -i -e "s#.*/etc/motd.*##g" $PKS
+					sed -i -e "s#.*useradd.*##g" $PKS
+					sed -i -e "s#^%post.*##g" $PKS
+					echo "%post" >> $PKS
+					echo "#!/bin/bash" >> $PKS
+					echo "wget http://$OPENQRM_SERVER_IP_ADDRESS/openqrm/boot-service/lcoe/openqrm-linuxcoe-autoinstall-client" >> $PKS
+					echo "chmod +x ./openqrm-linuxcoe-autoinstall-client" >> $PKS
+					echo "mount -t proc proc /proc" >> $PKS
+					echo "./openqrm-linuxcoe-autoinstall-client $OPENQRM_SERVER_IP_ADDRESS $PARAM_RESOURCE_ID $PARAM_RESOURCE_MAC $OPENQRM_SERVER_BASE_DIR $OPENQRM_WEB_PROTOCOL" >> $PKS
+					echo "umount /proc" >> $PKS
+					cat $PKS.useradd >> $PKS
+					rm -f $PKS.useradd
+					# add to install section
+					grep ^%packages -B 1000 $PKS | grep -v ^%packages > $PKS.firstpart
+					grep ^%packages -A 1000 $PKS > $PKS.secondpart
+					echo "text" > $PKS.addtoinstall
+					echo "selinux --disabled" >> $PKS.addtoinstall
+					echo "firewall --disabled" >> $PKS.addtoinstall
+					echo "reboot" >> $PKS.addtoinstall
+					echo "" >> $PKS.addtoinstall
+					echo "" >> $PKS.addtoinstall
+					cat $PKS.firstpart $PKS.addtoinstall $PKS.secondpart > $PKS
+					rm -f $PKS.firstpart $PKS.addtoinstall $PKS.secondpart
+
+					# prepare kernel + initrd for the auto-install
+					# check for os version
+
+					if grep -i centos $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/ks.cfg 1>/dev/null; then
+						# centos
+						# check for centos version
+						CENTOS_VERSION=`grep "\-\-url" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/ks.cfg | grep centos | sed -e "s#.*centos/##g" | cut -d'/' -f1`
+						CENTOS_MIRROR=`grep "\-\-url" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/ks.cfg | awk '{ print $3 }'`
+						CENTOS_ARCH=`basename $CENTOS_MIRROR`
+						linuxcoe_log "NOTICE: Dected CentOS $CENTOS_VERSION architecture $CENTOS_ARCH."
+						if echo $CENTOS_VERSION | grep ^4 1>/dev/null; then
+							# centos 4
+							KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/centos/4/$CENTOS_ARCH/vmlinuz-$CENTOS_ARCH-centos4"
+							KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/centos/4/$CENTOS_ARCH/initrd-$CENTOS_ARCH-centos4.img"
+							# adapt version numbering (e.g. 5.1 is deprecated, 5 should be used
+							sed -i -e "s#/centos/.*/os#/centos/4/os#" $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/ks.$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.cfg
+
+						elif echo $CENTOS_VERSION | grep ^5 1>/dev/null; then
+							# centos 5
+							KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/centos/5/$CENTOS_ARCH/vmlinuz-$CENTOS_ARCH-centos5"
+							KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/centos/5/$CENTOS_ARCH/initrd-$CENTOS_ARCH-centos5.img"
+							sed -i -e "s#/centos/.*/os#/centos/5/os#" $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/ks.$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.cfg
+
+						else
+							linuxcoe_log "ERROR: CentOS $CENTOS_VERSION not yet supported."
+							linuxcoe_lock release
+							return
+						fi
+
+
+
+					elif grep ^os $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/ks.cfg | grep -i fedora 1>/dev/null; then
+						# fedora
+
+						FEDORA_VERSION=`grep "\-\-url" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/ks.cfg | grep fedora | sed -e "s#.*/releases/##g" | cut -d'/' -f1`
+						FEDORA_ARCH=`grep ^arch $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/ks.cfg | cut -d'=' -f2`
+						linuxcoe_log "NOTICE: Detected Fedora $FEDORA_VERSION architecture $FEDORA_ARCH."
+						if echo $FEDORA_VERSION | grep ^7 1>/dev/null; then
+							# fedora 7
+							KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/7/$FEDORA_ARCH/vmlinuz-$FEDORA_ARCH-fedora7"
+							KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/7/$FEDORA_ARCH/initrd-$FEDORA_ARCH-fedora7.img"
+						elif echo $FEDORA_VERSION | grep ^8 1>/dev/null; then
+							# fedora 8
+							KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/8/$FEDORA_ARCH/vmlinuz-$FEDORA_ARCH-fedora8"
+							KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/8/$FEDORA_ARCH/initrd-$FEDORA_ARCH-fedora8.img"
+						elif echo $FEDORA_VERSION | grep ^9 1>/dev/null; then
+							# fedora 9
+							KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/9/$FEDORA_ARCH/vmlinuz-$FEDORA_ARCH-fedora9"
+							KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/9/$FEDORA_ARCH/initrd-$FEDORA_ARCH-fedora9.img"
+						elif echo $FEDORA_VERSION | grep ^10 1>/dev/null; then
+							# fedora 10
+							KICKSTART_KERNEL="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/10/$FEDORA_ARCH/vmlinuz-$FEDORA_ARCH-fedora10"
+							KICKSTART_INITRD="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/etc/fedora/10/$FEDORA_ARCH/initrd-$FEDORA_ARCH-fedora10.img"
+						else
+							linuxcoe_log "ERROR: Fedora $FEDORA_VERSION not yet supported."
+							linuxcoe_lock release
+							return
+						fi
+
+
+					else
+						linuxcoe_log "ERROR: OS Version not yet supported."
+						linuxcoe_lock release
+						return
+					fi
+
+
+
+					if [ ! -f $KICKSTART_KERNEL ]; then
+						linuxcoe_log "ERROR: Could not find kickstart auto-install kernel $KICKSTART_KERNEL"
+						linuxcoe_lock release
+						return
+					fi
+					if [ ! -f $KICKSTART_INITRD ]; then
+						linuxcoe_log "ERROR: Could not find kickstart auto-install initrd $KICKSTART_INITRD"
+						linuxcoe_lock release
+						return
+					fi
+					/bin/cp -f $KICKSTART_KERNEL $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME
+					/bin/cp -f $KICKSTART_INITRD $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.img
+
+					# prepare the auto-install pxe boot
+					cat $AUTO_INSTALL_PXE_TEMPLATE_KICKSTART | \
+						sed -e "s#@@OPENQRM_BOOTIMAGE_KERNEL@@#vmlinuz-$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME#g"	| \
+						sed -e "s#@@OPENQRM_BOOTIMAGE_INITRD@@#initrd-$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.img#g"	| \
+						sed -e "s#@@LINUXCOE_INSTALL_LANGUAGE@@#$LINUXCOE_INSTALL_LANGUAGE#g"	| \
+						sed -e "s#@@OPENQRM_SERVER_IP_ADDRESS@@#$OPENQRM_SERVER_IP_ADDRESS#g"	| \
+						sed -e "s#@@LINUXCOE_PROFILE_NAME@@#$PARAM_PROFILE_NAME#g"	| \
+						sed -e "s#@@PARAM_RESOURCE_MAC@@#$PARAM_RESOURCE_MAC#g"	| \
+						sed -e "s#@@OPENQRM_RESOURCE_ID@@#$PARAM_RESOURCE_ID#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+
+					linuxcoe_log "Prepared resources pxe-configuration for the automatic installation ($OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE)"
+
+
+					;;
+
+			autoyast)
+
+					linuxcoe_log "Automatic installation method $AUTO_INSTALL_METHOD not supported yet."
+
+					;;
+
+			*)
+					linuxcoe_log "Automatic installation method $AUTO_INSTALL_METHOD not supported yet."
+					linuxcoe_lock release
+					return 1
+					;;
+		esac
+		linuxcoe_lock release
+
+		# wait for reboot of the resource
+		sleep $LINUXCOE_INSTALL_START_DELAY
+		# revert pxe config
+		$0 take_over_from_linuxcoe -n $PARAM_PROFILE_NAME -x $PARAM_RESOURCE_ID -i $PARAM_RESOURCE_IP -m $PARAM_RESOURCE_MAC
+		# set the clients pxe config to local-boot
+		RESOURCE_PXELINUXCFG_FILE=`echo 01-$PARAM_RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
+		sed -i -e "s/^default.*/default local/g" $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+
+		# start the openqrm-linuxcoe-monitord to send transaction state to openQRM
+		$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/sbin/openqrm-linuxcoe-monitord $PARAM_RESOURCE_ID $PARAM_RESOURCE_MAC
+		;;
+
+	take_over_from_linuxcoe)
+		if [ "$PARAM_PROFILE_NAME" == "" ]; then
+			return
+		fi
+		if [ "$PARAM_RESOURCE_ID" == "" ]; then
+			return
+		fi
+		if [ "$PARAM_RESOURCE_IP" == "" ]; then
+			return
+		fi
+		if [ "$PARAM_RESOURCE_MAC" == "" ]; then
+			return
+		fi
+
+		linuxcoe_log "Reverting profile $PARAM_PROFILE_NAME to resource $PARAM_RESOURCE_ID ($PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC)"
+		linuxcoe_lock aquire
+		RESOURCE_PXELINUXCFG_FILE=`echo 01-$PARAM_RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
+		/bin/mv -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.lcoe-$PARAM_PROFILE_NAME $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		# set the clients pxe config to net-boot, this is for appliance stop
+		sed -i -e "s/^default.*/default linux/g" $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+
+		# clean-up kernel + initrd
+		rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/vmlinuz-$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME
+		rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.img
+
+		# check which auto-install method was used
+		if [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/preseed ]; then
+			AUTO_INSTALL_METHOD="preseed"
+		elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/ks.cfg ]; then
+			AUTO_INSTALL_METHOD="kickstart"
+		elif grep autoyast $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe/web/profiles/$PARAM_PROFILE_NAME/isolinux.cfg 1>/dev/null; then
+			AUTO_INSTALL_METHOD="autoyast"
+		else
+			linuxcoe_log "ERROR: Could not find out which Auto-install method to use. Exiting."
+			linuxcoe_lock release
+			return
+		fi
+		case "$AUTO_INSTALL_METHOD" in
+			preseed)
+				rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/preseed.$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.cfg
+				;;
+			kickstart)
+				rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/lcoe/ks.$PARAM_RESOURCE_ID-$PARAM_PROFILE_NAME.cfg
+				;;
+			autoyast)
+				linuxcoe_log "Automatic installation method $AUTO_INSTALL_METHOD not supported yet."
+				;;
+
+			*)
+				linuxcoe_log "Automatic installation method $AUTO_INSTALL_METHOD not supported yet."
+				linuxcoe_lock release
+				return 1
+				;;
+		esac
 		linuxcoe_lock release
 		;;
-	revert)
-		linuxcoe_lock aquire
-		lcoe_revert_profile $PROFILE_NAME $RESOURCE_ID $RESOURCE_IP $RESOURCE_MAC
-		linuxcoe_lock release
+
+
+	set_linuxcoe_client_to_local_boot)
+		if [ "$PARAM_RESOURCE_MAC" == "" ]; then
+			return
+		fi
+		echo "NOTICE: Setting resource $PARAM_RESOURCE_MAC to local-boot."
+		# set the clients pxe config to local-boot, this is for appliance start
+		RESOURCE_PXELINUXCFG_FILE=`echo 01-$PARAM_RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
+		sed -i -e "s/^default.*/default local/g" $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
 		;;
-		*)
-		echo $"Usage: $0 {check|remove|apply|revert}"
-		exit 1
-		;;
+
 esac
 
