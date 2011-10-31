@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2010, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
@@ -597,6 +597,8 @@ EOF
 					# we have a real dev-name, mount it on top of root
 					umount -f $OPENVZ_VM_DISK $OPENQRM_VM_DIR/private/$OPENVZ_VM_NAME/ 1>/dev/null 2>&1
 					# rescan all lvols
+					pvscan >/dev/null
+					vgscan >/dev/null
 					lvscan >/dev/null
 					# activate the lvol
 					lvchange -ay $OPENVZ_VM_DISK
@@ -776,7 +778,7 @@ EOF
 			echo "@$OPENVZ_VEID@$OPENVZ_VM_STATUS@$OPENVZ_VM_MAC@$OPENVZ_VM_HOSTNAME@" >> $VM_LIST_TMP
 		done
 		# post
-		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$OPENVZ_OPENQRM_USERNAME --http-password=$OPENVZ_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_LIST_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?openvz_server_command=get_openvz_server; then
+		if ! $WGET -q -O /dev/null --http-user=$OPENVZ_OPENQRM_USERNAME --http-password=$OPENVZ_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_LIST_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?openvz_server_command=get_openvz_server; then
 			openqrm_post_event 0 "post_vm_list" 2 "openqrm-openvz-storage" "Could not post VM list to the openQRM-server at $OPENQRM_SERVER_IP!"
 			openvz_log post_lv "ERROR: Could not post VM list to the openQRM-server at $OPENQRM_SERVER_IP!"
 		fi
@@ -805,7 +807,7 @@ EOF
 		echo "OPENQRM_OPENVZ_STORAGE_BRIDGE_NET2=\"$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET2\"" >> $VM_CONFIG_TMP
 		echo "OPENQRM_OPENVZ_STORAGE_BRIDGE_NET3=\"$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET3\"" >> $VM_CONFIG_TMP
 		echo "OPENQRM_OPENVZ_STORAGE_BRIDGE_NET4=\"$OPENQRM_PLUGIN_OPENVZ_BRIDGE_NET4\"" >> $VM_CONFIG_TMP
-		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$OPENVZ_OPENQRM_USERNAME --http-password=$OPENVZ_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_CONFIG_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?openvz_server_command=get_openvz_config; then
+		if ! $WGET -q -O /dev/null --http-user=$OPENVZ_OPENQRM_USERNAME --http-password=$OPENVZ_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_CONFIG_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?openvz_server_command=get_openvz_config; then
 			openqrm_post_event 0 "post_vm_config" 2 "openqrm-openvz-storage" "Could not post VM config for OpenVZ VM $OPENVZ_VM_NAME!"
 			openvz_log post_lv "ERROR: Could not post VM config for OpenVZ VM $OPENVZ_VM_NAME!"
 		fi
@@ -1069,7 +1071,7 @@ EOF
 		# posting success to openQRM
 		if [ "$OPENVZ_OPENQRM_USERNAME" != "" ] && [ "$OPENVZ_OPENQRM_PASSWORD" != "" ]; then
 			echo "success" > $OPENVZ_VM_NAME.vm_migrated_successfully
-			if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$OPENVZ_OPENQRM_USERNAME --http-password=$OPENVZ_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $OPENVZ_VM_NAME.vm_migrated_successfully` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?openvz_server_command=get_vm_migration; then
+			if ! $WGET -q -O /dev/null --http-user=$OPENVZ_OPENQRM_USERNAME --http-password=$OPENVZ_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $OPENVZ_VM_NAME.vm_migrated_successfully` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/openvz-storage/openvz-storage-action.php?openvz_server_command=get_vm_migration; then
 				openqrm_post_event 0 "migrate" 2 "openqrm-openvz-storage" "Could not post VM $OPENVZ_VM_NAME migration status the openQRM-server at $OPENQRM_SERVER_IP!"
 			fi
 			rm -f $OPENVZ_VM_NAME.vm_migrated_successfully
