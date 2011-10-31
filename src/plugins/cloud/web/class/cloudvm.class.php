@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -46,9 +46,6 @@ $OPENQRM_SERVER_IP_ADDRESS=$openqrm_server->get_ip_address();
 global $OPENQRM_SERVER_IP_ADDRESS;
 global $RESOURCE_INFO_TABLE;
 
-$vmware_mac_address_space = "00:50:56:20";
-global $vmware_mac_address_space;
-
 // timout for starting a host from power-off
 $host_start_from_off_timeout=240;
 global $host_start_from_off_timeout;
@@ -77,11 +74,11 @@ class cloudvm {
 		global $OPENQRM_SERVER_IP_ADDRESS;
 		global $OPENQRM_EXEC_PORT;
 		global $RESOURCE_INFO_TABLE;
-		global $vmware_mac_address_space;
 		global $host_start_from_off_timeout;
 		global $RootDir;
 		$this->init($timeout);
 		global $event;
+		$vmware_mac_address_space = "00:50:56:20";
 		$vtype = new virtualization();
 		$vtype->get_instance_by_id($virtualization_type);
 		$virtualization_plugin_name = str_replace("-vm", "", $vtype->type);
@@ -200,6 +197,7 @@ class cloudvm {
 		// ! for all virt-storage plugins we need to make sure the vm is created on
 		// ! the same host as the image is located, for all others we try to lb
 		$less_load_resource_id=-1;
+
 		switch ($virtualization_plugin_name) {
 			case 'kvm-storage':
 			case 'lxc-storage':
@@ -286,6 +284,7 @@ class cloudvm {
 						break;
 					# citrix + vbox vms network parameter starts with -m1
 					case 'citrix':
+					case 'citrix-storage':
 					case 'vbox':
 						$nic_nr = $anic;
 						$additional_nic_str .= " -m".$nic_nr." ".$mac_gen_res->mac;

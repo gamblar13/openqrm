@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -24,6 +24,7 @@ $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
 $BaseDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/';
 $DocRoot = $_SERVER["DOCUMENT_ROOT"];
 require_once "$RootDir/include/user.inc.php";
+require_once "$RootDir/class/event.class.php";
 require_once "$RootDir/class/image.class.php";
 require_once "$RootDir/class/kernel.class.php";
 require_once "$RootDir/class/resource.class.php";
@@ -50,7 +51,8 @@ $OPENQRM_SERVER_IP_ADDRESS=$openqrm_server->get_ip_address();
 global $OPENQRM_SERVER_IP_ADDRESS;
 global $CLOUD_REQUEST_TABLE;
 
-
+$event = new event();
+global $event;
 
 if(htmlobject_request('action') != '') {
 	switch (htmlobject_request('action')) {
@@ -769,16 +771,23 @@ function my_cloud_create_request() {
 			if ($cl_user->id == $priv_image->cu_id) {
 				$priv_im = new image();
 				$priv_im->get_instance_by_id($priv_image->image_id);
+				// do not show active images
+				if ($priv_im->isactive == 1) {
+					continue;
+				}
 				// only show the non-shared image to the user if it is not attached to a resource
 				// because we don't want users to assign the same image to two appliances
 				$priv_cloud_im = new cloudimage();
 				$priv_cloud_im->get_instance_by_image_id($priv_image->image_id);
-				if($priv_cloud_im->resource_id == 0) {
+				if($priv_cloud_im->resource_id == 0 || $priv_cloud_im->resource_id == -1) {
 						$image_list[] = array("value" => $priv_im->id, "label" => $priv_im->name);
 				}
 			} else if ($priv_image->cu_id == 0) {
 				$priv_im = new image();
 				$priv_im->get_instance_by_id($priv_image->image_id);
+				if ($priv_im->isactive == 1) {
+					continue;
+				}
 				$image_list[] = array("value" => $priv_im->id, "label" => $priv_im->name);
 			}
 		}
@@ -789,6 +798,12 @@ function my_cloud_create_request() {
 		foreach($image_list_tmp as $list) {
 			$iname = $list['label'];
 			$iid = $list['value'];
+			$iimage = new image();
+			$iimage->get_instance_by_id($iid);
+			// do not show active images
+			if ($iimage->isactive == 1) {
+				continue;
+			}
 			if (!strstr($iname, ".cloud_")) {
 				$image_list[] = array("value" => $iid, "label" => $iname);
 			}
@@ -809,8 +824,8 @@ function my_cloud_create_request() {
 			require_once "$RootDir/plugins/ip-mgmt/class/ip-mgmt.class.php";
 			$ip_mgmt = new ip_mgmt();
 			$ip_mgmt_list_per_user = $ip_mgmt->get_list_by_user($cloud_user->cg_id);
-			$ip_mgmt_list_per_user_arr[] = array("value" => -1, "label" => "None");
 			$ip_mgmt_list_per_user_arr[] = array("value" => -2, "label" => "Auto");
+			$ip_mgmt_list_per_user_arr[] = array("value" => -1, "label" => "None");
 			foreach($ip_mgmt_list_per_user as $list) {
 				$ip_mgmt_id = $list['ip_mgmt_id'];
 				$ip_mgmt_name = trim($list['ip_mgmt_name']);
@@ -834,6 +849,16 @@ function my_cloud_create_request() {
 		}
 	}
 
+	// check if cloud_selector feature is enabled
+	$cloud_appliance_hostname = '';
+	$cloud_appliance_hostname_input = '';
+	$cloud_appliance_hostname_help = '';
+	$cloud_appliance_hostname_enabled = $cc_conf->get_value(34);	// appliance_hostname
+	if (!strcmp($cloud_appliance_hostname_enabled, "true")) {
+		$cloud_appliance_hostname = 'Hostname setup';
+		$cloud_appliance_hostname_input = htmlobject_input('cr_appliance_hostname', array("value" => '', "label" => ' '), 'text', 10);
+		$cloud_appliance_hostname_help = '<small>Multiple appliances get the postfix <b>_[#no]</b></small>';
+	}
 
 	// check for default-clone-on-deploy
 	$cc_default_clone_on_deploy = $cc_conf->get_value(5);	// default_clone_on_deploy
@@ -858,20 +883,14 @@ function my_cloud_create_request() {
 	$stop_request = $stop_request."</a>";
 
 	// create the quantity select
-	$cloud_quantiy_selector = new htmlobject_select();
+	$cloud_quantiy_selector = new htmlobject_input();
 	$cloud_quantiy_selector->id = "cr_resource_quantity";
 	$cloud_quantiy_selector->title = "cr_resource_quantity";
 	$cloud_quantiy_selector->name = "cr_resource_quantity";
-	$cloud_quantiy_selector->label = "Quantity";
-	$cloud_quantiy_selector->text_index = array("value" => "value", "text" => "label");
-	$cloud_quantiy_selector->text = $max_resources_per_cr_select;
-	$quantiy_select = '<div class="htmlobject_box select" id="htmlobject_box_cr_resource_quantity">';
-	$quantiy_select .= '<div class="left"><label for="cr_resource_quantity">Qantity</label></div>';
-	$quantiy_select .= '<div class="right">';
-	$quantiy_select .= $cloud_quantiy_selector->get_string();
-	$quantiy_select .= '</div>';
-	$quantiy_select .= '<div style="line-height:0px;height:0px;clear:both;" class="floatbreaker">&#160;</div>';
-	$quantiy_select .= '</div>';
+	$cloud_quantiy_selector->type = "hidden";
+	$cloud_quantiy_selector->label = " ";
+	$cloud_quantiy_selector->value = "1";
+	$quantiy_select = $cloud_quantiy_selector->get_string();
 
 	// create the network-card select
 	$cloud_network_card_selector = new htmlobject_select();
@@ -914,6 +933,9 @@ function my_cloud_create_request() {
 		'cloud_show_puppet' => $show_puppet,
 		'cloud_ip_mgmt_select' => $ip_mgmt_select,
 		'cloud_ip_mgmt' => $ip_mgmt_title,
+		'cloud_appliance_hostname' => $cloud_appliance_hostname,
+		'cloud_appliance_hostname_input' => $cloud_appliance_hostname_input,
+		'cloud_appliance_hostname_help' => $cloud_appliance_hostname_help,
 		'cloud_global_limits' => $cloud_global_limits,
 		'cloud_user_limits' => $cloud_user_limits,
 		'submit_save' => htmlobject_input('action', array("value" => 'Create', "label" => 'Create'), 'submit'),

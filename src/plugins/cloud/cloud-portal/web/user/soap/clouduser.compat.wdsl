@@ -88,6 +88,13 @@
   <part name='Result' type='xsd:string'/>
 </message>
 
+<message name='CloudRequestGetCostRequest'>
+  <part name='symbol' type='xsd:string'/>
+</message>
+<message name='CloudRequestGetCostResponse'>
+  <part name='Result' type='xsd:string'/>
+</message>
+
 <message name='CloudApplianceGetListRequest'>
   <part name='symbol' type='xsd:string'/>
 </message>
@@ -172,7 +179,12 @@
   <part name='Result' type='xsd:string'/>
 </message>
 
-
+<message name='GetIpSelectPerUserRequest'>
+  <part name='Result' type='xsd:string'/>
+</message>
+<message name='GetIpSelectPerUserResponse'>
+  <part name='Result' type='xsd:string'/>
+</message>
 
 <portType name='CloudPortType'>
 
@@ -229,6 +241,11 @@
   <operation name='CloudRequestExtend'>
     <input message='tns:CloudRequestExtendRequest'/>
     <output message='tns:CloudRequestExtendResponse'/>
+  </operation>
+
+  <operation name='CloudRequestGetCost'>
+    <input message='tns:CloudRequestGetCostRequest'/>
+    <output message='tns:CloudRequestGetCostResponse'/>
   </operation>
 
   <operation name='CloudApplianceGetList'>
@@ -289,6 +306,11 @@
   <operation name='ProductGetDetails'>
     <input message='tns:ProductGetDetailsRequest'/>
     <output message='tns:ProductGetDetailsResponse'/>
+  </operation>
+
+  <operation name='GetIpSelectPerUser'>
+    <input message='tns:GetIpSelectPerUserRequest'/>
+    <output message='tns:GetIpSelectPerUserResponse'/>
   </operation>
 
 </portType>
@@ -428,6 +450,18 @@
     </input>
     <output>
       <soap:body use='literal' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </output>
+  </operation>
+
+  <operation name='CloudRequestGetCost'>
+    <soap:operation soapAction='urn:localhost-cloud#CloudRequestGetCost'/>
+    <input>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </input>
+    <output>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
         encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
     </output>
   </operation>
@@ -576,7 +610,17 @@
     </output>
   </operation>
 
-
+  <operation name='GetIpSelectPerUser'>
+    <soap:operation soapAction='urn:localhost-cloud#GetIpSelectPerUser'/>
+    <input>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </input>
+    <output>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </output>
+  </operation>
 
 </binding>
 

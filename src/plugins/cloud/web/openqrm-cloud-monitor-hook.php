@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -83,9 +83,6 @@ $OPENQRM_SERVER_IP_ADDRESS=$openqrm_server->get_ip_address();
 global $OPENQRM_SERVER_IP_ADDRESS;
 global $event;
 
-# special macs for vmware vms
-$vmware_mac_address_space = "00:50:56:20";
-global $vmware_mac_address_space;
 
 $refresh_delay=1;
 $refresh_loop_max=60;
@@ -129,7 +126,7 @@ function openqrm_cloud_monitor() {
 	global $BaseDir;
 	global $RootDir;
 	global $vm_create_timout;
-	global $vmware_mac_address_space;
+	$vmware_mac_address_space = "00:50:56:20";
 	$cloud_monitor_lock = "$OPENQRM_SERVER_BASE_DIR/openqrm/web/action/cloud-conf/cloud-monitor.lock";
 	$cloud_monitor_timeout = "600";
 
@@ -168,6 +165,8 @@ function openqrm_cloud_monitor() {
 	$parallel_phase_five_actions = 0;
 	$parallel_phase_six_actions = 0;
 	$parallel_phase_seven_actions = 0;
+	// appliance hostname
+	$cloud_appliance_hostname_enabled = $cloud_performance_config->get_value(34);  // 34 appliance-hostname
 
 	$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "monitor-hook", "Cloud Phase I - Image actions, VM-removal", "", "", 0, 0, 0);
 
@@ -324,11 +323,20 @@ function openqrm_cloud_monitor() {
 			$ci_cr = new cloudrequest();
 			$ci_cr->get_instance_by_id($ci->cr_id);
 			if ($ci_cr->shared_req == 1) {
+				$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Cloud request set to shared, removing Image ".$ci_image_id.".", "", "", 0, 0, 0);
 				$physical_remove = true;
 			}
 			// or if the remove request came from a user for a private image
 			if ($ci_cr_id == 0) {
+				$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Cloud user requested to remove Image ".$ci_image_id.".", "", "", 0, 0, 0);
 				$physical_remove = true;
+			}
+			// re-check if this is a private image with clone-on-deploy set to false
+			$ci_private_image = new cloudprivateimage();
+			$ci_private_image->get_instance_by_image_id($ci_cr->image_id);
+			if ($ci_private_image->clone_on_deploy == 0) {
+				$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Image ".$ci_image_id." is private and set to NOT clone-on-deploy. Not removing.", "", "", 0, 0, 0);
+				$physical_remove = false;
 			}
 
 			if ($physical_remove) {
@@ -452,7 +460,9 @@ function openqrm_cloud_monitor() {
 		$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Provisioning request ID $cr_id", "", "", 0, 0, 0);
 
 		// ################################## quantity loop provisioning ###############################
-		$resource_quantity = $cr->resource_quantity;
+		// from 4.9 on we do not support more than one appliance per request.
+		// $resource_quantity = $cr->resource_quantity;
+		$resource_quantity = 1;
 
 		// check for max_apps_per_user
 		$cloud_user_apps_arr = array();
@@ -485,56 +495,250 @@ function openqrm_cloud_monitor() {
 			continue;
 		}
 
-		for ($cr_resource_number = 1; $cr_resource_number <= $resource_quantity; $cr_resource_number++) {
+		$cr_resource_number = 1;
+		// ################################## create appliance ###############################
+		// set hostname
+		$appliance_name = "cloud-".$cr_id."-".$cr_resource_number."-x";
+		if (!strcmp($cloud_appliance_hostname_enabled, "true")) {
+			if (strlen($cr->appliance_hostname)) {
+				$appliance_requested_hostname = $cr->appliance_hostname;
+				// check if the hostname is free, if not return to regular naming convention
+				$appliance_chk_hostname = new appliance();
+				$appliance_chk_hostname->get_instance_by_name($appliance_requested_hostname);
+				if ($appliance_chk_hostname->id > 0) {
+					$event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "cloud-monitor", "Requested hostname ".$appliance_requested_hostname." already in use. Reverting to ".$appliance_name." (CR ID ".$cr_id.").", "", "", 0, 0, 0);
+				} else {
+					// set requested hostname
+					$appliance_name = $appliance_requested_hostname;
+				}
+			}
+		}
+		// update cr with new hostname
+		$cr_update_hostname_fields=array();
+		$cr_update_hostname_fields["cr_appliance_hostname"]=$appliance_name;
+		$cr->update($cr->id, $cr_update_hostname_fields);
+		$cr->get_instance_by_id($cr->id);
+		// get new appliance id
+		$appliance_id = openqrm_db_get_free_id('appliance_id', $APPLIANCE_INFO_TABLE);
+		// we
+		$user_network_cards = $cr->network_req+1;
+		// prepare array to add appliance
+		$ar_request = array(
+			'appliance_id' => $appliance_id,
+			'appliance_resources' => "-1",
+			'appliance_name' => $appliance_name,
+			'appliance_kernelid' => $cr->kernel_id,
+			'appliance_imageid' => $cr->image_id,
+			'appliance_virtualization' => $cr->resource_type_req,
+			'appliance_cpunumber' => $cr->cpu_req,
+			'appliance_memtotal' => $cr->ram_req,
+			'appliance_nics' => $user_network_cards,
+			'appliance_comment' => "Requested by user $cu_name",
+			'appliance_ssi' => $cr->shared_req,
+			'appliance_highavailable' => $cr->ha_req,
+		);
 
-			// ################################## create appliance ###############################
+		// create + start the appliance :)
+		$appliance = new appliance();
+		$appliance->add($ar_request);
+		// first get admin email
+		$cc_acr_conf = new cloudconfig();
+		$cc_acr_admin_email = $cc_acr_conf->get_value(1);  // 1 is admin_email
+		// and the user details
+		$cu_name = $cu->name;
+		$cu_forename = $cu->forename;
+		$cu_lastname = $cu->lastname;
+		$cu_email = $cu->email;
+		// now lets find a resource for this new appliance
+		$appliance->get_instance_by_id($appliance_id);
+		$appliance_virtualization=$cr->resource_type_req;
 
-			$appliance_name = "cloud-".$cr_id."-".$cr_resource_number."-x";
-			$appliance_id = openqrm_db_get_free_id('appliance_id', $APPLIANCE_INFO_TABLE);
-			// we
-			$user_network_cards = $cr->network_req+1;
-			// prepare array to add appliance
-			$ar_request = array(
-				'appliance_id' => $appliance_id,
-				'appliance_resources' => "-1",
-				'appliance_name' => $appliance_name,
-				'appliance_kernelid' => $cr->kernel_id,
-				'appliance_imageid' => $cr->image_id,
-				'appliance_virtualization' => $cr->resource_type_req,
-				'appliance_cpunumber' => $cr->cpu_req,
-				'appliance_memtotal' => $cr->ram_req,
-				'appliance_nics' => $user_network_cards,
-				'appliance_comment' => "Requested by user $cu_name",
-				'appliance_ssi' => $cr->shared_req,
-				'appliance_highavailable' => $cr->ha_req,
-			);
+		// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "monitor-hook", "#### Cloud Phase II-1 - Getting a resource", "", "", 0, 0, 0);
 
-			// create + start the appliance :)
-			$appliance = new appliance();
-			$appliance->add($ar_request);
-			// first get admin email
-			$cc_acr_conf = new cloudconfig();
-			$cc_acr_admin_email = $cc_acr_conf->get_value(1);  // 1 is admin_email
-			// and the user details
-			$cu_name = $cu->name;
-			$cu_forename = $cu->forename;
-			$cu_lastname = $cu->lastname;
-			$cu_email = $cu->email;
-			// now lets find a resource for this new appliance
+		// ################################## phys. res. ###############################
+
+		if ($appliance_virtualization == 1) {
+
+			$appliance->find_resource($appliance_virtualization);
+			// check if we got a resource !
 			$appliance->get_instance_by_id($appliance_id);
-			$appliance_virtualization=$cr->resource_type_req;
+			if ($appliance->resources == -1) {
+				$event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "cloud-monitor", "Could not find a resource (type physical system) for request ID $cr_id!", "", "", 0, 0, 0);
+				$appliance->remove($appliance_id);
+				$cr->setstatus($cr_id, 'no-res');
 
-			// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "monitor-hook", "#### Cloud Phase II-1 - Getting a resource", "", "", 0, 0, 0);
+				// send mail to user
+				$rmail = new cloudmailer();
+				$rmail->to = "$cu_email";
+				$rmail->from = "$cc_acr_admin_email";
+				$rmail->subject = "openQRM Cloud: Not enough resources for provisioning your $cr_resource_number. system from request $cr_id";
+				$rmail->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/not_enough_resources.mail.tmpl";
+				$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"$cu_forename", '@@LASTNAME@@'=>"$cu_lastname", '@@RESNUMBER@@'=>"$cr_resource_number", '@@YOUR@@'=>"your");
+				$rmail->var_array = $arr;
+				$rmail->send();
+				// send mail to admin
+				$rmail_admin = new cloudmailer();
+				$rmail_admin->to = "$cc_acr_admin_email";
+				$rmail_admin->from = "$cc_acr_admin_email";
+				$rmail_admin->subject = "openQRM Cloud: Not enough resources for provisioning the $cr_resource_number. system from request $cr_id";
+				$rmail_admin->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/not_enough_resources.mail.tmpl";
+				$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"Cloudadmin", '@@LASTNAME@@'=>"", '@@RESNUMBER@@'=>"$cr_resource_number", '@@YOUR@@'=>"the");
+				$rmail_admin->var_array = $arr;
+				$rmail_admin->send();
+				continue;
+			}
+			// we have a phys. resource
 
-			// ################################## phys. res. ###############################
 
-			if ($appliance_virtualization == 1) {
+		} else {
 
+			// ################################## auto create vm ###############################
+			// check if we should try to create one
+
+			// request type vm
+			$cc_autovm_conf = new cloudconfig();
+			$cc_auto_create_vms = $cc_autovm_conf->get_value(7);  // 7 is auto_create_vms
+			if (!strcmp($cc_auto_create_vms, "true")) {
+				// check if createvmlc exists for this cr + res-quantity
+				unset($cvmlc);
+				$cvmlc = new cloudcreatevmlc();
+				$cvmlc->get_instance_by_cr_details($cr_id, $cr_resource_number);
+				if (!strlen($cvmlc->request_time)) {
+					// if no createvmlc exists so far create it and the vm
+					// generate a mac address
+					$mac_res = new resource();
+					// check if we need to generate the first nics mac address in the vmware address space
+					$new_vm_mac="";
+					$vm_virt = new virtualization();
+					$vm_virt->get_instance_by_id($cr->resource_type_req);
+					$virt_name = str_replace("-vm", "", $vm_virt->type);
+					switch ($virt_name) {
+						case 'vmware-esx':
+						case 'vmware-server':
+						case 'vmware-server2':
+							$mac_res->generate_mac();
+							$suggested_mac = $mac_res->mac;
+							$suggested_last_two_bytes = substr($suggested_mac, 12);
+							$new_vm_mac = $vmware_mac_address_space.":".$suggested_last_two_bytes;
+							break;
+						default:
+							$mac_res->generate_mac();
+							$new_vm_mac = $mac_res->mac;
+							break;
+					}
+					// additional_nics
+					$new_additional_nics = $cr->network_req;
+					// cpu
+					$new_vm_cpu = $cr->cpu_req;
+					// memory
+					$new_vm_memory = 256;
+					if ($cr->ram_req != 0) {
+						$new_vm_memory = $cr->ram_req;
+					}
+					// disk size
+					$new_vm_disk = 5000;
+					if ($cr->disk_req != 0) {
+						$new_vm_disk = $cr->disk_req;
+					}
+					// here we start the new vm !
+					$cloudvm = new cloudvm();
+					// this method returns the resource-id
+					$cloudvm->create($cr_cu_id, $appliance_virtualization, $appliance_name, $new_vm_mac, $new_additional_nics, $new_vm_cpu, $new_vm_memory, $new_vm_disk, $vm_create_timout);
+					$new_vm_resource_id = $cloudvm->resource_id;
+					$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Created VM with resource_id $new_vm_resource_id", "", "", 0, 0, 0);
+
+					// create cvmlc after we got a resource_id
+					$vm_create_time=$_SERVER['REQUEST_TIME'];
+					$cvmlc_resource_fields["vc_resource_id"]=$new_vm_resource_id;
+					$cvmlc_resource_fields["vc_cr_id"]=$cr_id;
+					$cvmlc_resource_fields["vc_cr_resource_number"]=$cr_resource_number;
+					$cvmlc_resource_fields["vc_request_time"]=$vm_create_time;
+					$cvmlc_resource_fields["vc_vm_create_timeout"]=$vm_create_timout;
+					$cvmlc_resource_fields["vc_state"]=0;
+					// get the new resource id from the db
+					$new_vc_id=openqrm_db_get_free_id('vc_id', $cvmlc->_db_table);
+					$cvmlc_resource_fields["vc_id"]=$new_vc_id;
+					$cvmlc->add($cvmlc_resource_fields);
+					// here we go on to the next cr or resource_number, remove app before
+					$appliance->remove($appliance_id);
+					continue;
+
+				} else {
+					// we have a cvmlc, check its resource and set its state
+					$cvm_resource = new resource();
+					$cvm_resource->get_instance_by_id($cvmlc->resource_id);
+					// idle ?
+					if (($cvm_resource->imageid == 1) && ($cvm_resource->state == 'active') && (strcmp($cvm_resource->ip, "0.0.0.0"))) {
+						// we have a new idle vm as resource :) update it in the appliance
+						$new_vm_resource_id = $cvmlc->resource_id;
+						$appliance_fields = array();
+						$appliance_fields['appliance_resources'] = $new_vm_resource_id;
+						// update and refresh the appliance object
+						$appliance->update($appliance->id, $appliance_fields);
+						$appliance->get_instance_by_id($appliance_id);
+						$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Created resource $new_vm_resource_id /cr $cr_id now idle, continue provisioning.", "", "", 0, 0, 0);
+						// remove cvmlc
+						$cvmlc->remove($cvmlc->id);
+
+					} else {
+
+						// check timeout
+						$vm_check_time=$_SERVER['REQUEST_TIME'];
+						$vm_c_timeout = $cvmlc->request_time + $cvmlc->vm_create_timeout;
+						if ($vm_check_time > $vm_c_timeout) {
+
+							$event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "cloud-monitor", "Could not create a new resource for request ID $cr_id!", "", "", 0, 0, 0);
+							$cr->setstatus($cr_id, 'no-res');
+
+							// send mail to user
+							$rmail = new cloudmailer();
+							$rmail->to = "$cu_email";
+							$rmail->from = "$cc_acr_admin_email";
+							$rmail->subject = "openQRM Cloud: Not enough resources for provisioning your $cr_resource_number. system from request $cr_id";
+							$rmail->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/not_enough_resources.mail.tmpl";
+							$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"$cu_forename", '@@LASTNAME@@'=>"$cu_lastname", '@@RESNUMBER@@'=>"$cr_resource_number", '@@YOUR@@'=>"your");
+							$rmail->var_array = $arr;
+							$rmail->send();
+							// send mail to admin
+							$rmail_admin = new cloudmailer();
+							$rmail_admin->to = "$cc_acr_admin_email";
+							$rmail_admin->from = "$cc_acr_admin_email";
+							$rmail_admin->subject = "openQRM Cloud: Not enough resources for provisioning the $cr_resource_number. system from request $cr_id";
+							$rmail_admin->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/not_enough_resources.mail.tmpl";
+							$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"Cloudadmin", '@@LASTNAME@@'=>"", '@@RESNUMBER@@'=>"$cr_resource_number", '@@YOUR@@'=>"the");
+							$rmail_admin->var_array = $arr;
+							$rmail_admin->send();
+
+							// remove app
+							$appliance->remove($appliance_id);
+							// do not remove the cvmlc, deprovisioning a "no-resource" cr needs it
+							// it will then remove the vm + cvmlc
+							// $cvmlc->remove($cvmlc->id);
+							// go on
+							continue;
+						}
+						// still waiting within  the timeout
+						// update state to 1 (starting)
+						// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Still waiting for cr $cr_id / res. ".$cvmlc->resource_id." to get idle", "", "", 0, 0, 0);
+						$cvm_state_fields['vc_state'] = 1;
+						$cvmlc->update($cvmlc->id, $cvm_state_fields);
+						// remove app
+						$appliance->remove($appliance_id);
+						// continue with the next cr/res-nr
+						continue;
+					}
+				}
+
+			// ################################## no auto create vm ###############################
+
+			} else {
+				// not set to auto-create vms
+				// try to find a fitting idle vm
 				$appliance->find_resource($appliance_virtualization);
 				// check if we got a resource !
 				$appliance->get_instance_by_id($appliance_id);
 				if ($appliance->resources == -1) {
-					$event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "cloud-monitor", "Could not find a resource (type physical system) for request ID $cr_id!", "", "", 0, 0, 0);
+					$event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "cloud-monitor", "Not creating a new resource for request ID $cr_id since auto-create-vms is disabled.", "", "", 0, 0, 0);
 					$appliance->remove($appliance_id);
 					$cr->setstatus($cr_id, 'no-res');
 
@@ -558,527 +762,380 @@ function openqrm_cloud_monitor() {
 					$rmail_admin->send();
 					continue;
 				}
-				// we have a phys. resource
+			}
+		}
 
+		// ################################## end auto create vm ###############################
 
+		// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Found resource ".$appliance->resources." (type $appliance_virtualization) for request ID $cr_id", "", "", 0, 0, 0);
+		// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "monitor-hook", "#### Cloud Phase II-2 - Got resource, Clone Image", "", "", 0, 0, 0);
+
+		// ################################## clone on deploy ###############################
+
+		// here we have a resource but
+		// do we have to clone the image before deployment ?
+		// get image definition
+		$image = new image();
+		$image->get_instance_by_id($cr->image_id);
+		$image_name = $image->name;
+		$image_type = $image->type;
+		$image_version = $image->version;
+		$image_rootdevice = $image->rootdevice;
+		$image_rootfstype = $image->rootfstype;
+		$image_storageid = $image->storageid;
+		$image_isshared = $image->isshared;
+		$image_comment = $image->comment;
+		$image_capabilities = $image->capabilities;
+		$image_deployment_parameter = $image->deployment_parameter;
+
+		// check if this is a private cloud image belonging to the user
+		// if yes, check if clone_on_deploy is enabled
+		$provision_private_image = new cloudprivateimage();
+		$provision_private_image->get_instance_by_image_id($image->id);
+		if ($provision_private_image->cu_id == $cr_cu_id) {
+			$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Image ".$image_name." belongs to cloud user ".$cr_cu_id.".", "", "", 0, 0, 0);
+			if ($provision_private_image->clone_on_deploy == 0) {
+				$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Image ".$image_name." is private and set to NOT clone-on-deploy.", "", "", 0, 0, 0);
+				$cr->shared_req = 0;
+				// update in the db
+				$cr_update_fields=array();
+				$cr_update_fields["cr_shared_req"]="0";
+				$cr->update($cr->id, $cr_update_fields);
 			} else {
+				$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Image ".$image_name." is private and set to clone-on-deploy.", "", "", 0, 0, 0);
+			}
+		}
 
-				// ################################## auto create vm ###############################
-				// check if we should try to create one
+		// we clone ?
+		if ($cr->shared_req == 1) {
+			// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Request ID $cr_id has clone-on-deploy activated. Cloning the image", "", "", 0, 0, 0);
+			// assign new name
+			$image_clone_name = $cr->image_id.".cloud_".$cr_id."_".$cr_resource_number."_";
+			// get new image id
+			$image_id  = openqrm_db_get_free_id('image_id', $IMAGE_INFO_TABLE);
 
-				// request type vm
-				$cc_autovm_conf = new cloudconfig();
-				$cc_auto_create_vms = $cc_autovm_conf->get_value(7);  // 7 is auto_create_vms
-				if (!strcmp($cc_auto_create_vms, "true")) {
-					// check if createvmlc exists for this cr + res-quantity
-					unset($cvmlc);
-					$cvmlc = new cloudcreatevmlc();
-					$cvmlc->get_instance_by_cr_details($cr_id, $cr_resource_number);
-					if (!strlen($cvmlc->request_time)) {
-						// if no createvmlc exists so far create it and the vm
-						// generate a mac address
-						$mac_res = new resource();
-						// check if we need to generate the first nics mac address in the vmware address space
-						$new_vm_mac="";
-						$vm_virt = new virtualization();
-						$vm_virt->get_instance_by_type($cr->resource_type_req);
-						$virt_name = str_replace("-vm", "", $vm_virt->type);
-						switch ($virt_name) {
-							case 'vmware-esx':
-							case 'vmware-server':
-							case 'vmware-server2':
-								$suggested_mac = $mac_res->mac;
-								$suggested_last_two_bytes = substr($suggested_mac, 12);
-								$new_vm_mac = $vmware_mac_address_space.":".$suggested_last_two_bytes;
-								break;
-							default:
-								$mac_res->generate_mac();
-								$new_vm_mac = $mac_res->mac;
-								break;
-						}
-						// additional_nics
-						$new_additional_nics = $cr->network_req;
-						// cpu
-						$new_vm_cpu = $cr->cpu_req;
-						// memory
-						$new_vm_memory = 256;
-						if ($cr->ram_req != 0) {
-							$new_vm_memory = $cr->ram_req;
-						}
-						// disk size
-						$new_vm_disk = 5000;
-						if ($cr->disk_req != 0) {
-							$new_vm_disk = $cr->disk_req;
-						}
-						// here we start the new vm !
-						$cloudvm = new cloudvm();
-						// this method returns the resource-id
-						$cloudvm->create($cr_cu_id, $appliance_virtualization, $appliance_name, $new_vm_mac, $new_additional_nics, $new_vm_cpu, $new_vm_memory, $new_vm_disk, $vm_create_timout);
-						$new_vm_resource_id = $cloudvm->resource_id;
-						$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Created VM with resource_id $new_vm_resource_id", "", "", 0, 0, 0);
+			// add the new image to the openQRM db
+			$ar_request = array(
+				'image_id' => $image_id,
+				'image_name' => $image_clone_name,
+				'image_version' => $image_version,
+				'image_type' => $image_type,
+				'image_rootdevice' => $image_rootdevice,
+				'image_rootfstype' => $image_rootfstype,
+				'image_storageid' => $image_storageid,
+				'image_isshared' => $image_isshared,
+				'image_comment' => "Requested by user $cu_name",
+				'image_capabilities' => $image_capabilities,
+				'image_deployment_parameter' => $image_deployment_parameter,
+			);
+			$image->add($ar_request);
+			$image->get_instance_by_id($image_id);
 
-						// create cvmlc after we got a resource_id
-						$vm_create_time=$_SERVER['REQUEST_TIME'];
-						$cvmlc_resource_fields["vc_resource_id"]=$new_vm_resource_id;
-						$cvmlc_resource_fields["vc_cr_id"]=$cr_id;
-						$cvmlc_resource_fields["vc_cr_resource_number"]=$cr_resource_number;
-						$cvmlc_resource_fields["vc_request_time"]=$vm_create_time;
-						$cvmlc_resource_fields["vc_vm_create_timeout"]=$vm_create_timout;
-						$cvmlc_resource_fields["vc_state"]=0;
-						// get the new resource id from the db
-						$new_vc_id=openqrm_db_get_free_id('vc_id', $cvmlc->_db_table);
-						$cvmlc_resource_fields["vc_id"]=$new_vc_id;
-						$cvmlc->add($cvmlc_resource_fields);
-						// here we go on to the next cr or resource_number, remove app before
-						$appliance->remove($appliance_id);
+			// set the new image in the appliance !
+			// prepare array to update appliance
+			$ar_appliance_update = array(
+				'appliance_imageid' => $image_id,
+			);
+			$appliance->update($appliance_id, $ar_appliance_update);
+			// refresh the appliance object
+			$appliance->get_instance_by_id($appliance_id);
+
+			// here we put the image + resource definition into an cloudimage
+			// this cares e.g. later to remove the image after the resource gets idle again
+			// -> the check for the resource-idle state happens at the beginning
+			//    of every cloud-monitor loop
+			$ci_disk_size=5000;
+			if (strlen($cr->disk_req)) {
+				$ci_disk_size=$cr->disk_req;
+			}
+			// get a new ci_id
+			$cloud_image_id  = openqrm_db_get_free_id('ci_id', $CLOUD_IMAGE_TABLE);
+			$cloud_image_arr = array(
+					'ci_id' => $cloud_image_id,
+					'ci_cr_id' => $cr->id,
+					'ci_image_id' => $appliance->imageid,
+					'ci_appliance_id' => $appliance->id,
+					'ci_resource_id' => $appliance->resources,
+					'ci_disk_size' => $ci_disk_size,
+					'ci_state' => 1,
+			);
+			$cloud_image = new cloudimage();
+			$cloud_image->add($cloud_image_arr);
+
+			// get image storage
+			$storage = new storage();
+			$storage->get_instance_by_id($image_storageid);
+			$storage_resource_id = $storage->resource_id;
+			// get storage resource
+			$resource = new resource();
+			$resource->get_instance_by_id($storage_resource_id);
+			$resource_id = $resource->id;
+			$resource_ip = $resource->ip;
+
+			$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Sending clone command to $resource_ip to create Image $image_clone_name", "", "", 0, 0, 0);
+			$storage_clone_timeout=60;
+			$cloudstorage = new cloudstorage();
+			$cloudstorage->create_clone($cloud_image_id, $image_clone_name, $ci_disk_size, $storage_clone_timeout);
+			// be sure to have the create command run before appliance start / storage auth hook
+			sleep(5);
+
+		} else {
+
+			// non shared !
+			$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Not cloning Image ".$image_name.".", "", "", 0, 0, 0);
+			// we put it into an cloudimage too but it won't get removed
+			$ci_disk_size=5000;
+			if (strlen($cr->disk_req)) {
+				$ci_disk_size=$cr->disk_req;
+			}
+			// get a new ci_id
+			$cloud_image_id  = openqrm_db_get_free_id('ci_id', $CLOUD_IMAGE_TABLE);
+			$cloud_image_arr = array(
+					'ci_id' => $cloud_image_id,
+					'ci_cr_id' => $cr->id,
+					'ci_image_id' => $appliance->imageid,
+					'ci_appliance_id' => $appliance->id,
+					'ci_resource_id' => $appliance->resources,
+					'ci_disk_size' => $ci_disk_size,
+					'ci_state' => 1,
+			);
+			$cloud_image = new cloudimage();
+			$cloud_image->add($cloud_image_arr);
+		}
+
+
+
+		// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "monitor-hook", "#### Cloud Phase II-3 - Appliance start", "", "", 0, 0, 0);
+
+		// ################################## start appliance ###############################
+
+		// assign the resource
+		$kernel = new kernel();
+		$kernel->get_instance_by_id($appliance->kernelid);
+		$resource = new resource();
+		$resource->get_instance_by_id($appliance->resources);
+		// in case we do not have an external ip-config send the resource ip to the user
+		$resource_external_ip=$resource->ip;
+		// ################################## ip-mgmt assing  ###############################
+		// check ip-mgmt
+		$cc_conf = new cloudconfig();
+		$show_ip_mgmt = $cc_conf->get_value(26);	// ip-mgmt enabled ?
+		if (!strcmp($show_ip_mgmt, "true")) {
+			if (file_exists("$RootDir/plugins/ip-mgmt/.running")) {
+				require_once "$RootDir/plugins/ip-mgmt/class/ip-mgmt.class.php";
+				$ip_mgmt_array = explode(",", $cr->ip_mgmt);
+				$ip_mgmt_assign_loop = 1;
+				foreach($ip_mgmt_array as $ip_mgmt_config_str) {
+					$collon_pos = strpos($ip_mgmt_config_str, ":");
+					$nic_id = substr($ip_mgmt_config_str, 0, $collon_pos);
+					$ip_mgmt_id = substr($ip_mgmt_config_str, $collon_pos+1);
+					if (!strlen($ip_mgmt_id)) {
 						continue;
-
+					}
+					$orginal_ip_mgmt_id = $ip_mgmt_id;
+					$ip_mgmt_assign = new ip_mgmt();
+					$ip_mgmt_id_final = $ip_mgmt_id;
+					// we need to check if the ip is still free
+					$ip_mgmt_object_arr = $ip_mgmt_assign->get_instance('id', $ip_mgmt_id);
+					$ip_app_id = $ip_mgmt_object_arr['ip_mgmt_appliance_id'];
+					if ($ip_app_id > 0) {
+						$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "WARNING: ip-mgmt id ".$ip_mgmt_id." is already in use. Trying to find the next free ip..", "", "", 0, 0, 0);
+						$ip_mgmt_id = -2;
 					} else {
-						// we have a cvmlc, check its resource and set its state
-						$cvm_resource = new resource();
-						$cvm_resource->get_instance_by_id($cvmlc->resource_id);
-						// idle ?
-						if (($cvm_resource->imageid == 1) && ($cvm_resource->state == 'active') && (strcmp($cvm_resource->ip, "0.0.0.0"))) {
-							// we have a new idle vm as resource :) update it in the appliance
-							$new_vm_resource_id = $cvmlc->resource_id;
-							$appliance_fields = array();
-							$appliance_fields['appliance_resources'] = $new_vm_resource_id;
-							// update and refresh the appliance object
-							$appliance->update($appliance->id, $appliance_fields);
-							$appliance->get_instance_by_id($appliance_id);
-							$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Created resource $new_vm_resource_id /cr $cr_id now idle, continue provisioning.", "", "", 0, 0, 0);
-							// remove cvmlc
-							$cvmlc->remove($cvmlc->id);
+						$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "SUCCESS: ip-mgmt id ".$ip_mgmt_id." is free.", "", "", 0, 0, 0);
+					}
 
-						} else {
-
-							// check timeout
-							$vm_check_time=$_SERVER['REQUEST_TIME'];
-							$vm_c_timeout = $cvmlc->request_time + $cvmlc->vm_create_timeout;
-							if ($vm_check_time > $vm_c_timeout) {
-
-								$event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "cloud-monitor", "Could not create a new resource for request ID $cr_id!", "", "", 0, 0, 0);
-								$cr->setstatus($cr_id, 'no-res');
-
-								// send mail to user
-								$rmail = new cloudmailer();
-								$rmail->to = "$cu_email";
-								$rmail->from = "$cc_acr_admin_email";
-								$rmail->subject = "openQRM Cloud: Not enough resources for provisioning your $cr_resource_number. system from request $cr_id";
-								$rmail->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/not_enough_resources.mail.tmpl";
-								$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"$cu_forename", '@@LASTNAME@@'=>"$cu_lastname", '@@RESNUMBER@@'=>"$cr_resource_number", '@@YOUR@@'=>"your");
-								$rmail->var_array = $arr;
-								$rmail->send();
-								// send mail to admin
-								$rmail_admin = new cloudmailer();
-								$rmail_admin->to = "$cc_acr_admin_email";
-								$rmail_admin->from = "$cc_acr_admin_email";
-								$rmail_admin->subject = "openQRM Cloud: Not enough resources for provisioning the $cr_resource_number. system from request $cr_id";
-								$rmail_admin->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/not_enough_resources.mail.tmpl";
-								$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"Cloudadmin", '@@LASTNAME@@'=>"", '@@RESNUMBER@@'=>"$cr_resource_number", '@@YOUR@@'=>"the");
-								$rmail_admin->var_array = $arr;
-								$rmail_admin->send();
-
-								// remove app
-								$appliance->remove($appliance_id);
-								// do not remove the cvmlc, deprovisioning a "no-resource" cr needs it
-								// it will then remove the vm + cvmlc
-								// $cvmlc->remove($cvmlc->id);
-								// go on
-								continue;
+					// if ip_mgmt_id == auto (-2) search the next free ip for the user
+					if ($ip_mgmt_id == -2) {
+						$ip_mgmt_list_per_user = $ip_mgmt_assign->get_list_by_user($cu->cg_id);
+						$next_free_ip_mgmt_id = 0;
+						foreach($ip_mgmt_list_per_user as $list) {
+							$possible_next_ip_mgmt_id = $list['ip_mgmt_id'];
+							$possible_next_ip_mgmt_object_arr = $ip_mgmt_assign->get_instance('id', $possible_next_ip_mgmt_id);
+							if ($possible_next_ip_mgmt_object_arr['ip_mgmt_appliance_id'] == NULL) {
+								// we have found the next free ip-mgmt id
+								$next_free_ip_mgmt_id = $possible_next_ip_mgmt_id;
+								$ip_mgmt_id_final = $possible_next_ip_mgmt_id;
+								break;
 							}
-							// still waiting within  the timeout
-							// update state to 1 (starting)
-							// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Still waiting for cr $cr_id / res. ".$cvmlc->resource_id." to get idle", "", "", 0, 0, 0);
-							$cvm_state_fields['vc_state'] = 1;
-							$cvmlc->update($cvmlc->id, $cvm_state_fields);
-							// remove app
-							$appliance->remove($appliance_id);
-							// continue with the next cr/res-nr
+						}
+						if ($next_free_ip_mgmt_id == 0) {
+							$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "WARNING: Could not find the next free ip-mgmt id for appliance ".$appliance_id.".", "", "", 0, 0, 0);
 							continue;
+						} else {
+							$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "SUCCESS: Found the next free ip-mgmt id ".$next_free_ip_mgmt_id." for appliance ".$appliance_id.".", "", "", 0, 0, 0);
+							$ip_mgmt_id = $next_free_ip_mgmt_id;
+							// here we have to update the cr with the new ip-mgmt-id
+							$new_cr_ip_mgmt_str = str_replace($nic_id.":".$orginal_ip_mgmt_id, $nic_id.":".$ip_mgmt_id, $cr->ip_mgmt);
+							$new_cr_ip_mgmt_fields=array();
+							$new_cr_ip_mgmt_fields["cr_ip_mgmt"]=$new_cr_ip_mgmt_str;
+							$cr->update($cr->id, $new_cr_ip_mgmt_fields);
+							$cr->get_instance_by_id($cr->id);
 						}
 					}
 
-				// ################################## no auto create vm ###############################
+					// here we have a valid ip-mgmt opbject to update
+					$ip_mgmt_fields=array();
+					$ip_mgmt_fields["ip_mgmt_appliance_id"]=$appliance_id;
+					$ip_mgmt_fields["ip_mgmt_nic_id"]=$nic_id;
+					$ip_mgmt_assign->update_ip($ip_mgmt_id, $ip_mgmt_fields);
+					// set resource_external_ip
+					if ($ip_mgmt_assign_loop == 1) {
+						$ip_mgmt_assign_arr = $ip_mgmt_assign->get_config_by_id($ip_mgmt_id_final);
+						$resource_external_ip = $ip_mgmt_assign_arr[0]['ip_mgmt_address'];
+					}
+					$ip_mgmt_assign_loop++;
+				}
+			}
+		}
+
+		// #####################################################################################
+
+		// send command to the openQRM-server
+		$openqrm_server->send_command("openqrm_assign_kernel $resource->id $resource->mac $kernel->name");
+		// wait until the resource got the new kernel assigned
+		sleep(2);
+
+		//start the appliance, refresh the object before in case of clone-on-deploy
+		$appliance->get_instance_by_id($appliance_id);
+		$appliance->start();
+
+		// update appliance id in request
+		$cr->get_instance_by_id($cr->id);
+		$cr->setappliance("add", $appliance_id);
+		// update request status
+		$cr->setstatus($cr_id, "active");
+
+		// now we generate a random password to send to the user
+		$image = new image();
+		$appliance_password = $image->generatePassword(8);
+		$image->set_root_password($appliance->imageid, $appliance_password);
+
+		// here we insert the new appliance into the cloud-appliance table
+		$cloud_appliance_id  = openqrm_db_get_free_id('ca_id', $CLOUD_APPLIANCE_TABLE);
+		$cloud_appliance_arr = array(
+				'ca_id' => $cloud_appliance_id,
+				'ca_cr_id' => $cr->id,
+				'ca_appliance_id' => $appliance_id,
+				'ca_cmd' => 0,
+				'ca_state' => 1,
+		);
+		$cloud_appliance = new cloudappliance();
+		$cloud_appliance->add($cloud_appliance_arr);
+
+
+		// ################################## apply puppet groups ###############################
+
+		// check if puppet is enabled
+		$puppet_conf = new cloudconfig();
+		$show_puppet_groups = $puppet_conf->get_value(11);	// show_puppet_groups
+		if (!strcmp($show_puppet_groups, "true")) {
+			// is puppet enabled ?
+			if (file_exists("$RootDir/plugins/puppet/.running")) {
+				// check if we have a puppet config in the request
+				$puppet_appliance = $appliance->name;
+				if (strlen($cr->puppet_groups)) {
+					$puppet_groups_str = $cr->puppet_groups;
+					$puppet_appliance = $appliance->name;
+					$puppet_debug = "Applying $puppet_groups_str to appliance $puppet_appliance";
+					$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", $puppet_debug, "", "", 0, 0, 0);
+					require_once "$RootDir/plugins/puppet/class/puppet.class.php";
+					$puppet_group_dir = "$RootDir/plugins/puppet/puppet/manifests/groups";
+					global $puppet_group_dir;
+					$puppet_appliance_dir = "$RootDir/plugins/puppet/puppet/manifests/appliances";
+					global $puppet_appliance_dir;
+					// $puppet_group_array = array();
+					$puppet_group_array = explode(",", $cr->puppet_groups);
+					$puppet = new puppet();
+					$puppet->set_groups($appliance->name, $puppet_group_array);
+				}
+			}
+		}
+
+
+		// ################################## mail user provisioning ###############################
+
+		// send mail to user
+		// get admin email
+		$cc_conf = new cloudconfig();
+		$cc_admin_email = $cc_conf->get_value(1);  // 1 is admin_email
+		// get user + request + appliance details
+		$cu_id = $cr->cu_id;
+		$cu = new clouduser();
+		$cu->get_instance_by_id($cu_id);
+		$cu_name = $cu->name;
+		$cu_forename = $cu->forename;
+		$cu_lastname = $cu->lastname;
+		$cu_email = $cu->email;
+		// start/stop time
+		$cr_start = $cr->start;
+		$start = date("d-m-Y H-i", $cr_start);
+		$cr_stop = $cr->stop;
+		$stop = date("d-m-Y H-i", $cr_stop);
+
+		$rmail = new cloudmailer();
+		$rmail->to = "$cu_email";
+		$rmail->from = "$cc_admin_email";
+		$rmail->subject = "openQRM Cloud: Your $cr_resource_number. resource from request $cr_id is now active";
+		$rmail->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/active_cloud_request.mail.tmpl";
+		$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"$cu_forename", '@@LASTNAME@@'=>"$cu_lastname", '@@START@@'=>"$start", '@@STOP@@'=>"$stop", '@@PASSWORD@@'=>"$appliance_password", '@@IP@@'=>"$resource_external_ip", '@@RESNUMBER@@'=>"$cr_resource_number");
+		$rmail->var_array = $arr;
+		$rmail->send();
+
+		# mail the ip + root password to the cloud admin
+		$rmail_admin = new cloudmailer();
+		$rmail_admin->to = "$cc_admin_email";
+		$rmail_admin->from = "$cc_admin_email";
+		$rmail_admin->subject = "openQRM Cloud: $cr_resource_number. resource from request $cr_id is now active";
+		$rmail_admin->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/active_cloud_request_admin.mail.tmpl";
+		$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"$cu_forename", '@@LASTNAME@@'=>"$cu_lastname", '@@START@@'=>"$start", '@@STOP@@'=>"$stop", '@@PASSWORD@@'=>"$appliance_password", '@@IP@@'=>"$resource_external_ip", '@@RESNUMBER@@'=>"$cr_resource_number");
+		$rmail_admin->var_array = $arr;
+		$rmail_admin->send();
+
+
+		// ################################## setup access to collectd graphs ####################
+
+		// check if collectd is enabled
+		$collectd_conf = new cloudconfig();
+		$show_collectd_graphs = $collectd_conf->get_value(19);	// show_collectd_graphs
+		if (!strcmp($show_collectd_graphs, "true")) {
+			// is collectd enabled ?
+			if (file_exists("$RootDir/plugins/collectd/.running")) {
+				// ldap or regular user ?
+				$collectd_appliance = $appliance->name;
+				if (file_exists("$RootDir/plugins/ldap/.running")) {
+					$collectd_debug = "Setting up access to the collectd graphs of appliance $collectd_appliance for ldap Cloud user $cu_name";
+					$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", $collectd_debug, "", "", 0, 0, 0);
+					// get ldap from db config
+					$ldap_conf = new ldapconfig();
+					$ldap_conf->get_instance_by_id(1);
+					$ldap_host = $ldap_conf->value;
+					$ldap_conf->get_instance_by_id(2);
+					$ldap_port = $ldap_conf->value;
+					$ldap_conf->get_instance_by_id(3);
+					$ldap_base_dn = $ldap_conf->value;
+					$ldap_conf->get_instance_by_id(4);
+					$ldap_admin = $ldap_conf->value;
+					$ldap_conf->get_instance_by_id(5);
+					$ldap_password = $ldap_conf->value;
+					// send command to the openQRM-server
+					$setup_collectd = $OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/cloud/bin/openqrm-cloud-manager setup-graph-ldap ".$collectd_appliance." ".$cu_name." ".$ldap_host." ".$ldap_port." ".$ldap_base_dn." ".$ldap_password;
+					$openqrm_server->send_command($setup_collectd);
 
 				} else {
-					// not set to auto-create vms
-					// try to find a fitting idle vm
-					$appliance->find_resource($appliance_virtualization);
-					// check if we got a resource !
-					$appliance->get_instance_by_id($appliance_id);
-					if ($appliance->resources == -1) {
-						$event->log("cloud", $_SERVER['REQUEST_TIME'], 2, "cloud-monitor", "Not creating a new resource for request ID $cr_id since auto-create-vms is disabled.", "", "", 0, 0, 0);
-						$appliance->remove($appliance_id);
-						$cr->setstatus($cr_id, 'no-res');
-
-						// send mail to user
-						$rmail = new cloudmailer();
-						$rmail->to = "$cu_email";
-						$rmail->from = "$cc_acr_admin_email";
-						$rmail->subject = "openQRM Cloud: Not enough resources for provisioning your $cr_resource_number. system from request $cr_id";
-						$rmail->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/not_enough_resources.mail.tmpl";
-						$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"$cu_forename", '@@LASTNAME@@'=>"$cu_lastname", '@@RESNUMBER@@'=>"$cr_resource_number", '@@YOUR@@'=>"your");
-						$rmail->var_array = $arr;
-						$rmail->send();
-						// send mail to admin
-						$rmail_admin = new cloudmailer();
-						$rmail_admin->to = "$cc_acr_admin_email";
-						$rmail_admin->from = "$cc_acr_admin_email";
-						$rmail_admin->subject = "openQRM Cloud: Not enough resources for provisioning the $cr_resource_number. system from request $cr_id";
-						$rmail_admin->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/not_enough_resources.mail.tmpl";
-						$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"Cloudadmin", '@@LASTNAME@@'=>"", '@@RESNUMBER@@'=>"$cr_resource_number", '@@YOUR@@'=>"the");
-						$rmail_admin->var_array = $arr;
-						$rmail_admin->send();
-						continue;
-					}
+					// regular basic auth user
+					$collectd_debug = "Setting up access to the collectd graphs of appliance $collectd_appliance for Cloud user $cu_name";
+					$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", $collectd_debug, "", "", 0, 0, 0);
+					// here we still have the valid user object, get the password
+					$cu_pass = $cu->password;
+					// send command to the openQRM-server
+					$setup_collectd = $OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/cloud/bin/openqrm-cloud-manager setup-graph ".$collectd_appliance." ".$cu_name." ".$cu_pass;
+					$openqrm_server->send_command($setup_collectd);
 				}
+
 			}
-
-
-			// ################################## end auto create vm ###############################
-
-			// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Found resource ".$appliance->resources." (type $appliance_virtualization) for request ID $cr_id", "", "", 0, 0, 0);
-			// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "monitor-hook", "#### Cloud Phase II-2 - Got resource, Clone Image", "", "", 0, 0, 0);
-
-			// ################################## clone on deploy ###############################
-
-			// here we have a resource but
-			// do we have to clone the image before deployment ?
-			// get image definition
-			$image = new image();
-			$image->get_instance_by_id($cr->image_id);
-			$image_name = $image->name;
-			$image_type = $image->type;
-			$image_version = $image->version;
-			$image_rootdevice = $image->rootdevice;
-			$image_rootfstype = $image->rootfstype;
-			$image_storageid = $image->storageid;
-			$image_isshared = $image->isshared;
-			$image_comment = $image->comment;
-			$image_capabilities = $image->capabilities;
-			$image_deployment_parameter = $image->deployment_parameter;
-
-			// we clone ?
-			if ($cr->shared_req == 1) {
-				// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Request ID $cr_id has clone-on-deploy activated. Cloning the image", "", "", 0, 0, 0);
-				// assign new name
-				$image_clone_name = $cr->image_id.".cloud_".$cr_id."_".$cr_resource_number."_";
-				// get new image id
-				$image_id  = openqrm_db_get_free_id('image_id', $IMAGE_INFO_TABLE);
-
-				// add the new image to the openQRM db
-				$ar_request = array(
-					'image_id' => $image_id,
-					'image_name' => $image_clone_name,
-					'image_version' => $image_version,
-					'image_type' => $image_type,
-					'image_rootdevice' => $image_rootdevice,
-					'image_rootfstype' => $image_rootfstype,
-					'image_storageid' => $image_storageid,
-					'image_isshared' => $image_isshared,
-					'image_comment' => "Requested by user $cu_name",
-					'image_capabilities' => $image_capabilities,
-					'image_deployment_parameter' => $image_deployment_parameter,
-				);
-				$image->add($ar_request);
-				$image->get_instance_by_id($image_id);
-
-				// set the new image in the appliance !
-				// prepare array to update appliance
-				$ar_appliance_update = array(
-					'appliance_imageid' => $image_id,
-				);
-				$appliance->update($appliance_id, $ar_appliance_update);
-				// refresh the appliance object
-				$appliance->get_instance_by_id($appliance_id);
-
-				// here we put the image + resource definition into an cloudimage
-				// this cares e.g. later to remove the image after the resource gets idle again
-				// -> the check for the resource-idle state happens at the beginning
-				//    of every cloud-monitor loop
-				$ci_disk_size=5000;
-				if (strlen($cr->disk_req)) {
-					$ci_disk_size=$cr->disk_req;
-				}
-				// get a new ci_id
-				$cloud_image_id  = openqrm_db_get_free_id('ci_id', $CLOUD_IMAGE_TABLE);
-				$cloud_image_arr = array(
-						'ci_id' => $cloud_image_id,
-						'ci_cr_id' => $cr->id,
-						'ci_image_id' => $appliance->imageid,
-						'ci_appliance_id' => $appliance->id,
-						'ci_resource_id' => $appliance->resources,
-						'ci_disk_size' => $ci_disk_size,
-						'ci_state' => 1,
-				);
-				$cloud_image = new cloudimage();
-				$cloud_image->add($cloud_image_arr);
-
-				// get image storage
-				$storage = new storage();
-				$storage->get_instance_by_id($image_storageid);
-				$storage_resource_id = $storage->resource_id;
-				// get storage resource
-				$resource = new resource();
-				$resource->get_instance_by_id($storage_resource_id);
-				$resource_id = $resource->id;
-				$resource_ip = $resource->ip;
-
-				$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Sending clone command to $resource_ip to create Image $image_clone_name", "", "", 0, 0, 0);
-				$storage_clone_timeout=60;
-				$cloudstorage = new cloudstorage();
-				$cloudstorage->create_clone($cloud_image_id, $image_clone_name, $ci_disk_size, $storage_clone_timeout);
-				// be sure to have the create command run before appliance start / storage auth hook
-				sleep(5);
-			} else {
-
-				// non shared !
-				// we put it into an cloudimage too but it won't get removed
-				$ci_disk_size=5000;
-				if (strlen($cr->disk_req)) {
-					$ci_disk_size=$cr->disk_req;
-				}
-				// get a new ci_id
-				$cloud_image_id  = openqrm_db_get_free_id('ci_id', $CLOUD_IMAGE_TABLE);
-				$cloud_image_arr = array(
-						'ci_id' => $cloud_image_id,
-						'ci_cr_id' => $cr->id,
-						'ci_image_id' => $appliance->imageid,
-						'ci_appliance_id' => $appliance->id,
-						'ci_resource_id' => $appliance->resources,
-						'ci_disk_size' => $ci_disk_size,
-						'ci_state' => 1,
-				);
-				$cloud_image = new cloudimage();
-				$cloud_image->add($cloud_image_arr);
-			}
-
-
-
-			// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "monitor-hook", "#### Cloud Phase II-3 - Appliance start", "", "", 0, 0, 0);
-
-			// ################################## start appliance ###############################
-
-			// assign the resource
-			$kernel = new kernel();
-			$kernel->get_instance_by_id($appliance->kernelid);
-			$resource = new resource();
-			$resource->get_instance_by_id($appliance->resources);
-			// in case we do not have an external ip-config send the resource ip to the user
-			$resource_external_ip=$resource->ip;
-			// ################################## ip-mgmt assing  ###############################
-			// check ip-mgmt
-			$cc_conf = new cloudconfig();
-			$show_ip_mgmt = $cc_conf->get_value(26);	// ip-mgmt enabled ?
-			if (!strcmp($show_ip_mgmt, "true")) {
-				if (file_exists("$RootDir/plugins/ip-mgmt/.running")) {
-					require_once "$RootDir/plugins/ip-mgmt/class/ip-mgmt.class.php";
-					$ip_mgmt_array = explode(",", $cr->ip_mgmt);
-
-					foreach($ip_mgmt_array as $ip_mgmt_config_str) {
-						$collon_pos = strpos($ip_mgmt_config_str, ":");
-						$nic_id = substr($ip_mgmt_config_str, 0, $collon_pos);
-						$ip_mgmt_id = substr($ip_mgmt_config_str, $collon_pos+1);
-						$orginal_ip_mgmt_id = $ip_mgmt_id;
-						$ip_mgmt_assign = new ip_mgmt();
-						// we need to check if the ip is still free
-						$ip_mgmt_object_arr = $ip_mgmt_assign->get_instance('id', $ip_mgmt_id);
-						$ip_app_id = $ip_mgmt_object_arr['ip_mgmt_appliance_id'];
-						if ($ip_app_id > 0) {
-							$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "WARNING: ip-mgmt id ".$ip_mgmt_id." is already in use. Trying to find the next free ip..", "", "", 0, 0, 0);
-							$ip_mgmt_id = -2;
-						} else {
-							$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "SUCCESS: ip-mgmt id ".$ip_mgmt_id." is free.", "", "", 0, 0, 0);
-						}
-
-						// if ip_mgmt_id == auto (-2) search the next free ip for the user
-						if ($ip_mgmt_id == -2) {
-							$ip_mgmt_list_per_user = $ip_mgmt_assign->get_list_by_user($cu->cg_id);
-							$next_free_ip_mgmt_id = 0;
-							foreach($ip_mgmt_list_per_user as $list) {
-								$possible_next_ip_mgmt_id = $list['ip_mgmt_id'];
-								$possible_next_ip_mgmt_object_arr = $ip_mgmt_assign->get_instance('id', $possible_next_ip_mgmt_id);
-								if ($possible_next_ip_mgmt_object_arr['ip_mgmt_appliance_id'] == NULL) {
-									// we have found the next free ip-mgmt id
-									$next_free_ip_mgmt_id = $possible_next_ip_mgmt_id;
-									break;
-								}
-							}
-							if ($next_free_ip_mgmt_id == 0) {
-								$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "WARNING: Could not find the next free ip-mgmt id for appliance ".$appliance_id.".", "", "", 0, 0, 0);
-								continue;
-							} else {
-								$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "SUCCESS: Found the next free ip-mgmt id ".$next_free_ip_mgmt_id." for appliance ".$appliance_id.".", "", "", 0, 0, 0);
-								$ip_mgmt_id = $next_free_ip_mgmt_id;
-								// here we have to update the cr with the new ip-mgmt-id
-								$new_cr_ip_mgmt_str = str_replace($nic_id.":".$orginal_ip_mgmt_id, $nic_id.":".$ip_mgmt_id, $cr->ip_mgmt);
-								$new_cr_ip_mgmt_fields=array();
-								$new_cr_ip_mgmt_fields["cr_ip_mgmt"]=$new_cr_ip_mgmt_str;
-								$cr->update($cr->id, $new_cr_ip_mgmt_fields);
-								$cr->get_instance_by_id($cr->id);
-							}
-						}
-								
-						// here we have a valid ip-mgmt opbject to update
-						$ip_mgmt_fields=array();
-						$ip_mgmt_fields["ip_mgmt_appliance_id"]=$appliance_id;
-						$ip_mgmt_fields["ip_mgmt_nic_id"]=$nic_id;
-						$ip_mgmt_assign->update_ip($ip_mgmt_id, $ip_mgmt_fields);
-					}
-				}
-			}
-
-			// #####################################################################################
-
-			// send command to the openQRM-server
-			$openqrm_server->send_command("openqrm_assign_kernel $resource->id $resource->mac $kernel->name");
-			// wait until the resource got the new kernel assigned
-			sleep(2);
-
-			//start the appliance, refresh the object before in case of clone-on-deploy
-			$appliance->get_instance_by_id($appliance_id);
-			$appliance->start();
-
-			// update appliance id in request
-			$cr->get_instance_by_id($cr->id);
-			$cr->setappliance("add", $appliance_id);
-			// update request status
-			$cr->setstatus($cr_id, "active");
-
-			// now we generate a random password to send to the user
-			$image = new image();
-			$appliance_password = $image->generatePassword(8);
-			$image->set_root_password($appliance->imageid, $appliance_password);
-
-			// here we insert the new appliance into the cloud-appliance table
-			$cloud_appliance_id  = openqrm_db_get_free_id('ca_id', $CLOUD_APPLIANCE_TABLE);
-			$cloud_appliance_arr = array(
-					'ca_id' => $cloud_appliance_id,
-					'ca_cr_id' => $cr->id,
-					'ca_appliance_id' => $appliance_id,
-					'ca_cmd' => 0,
-					'ca_state' => 1,
-			);
-			$cloud_appliance = new cloudappliance();
-			$cloud_appliance->add($cloud_appliance_arr);
-
-
-			// ################################## apply puppet groups ###############################
-
-			// check if puppet is enabled
-			$puppet_conf = new cloudconfig();
-			$show_puppet_groups = $puppet_conf->get_value(11);	// show_puppet_groups
-			if (!strcmp($show_puppet_groups, "true")) {
-				// is puppet enabled ?
-				if (file_exists("$RootDir/plugins/puppet/.running")) {
-					// check if we have a puppet config in the request
-					$puppet_appliance = $appliance->name;
-					if (strlen($cr->puppet_groups)) {
-						$puppet_groups_str = $cr->puppet_groups;
-						$puppet_appliance = $appliance->name;
-						$puppet_debug = "Applying $puppet_groups_str to appliance $puppet_appliance";
-						$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", $puppet_debug, "", "", 0, 0, 0);
-						require_once "$RootDir/plugins/puppet/class/puppet.class.php";
-						$puppet_group_dir = "$RootDir/plugins/puppet/puppet/manifests/groups";
-						global $puppet_group_dir;
-						$puppet_appliance_dir = "$RootDir/plugins/puppet/puppet/manifests/appliances";
-						global $puppet_appliance_dir;
-						// $puppet_group_array = array();
-						$puppet_group_array = explode(",", $cr->puppet_groups);
-						$puppet = new puppet();
-						$puppet->set_groups($appliance->name, $puppet_group_array);
-					}
-				}
-			}
-
-
-			// ################################## mail user provisioning ###############################
-
-			// send mail to user
-			// get admin email
-			$cc_conf = new cloudconfig();
-			$cc_admin_email = $cc_conf->get_value(1);  // 1 is admin_email
-			// get user + request + appliance details
-			$cu_id = $cr->cu_id;
-			$cu = new clouduser();
-			$cu->get_instance_by_id($cu_id);
-			$cu_name = $cu->name;
-			$cu_forename = $cu->forename;
-			$cu_lastname = $cu->lastname;
-			$cu_email = $cu->email;
-			// start/stop time
-			$cr_start = $cr->start;
-			$start = date("d-m-Y H-i", $cr_start);
-			$cr_stop = $cr->stop;
-			$stop = date("d-m-Y H-i", $cr_stop);
-
-			$rmail = new cloudmailer();
-			$rmail->to = "$cu_email";
-			$rmail->from = "$cc_admin_email";
-			$rmail->subject = "openQRM Cloud: Your $cr_resource_number. resource from request $cr_id is now active";
-			$rmail->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/active_cloud_request.mail.tmpl";
-			$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"$cu_forename", '@@LASTNAME@@'=>"$cu_lastname", '@@START@@'=>"$start", '@@STOP@@'=>"$stop", '@@PASSWORD@@'=>"$appliance_password", '@@IP@@'=>"$resource_external_ip", '@@RESNUMBER@@'=>"$cr_resource_number");
-			$rmail->var_array = $arr;
-			$rmail->send();
-
-			# mail the ip + root password to the cloud admin
-			$rmail_admin = new cloudmailer();
-			$rmail_admin->to = "$cc_admin_email";
-			$rmail_admin->from = "$cc_admin_email";
-			$rmail_admin->subject = "openQRM Cloud: $cr_resource_number. resource from request $cr_id is now active";
-			$rmail_admin->template = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/etc/mail/active_cloud_request_admin.mail.tmpl";
-			$arr = array('@@ID@@'=>"$cr_id", '@@FORENAME@@'=>"$cu_forename", '@@LASTNAME@@'=>"$cu_lastname", '@@START@@'=>"$start", '@@STOP@@'=>"$stop", '@@PASSWORD@@'=>"$appliance_password", '@@IP@@'=>"$resource_external_ip", '@@RESNUMBER@@'=>"$cr_resource_number");
-			$rmail_admin->var_array = $arr;
-			$rmail_admin->send();
-
-
-			// ################################## setup access to collectd graphs ####################
-
-			// check if collectd is enabled
-			$collectd_conf = new cloudconfig();
-			$show_collectd_graphs = $collectd_conf->get_value(19);	// show_collectd_graphs
-			if (!strcmp($show_collectd_graphs, "true")) {
-				// is collectd enabled ?
-				if (file_exists("$RootDir/plugins/collectd/.running")) {
-					// ldap or regular user ?
-					$collectd_appliance = $appliance->name;
-					if (file_exists("$RootDir/plugins/ldap/.running")) {
-						$collectd_debug = "Setting up access to the collectd graphs of appliance $collectd_appliance for ldap Cloud user $cu_name";
-						$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", $collectd_debug, "", "", 0, 0, 0);
-						// get ldap from db config
-						$ldap_conf = new ldapconfig();
-						$ldap_conf->get_instance_by_id(1);
-						$ldap_host = $ldap_conf->value;
-						$ldap_conf->get_instance_by_id(2);
-						$ldap_port = $ldap_conf->value;
-						$ldap_conf->get_instance_by_id(3);
-						$ldap_base_dn = $ldap_conf->value;
-						$ldap_conf->get_instance_by_id(4);
-						$ldap_admin = $ldap_conf->value;
-						$ldap_conf->get_instance_by_id(5);
-						$ldap_password = $ldap_conf->value;
-						// send command to the openQRM-server
-						$setup_collectd = $OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/cloud/bin/openqrm-cloud-manager setup-graph-ldap ".$collectd_appliance." ".$cu_name." ".$ldap_host." ".$ldap_port." ".$ldap_base_dn." ".$ldap_password;
-						$openqrm_server->send_command($setup_collectd);
-
-					} else {
-						// regular basic auth user
-						$collectd_debug = "Setting up access to the collectd graphs of appliance $collectd_appliance for Cloud user $cu_name";
-						$event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", $collectd_debug, "", "", 0, 0, 0);
-						// here we still have the valid user object, get the password
-						$cu_pass = $cu->password;
-						// send command to the openQRM-server
-						$setup_collectd = $OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/cloud/bin/openqrm-cloud-manager setup-graph ".$collectd_appliance." ".$cu_name." ".$cu_pass;
-						$openqrm_server->send_command($setup_collectd);
-					}
-
-				}
-			}
-
-			// ################################## quantity loop provisioning ###############################
-			// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "cloud-monitor", "Provisioning resource no. $cr_resource_number request ID $cr_id finished", "", "", 0, 0, 0);
 		}
+
 		// ################################## provision finished ####################
 		// $event->log("cloud", $_SERVER['REQUEST_TIME'], 5, "monitor-hook", "#### Cloud Phase II-4 - Provisioning $cr_resource_number finished", "", "", 0, 0, 0);
 
@@ -1598,6 +1655,7 @@ function openqrm_cloud_monitor() {
 								case 'vmware-esx':
 								case 'vmware-server':
 								case 'vmware-server2':
+									$mac_res->generate_mac();
 									$suggested_mac = $mac_res->mac;
 									$suggested_last_two_bytes = substr($suggested_mac, 12);
 									$new_vm_mac = $vmware_mac_address_space.":".$suggested_last_two_bytes;
@@ -1777,10 +1835,13 @@ function openqrm_cloud_monitor() {
 							$collon_pos = strpos($ip_mgmt_config_str, ":");
 							$nic_id = substr($ip_mgmt_config_str, 0, $collon_pos);
 							$ip_mgmt_id = substr($ip_mgmt_config_str, $collon_pos+1);
+							if (!strlen($ip_mgmt_id)) {
+								continue;
+							}
 							$ip_mgmt_unpause = new ip_mgmt();
 							$ip_mgmt_config_arr = $ip_mgmt_unpause->get_config_by_id($ip_mgmt_id);
 							$cloud_ip = $ip_mgmt_config_arr[0]['ip_mgmt_address'];
-							$resource_external_ip .= $cloud_ip.",";
+							$resource_external_ip = $cloud_ip.",";
 						}
 						$resource_external_ip = rtrim($resource_external_ip, ",");
 					}

@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -194,7 +194,7 @@ class cloudusergroup {
 	function remove_by_name($cloudusergroup_name) {
 		global $CLOUD_USER_GROUPS_TABLE;
 		$db=openqrm_get_db_connection();
-		$rs = $db->Execute("delete from $CLOUD_USER_GROUPS_TABLE where cu_name='$cloudusergroup_name'");
+		$rs = $db->Execute("delete from $CLOUD_USER_GROUPS_TABLE where cg_name='$cloudusergroup_name'");
 	}
 
 

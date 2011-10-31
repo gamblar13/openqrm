@@ -228,7 +228,7 @@ a:hover {
 	width:396px;
 }
 .htmlobject_box input[type=text] {	
-	width:180px;
+	width:120px;
 }
 .htmlobject_box .left {
 	float:left;
@@ -471,6 +471,11 @@ hr  {
 }
 
 #ip_mgmt {
+	border: solid 1px #ccc;
+	padding: 5px 5px 0 5px;
+}
+
+#cloud_appliance_hostname {
 	border: solid 1px #ccc;
 	padding: 5px 5px 0 5px;
 }

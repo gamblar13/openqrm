@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
@@ -42,6 +42,8 @@ function cloud_manager_usage() {
 	echo "      : $0 setup-graph <cloud-appliancename> <cloud-username> <cloud-userpassword> "
 	echo "      : $0 setup-graph-ldap <cloud-appliancename> <cloud-username> <cloud-ldap-host> <cloud-ldap-host> <cloud-ldap-port> <cloud-ldap-base-dn> <cloud-ldap-password> "
 	echo "      : $0 remove-graph <cloud-appliancename> <cloud-username>"
+	echo "      : $0 update-soap"
+
 	exit 1
 }
 
@@ -153,6 +155,22 @@ case "$CLOUD_MANAGER_COMMAND" in
 		# you will get the doc-root dir for the different supported linux-distris
 
 
+		;;
+
+
+
+	update-soap)
+		# update the wdsl definitions
+		echo "Updating openQRM Cloud SOAP webservice configuration"
+		cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/web/soap/cloudadmin.wdsl	| \
+			sed -e "s/@@OPENQRM_SERVER_IP_ADDRESS@@/$OPENQRM_SERVER_IP_ADDRESS/g" > $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/cloudadmin.wdsl
+		cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/soap/clouduser.wdsl	| \
+			sed -e "s/@@OPENQRM_SERVER_IP_ADDRESS@@/$OPENQRM_SERVER_IP_ADDRESS/g" > $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/clouduser.wdsl
+		# compat webservices
+		cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/web/soap/cloudadmin.compat.wdsl	| \
+			sed -e "s/@@OPENQRM_SERVER_IP_ADDRESS@@/$OPENQRM_SERVER_IP_ADDRESS/g" > $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/cloudadmin.compat.wdsl
+		cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cloud/cloud-portal/web/user/soap/clouduser.compat.wdsl	| \
+			sed -e "s/@@OPENQRM_SERVER_IP_ADDRESS@@/$OPENQRM_SERVER_IP_ADDRESS/g" > $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/clouduser.compat.wdsl
 		;;
 
 

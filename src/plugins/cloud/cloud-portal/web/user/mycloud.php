@@ -48,7 +48,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -202,6 +202,33 @@ function check_request($request_fields, $request_user) {
 	check_param("Memory", $request_fields['cr_ram_req']);
 	check_param("CPU", $request_fields['cr_cpu_req']);
 	check_param("Network", $request_fields['cr_network_req']);
+	// hostname
+	if (isset($request_fields['cr_appliance_hostname'])) {
+		if (!is_allowed_char($request_fields['cr_appliance_hostname'])) {
+			$strMsg = "Appliance hostname contains special characters!";
+			redirect($strMsg, "tab0");
+			exit(0);
+		}
+		// check if appliance hostname is free
+		if (strlen($request_fields['cr_appliance_hostname'])) {
+			$appliance_hostname_quantity = $request_fields['cr_resource_quantity'];
+			$appliance_requested_hostname = $request_fields['cr_appliance_hostname'];
+			for ($appliance_hostname_resource = 1; $appliance_hostname_resource <= $appliance_hostname_quantity; $appliance_hostname_resource++) {
+				if ($appliance_hostname_quantity > 1) {
+					$appliance_requested_hostname = $appliance_requested_hostname."_".$appliance_hostname_resource;
+				}
+				$appliance_check_hostname = new appliance();
+				$appliance_check_hostname->get_instance_by_name($appliance_requested_hostname);
+				if ($appliance_check_hostname->id > 0) {
+					// appliance with the requested hostname already exists
+					$strMsg = "Appliance hostname ".$appliance_requested_hostname." already in use!";
+					redirect($strMsg, "tab0");
+					exit(0);
+				}
+			}
+		}
+	}
+
 
 	// check user limits
 	$cloud_user_limit = new clouduserlimits();
@@ -213,10 +240,7 @@ function check_request($request_fields, $request_user) {
 	$network_req = $request_fields['cr_network_req'];
 	if (!$cloud_user_limit->check_limits($resource_quantity, $ram_req, $disk_req, $cpu_req, $network_req)) {
 		$strMsg = "User exceeds its Cloud-Limits ! Not adding the request";
-		echo "$strMsg <br>";
-		flush();
-		sleep(4);
-		redirect($strMsg, 'tab0', "cloud-manager.php");
+		redirect($strMsg, "tab0");
 		exit(0);
 	}
 
@@ -620,12 +644,22 @@ if (htmlobject_request('action') != '') {
 			$pr_request_fields['pr_resource_type_req'] = $request_fields['cr_resource_type_req'];
 			$pr_request_fields['pr_ha_req'] = $request_fields['cr_ha_req'];
 			$pr_request_fields['pr_shared_req'] = $request_fields['cr_shared_req'];
+			// prepare puppet groups
 			if (isset($request_fields['cr_puppet_groups'])) {
-				$pr_request_fields['pr_puppet_groups'] = $request_fields['cr_puppet_groups'];
+				$puppet_profile_array = $request_fields['cr_puppet_groups'];
+				foreach($puppet_profile_array as $puppet_profile_group) {
+					$puppet_profile_groups_str .= "$puppet_profile_group,";
+				}
+				// remove last ,
+				$puppet_profile_groups_str = rtrim($puppet_profile_groups_str, ",");
+				$pr_request_fields['pr_puppet_groups'] = $puppet_profile_groups_str;
 			}
 			$pr_request_fields['pr_ip_mgmt'] = $request_fields['cr_ip_mgmt'];
 			$pr_request_fields['pr_name'] = $profile_name;
-
+			// hostname
+			if (isset($request_fields['cr_appliance_hostname'])) {
+				$pr_request_fields['pr_appliance_hostname'] = $request_fields['cr_appliance_hostname'];
+			}
 			// set user id
 			$pr_request_fields['pr_cu_id'] = $request_user->id;
 			// id

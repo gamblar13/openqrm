@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
 
@@ -242,6 +242,12 @@
 		{cloud_ip_mgmt_select}
 		</div>
 
+		<div id="cloud_appliance_hostname">
+		<b><u>{cloud_appliance_hostname}</u></b>
+		<br>
+		{cloud_appliance_hostname_input}
+		{cloud_appliance_hostname_help}
+		</div>
 
 
 	</div>
@@ -267,19 +273,17 @@
 
 			<div id="costs_summary">
 				<hr>
-				Quantity : <div id="quantity_val" class="inline">0</div> * <div id="cost_per_appliance_val" class="inline">0</div>
-				<hr>
 				Sum : <div id="cost_overall_val" class="inline">0</div> CCU/h
 				<hr>
 				<br>
 				<br>
 				<nobr>1000 CCUs == <div id="cloud_1000_ccus" class="inline">0</div> <div id="cloud_currency" class="inline">0</div></nobr>
 				<hr>
-				Hourly : <div id="cost_hourly" class="inline">0</div> <div id="cloud_currency_h" class="inline">0</div></nobr>
+				<nobr>Hourly : <div id="cost_hourly" class="inline">0</div> <div id="cloud_currency_h" class="inline">0</div></nobr>
 				<br>
-				Daily : <div id="cost_daily" class="inline">0</div> <div id="cloud_currency_d" class="inline">0</div></nobr>
+				<nobr>Daily : <div id="cost_daily" class="inline">0</div> <div id="cloud_currency_d" class="inline">0</div></nobr>
 				<br>
-				Monthly : <div id="cost_monthly" class="inline">0</div> <div id="cloud_currency_m" class="inline">0</div></nobr>
+				<nobr>Monthly : <div id="cost_monthly" class="inline">0</div> <div id="cloud_currency_m" class="inline">0</div></nobr>
 
 			</div>
 
@@ -448,7 +452,7 @@
 		});
 
 		// apps
-		$("input[name='puppet_groups[]']").each(
+		$("input[name='cr_puppet_groups[]']").each(
 			function() {
 				$(this).click(function() {
 					if($(this).is(":checked")) {
@@ -536,7 +540,7 @@
 			sum_per_appliance = sum_per_appliance + parseInt($("#cost_network_val").text());
 			sum_per_appliance = sum_per_appliance + parseInt($("#cost_ha_val").text());
 			sum_per_appliance = sum_per_appliance + parseInt($("#cost_apps_val").text());
-			sum_overall = sum_per_appliance * parseInt($("#quantity_val").text());
+			sum_overall = sum_per_appliance * 1;
 			$("#cost_per_appliance_val").text(sum_per_appliance);;
 			$("#cost_overall_val").text(sum_overall);;
 			// cost in real currency

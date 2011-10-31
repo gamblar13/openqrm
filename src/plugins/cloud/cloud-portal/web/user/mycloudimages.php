@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -114,6 +114,14 @@ if (htmlobject_request('action') != '') {
 						redirect2image($strMsg, 'tab4', "mycloud.php");
 						exit(0);
 					}
+					// check that image is not active
+					$remove_image = new image();
+					$remove_image->get_instance_by_id($pimage->image_id);
+					if ($remove_image->isactive == 1) {
+						$strMsg = "Private image ".$pimage->image_id." is still active ! Skipping removal ... <br>";
+						redirect2image($strMsg, 'tab4', "mycloud.php");
+						exit(0);
+					}
 					// register a new cloudimage for removal
 					$cloud_image_id  = openqrm_db_get_free_id('ci_id', $CLOUD_IMAGE_TABLE);
 					$cloud_image_arr = array(
@@ -129,7 +137,7 @@ if (htmlobject_request('action') != '') {
 					$cloud_image->add($cloud_image_arr);
 					// remove logic cloudprivateimage
 					$pimage->remove($id);
-					$strMsg .= "Removed private Cloud image $id.";
+					$strMsg .= "Removed private Cloud image ".$id."<br>";
 
 				}
 			}
@@ -175,12 +183,49 @@ if (htmlobject_request('action') != '') {
 						'co_comment' => "$updated_image_comment",
 					);
 					$cloud_pimage->update($id, $ar_request);
-					$strMsg .= "Updated comment on private Cloud image $id";
+					$strMsg .= "Updated comment on private Cloud image ".$id."<br>";
 
 				}
 			}
 			redirect2image($strMsg, 'tab4', "mycloud.php");
 			break;
+
+
+		case 'update-clone':
+			if (isset($_REQUEST['identifier'])) {
+				foreach($_REQUEST['identifier'] as $id) {
+					$pimage = new cloudprivateimage();
+					$pimage->get_instance_by_id($id);
+					$cp_user = new clouduser();
+					$cp_user->get_instance_by_name("$auth_user");
+					if ($cp_user->id != $pimage->cu_id) {
+						$strMsg = "Private image $id is not owned by $auth_user  $cp_user->id  ! Skipping ... <br>";
+						redirect2image($strMsg, 'tab4', "mycloud.php");
+						exit(0);
+					}
+					if (!$private_image_enabled) {
+						$strMsg = "Private image feature is not enabled in this Cloud ! Skipping ... <br>";
+						redirect2image($strMsg, 'tab4', "mycloud.php");
+						exit(0);
+					}
+					$updated_image_cod_arr = htmlobject_request('image_clone_on_deploy');
+					if (isset($updated_image_cod_arr["$id"])) {
+						$updated_image_cod = 1;
+					} else {
+						$updated_image_cod = 0;
+					}
+					$cloud_pimage = new cloudprivateimage();
+					$ar_request = array(
+						'co_clone_on_deploy' => $updated_image_cod,
+					);
+					$cloud_pimage->update($id, $ar_request);
+					$strMsg .= "Updated clone-on-deploy on private Cloud image ".$id."  - $updated_image_cod<br>";
+
+				}
+			}
+			redirect2image($strMsg, 'tab4', "mycloud.php");
+			break;
+
 
 // ######################## end of cloud-image actions #####################
 
@@ -221,6 +266,12 @@ function mycloud_images() {
 	$arHead['image_name'] = array();
 	$arHead['image_name']['title'] ='Name';
 
+	$arHead['image_isactive'] = array();
+	$arHead['image_isactive']['title'] ='State';
+
+	$arHead['private_image_clone_on_deploy'] = array();
+	$arHead['private_image_clone_on_deploy']['title'] ='Clone-on-deploy';
+
 	$arHead['co_comment'] = array();
 	$arHead['co_comment']['title'] ='Comment';
 
@@ -233,17 +284,32 @@ function mycloud_images() {
 	$private_image = new cloudprivateimage();
 	$private_image_array = $private_image->display_overview_per_user($cl_user->id, $table->order);
 	foreach ($private_image_array as $index => $private_image_db) {
+		$pco_id = $private_image_db["co_id"];
+		$pcomment = $private_image_db["co_comment"];
 		$private_image_t = new cloudprivateimage();
 		$private_image_t->get_instance_by_id($private_image_db["co_id"]);
 		// get the image name
 		$pimage = new image();
 		$pimage->get_instance_by_id($private_image_t->image_id);
-		$pco_id = $private_image_db["co_id"];
-		$pcomment = $private_image_db["co_comment"];
+		// set the active icon
+		if ($private_image_t->clone_on_deploy == 1) {
+			$private_image_clone_on_deploy = '<input type="checkbox" name="image_clone_on_deploy['.$pco_id.']" value="1" checked="checked" /> Clone';
+		} else {
+			$private_image_clone_on_deploy = '<input type="checkbox" name="image_clone_on_deploy['.$pco_id.']" value="1" /> Clone';
+		}
+		$isactive_icon = "/openqrm/base/plugins/aa_plugins/img/enable.png";
+		if ($pimage->isactive == 1) {
+			$isactive_icon = "/openqrm/base/plugins/aa_plugins/img/disable.png";
+			$private_image_clone_on_deploy = "";
+		}
+		$image_isactive_icon = "<img src=".$isactive_icon." width='24' height='24' alt='State'>";
+		
 		$arBody[] = array(
 			'image_icon' => "<img width=16 height=16 src=$active_state_icon><input type=hidden name=\"currenttab\" value=\"tab4\">",
 			'co_id' => $pco_id,
 			'image_name' => $pimage->name,
+			'image_isactive' => $image_isactive_icon,
+			'private_image_clone_on_deploy' => $private_image_clone_on_deploy,
 			'co_comment' => "<input type=text name=\"image_comment[$pco_id]\" value=\"$pcomment\">",
 		);
 		$private_image_count++;
@@ -259,7 +325,7 @@ function mycloud_images() {
 	$table->body = $arBody;
 	$table->autosort = true;
 	#$table->sort = "";
-	$table->bottom = array('remove', 'comment');
+	$table->bottom = array('update-clone', 'comment', 'remove');
 	$table->identifier = 'co_id';
 	$table->max = $private_image_count;
 

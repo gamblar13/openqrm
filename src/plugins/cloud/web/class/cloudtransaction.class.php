@@ -14,24 +14,35 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
 // This class represents a cloudtransaction object in openQRM
 
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
-require_once "$RootDir/include/openqrm-database-functions.php";
-require_once "$RootDir/class/resource.class.php";
-require_once "$RootDir/class/virtualization.class.php";
-require_once "$RootDir/class/image.class.php";
-require_once "$RootDir/class/kernel.class.php";
-require_once "$RootDir/class/plugin.class.php";
-require_once "$RootDir/class/event.class.php";
-require_once "$RootDir/class/openqrm_server.class.php";
+require_once $RootDir."/include/openqrm-database-functions.php";
+require_once $RootDir."/include/user.inc.php";
+require_once $RootDir."/class/resource.class.php";
+require_once $RootDir."/class/virtualization.class.php";
+require_once $RootDir."/class/image.class.php";
+require_once $RootDir."/class/kernel.class.php";
+require_once $RootDir."/class/plugin.class.php";
+require_once $RootDir."/class/event.class.php";
+require_once $RootDir."/class/openqrm_server.class.php";
+// cloud user class for updating ccus from the cloud zones master
+// cloud config for getting the cloud zones config
+require_once $RootDir."/plugins/cloud/class/clouduser.class.php";
+require_once $RootDir."/plugins/cloud/class/cloudusergroup.class.php";
+require_once $RootDir."/plugins/cloud/class/cloudconfig.class.php";
+require_once $RootDir."/plugins/cloud/class/cloudtransactionfailed.class.php";
+
 
 $CLOUD_TRANSACTION_TABLE="cloud_transaction";
 global $CLOUD_TRANSACTION_TABLE;
+$CLOUD_TRANSACTION_FAILED_TABLE="cloud_transaction_failed";
+global $CLOUD_TRANSACTION_FAILED_TABLE;
+
 global $OPENQRM_SERVER_BASE_DIR;
 global $OPENQRM_EXEC_PORT;
 $event = new event();
@@ -180,8 +191,7 @@ class cloudtransaction {
 
 	// function to push a new transaction to the stack
 	function push($cr_id, $cu_id, $ccu_charge, $ccu_balance, $reason, $comment) {
-		global $CLOUD_TRANSACTION_TABLE;
-		global $event;
+
 		$transaction_fields['ct_id'] = openqrm_db_get_free_id('ct_id', $this->_db_table);
 		$transaction_fields['ct_time'] = $_SERVER['REQUEST_TIME'];
 		$transaction_fields['ct_cr_id'] = $cr_id;
@@ -192,6 +202,65 @@ class cloudtransaction {
 		$transaction_fields['ct_comment'] = $comment;
 		$new_ct_id = $transaction_fields['ct_id'];
 		$this->add($transaction_fields);
+
+		// check if we need to sync with the cloud-zones master
+		$cz_conf = new cloudconfig();
+		$cz_client = $cz_conf->get_value(35);			// 35 is cloud_zones_client
+		if (!strcmp($cz_client, "true")) {
+			$this->sync($transaction_fields['ct_id'], true);
+		}
+
+	}
+
+
+	// function to sync a new transaction with the cloud zones master
+	function sync($ct_id, $insert_into_failed) {
+		global $CLOUD_TRANSACTION_FAILED_TABLE;
+		global $OPENQRM_SERVER_IP_ADDRESS;
+		global $event;
+
+		$this->get_instance_by_id($ct_id);
+		// get cloud user
+		$local_transaction_cloud_user = new clouduser();
+		$local_transaction_cloud_user->get_instance_by_id($this->cu_id);
+		// get cloud-zones config parameters from main config
+		$cz_conf = new cloudconfig();
+		$cloud_zones_master_ip = $cz_conf->get_value(36);			// 36 is cloud_zones_master_ip
+		// check if cloud_external_ip is set
+		$cloud_external_ip = $cz_conf->get_value(37);			// 37 is cloud_external_ip
+		if (!strlen($cloud_external_ip)) {
+			$cloud_external_ip = $OPENQRM_SERVER_IP_ADDRESS;
+		}
+		// get the admin user, the zone master will automatically authenticate against this user
+		$openqrm_admin_user = new user("openqrm");
+		$openqrm_admin_user->set_user();
+		// url for the wdsl
+		$url = "https://".$cloud_zones_master_ip."/openqrm/boot-service/cloud-zones-soap.wsdl";
+		// turn off the WSDL cache
+		ini_set("soap.wsdl_cache_enabled", "0");
+		// create the soap-client
+		$client = new SoapClient($url, array('soap_version' => SOAP_1_2, 'trace' => 1, 'login'=> $openqrm_admin_user->name, 'password' => $openqrm_admin_user->password ));
+//			var_dump($client->__getFunctions());
+		try {
+			$send_transaction_parameters = $openqrm_admin_user->name.",".$openqrm_admin_user->password.",".$cloud_external_ip.",".$local_transaction_cloud_user->name.",".$this->id.",".$this->time.",".$this->cr_id.",".$this->ccu_charge.",".$this->reason.",".$this->comment;
+			$new_local_ccu_value = $client->CloudZonesSync($send_transaction_parameters);
+			// update users ccus values with return from master
+			$local_transaction_cloud_user->set_users_ccunits($this->cu_id, $new_local_ccu_value);
+			$event->log("push", $_SERVER['REQUEST_TIME'], 5, "cloudtransaction.class.php", "Synced transaction! User:".$this->cu_id."/CR:".$this->cr_id."/Global CCU:".$new_local_ccu_value, "", "", 0, 0, 0);
+			return true;
+
+		} catch (Exception $e) {
+			$soap_error_msg = $e->getMessage();
+			$event->log("push", $_SERVER['REQUEST_TIME'], 2, "cloudtransaction.class.php", "Could not sync transaction! User:".$this->cu_id."/CR:".$this->cr_id."/Charge:".$this->ccu_charge."/".$soap_error_msg, "", "", 0, 0, 0);
+			if ($insert_into_failed) {
+				// add to failed transactions
+				$cloudtransactionfailed = new cloudtransactionfailed();
+				$failed_transaction_fields['tf_id'] = openqrm_db_get_free_id('tf_id', $CLOUD_TRANSACTION_FAILED_TABLE);
+				$failed_transaction_fields['tf_ct_id'] = $ct_id;
+				$cloudtransactionfailed->add($failed_transaction_fields);
+			}
+			return false;
+		}
 	}
 
 

@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -85,7 +85,7 @@ class cloudsoap {
 	* Provision a system in the openQRM Cloud -> creates a Cloud-Request
 	* @access public
 	* @param string $method_parameters
-	*  -> mode,user-name,user-password,cloud-user-name,kernel-name,image-name,memory,cpus,disk,network,resource-quantity,resource-type,ha,puppet-groups
+	*  -> mode,user-name,user-password,cloud-user-name,kernel-id,image-name,memory,cpus,disk,network,resource-quantity,resource-type,ha,puppet-groupsm,ip_mgmt,hostname
 	* @return int cloudrequest_id
 	*/
 	//--------------------------------------------------
@@ -99,18 +99,20 @@ class cloudsoap {
 		$cloud_username = $parameter_array[3];
 		$start = $parameter_array[4];
 		$stop = $parameter_array[5];
-		$kernel_name = $parameter_array[6];
+		$kernel_id = $parameter_array[6];
 		$image_name = $parameter_array[7];
 		$ram_req = $parameter_array[8];
 		$cpu_req = $parameter_array[9];
 		$disk_req = $parameter_array[10];
 		$network_req = $parameter_array[11];
 		$resource_quantity = $parameter_array[12];
-		$virtualization_name = $parameter_array[13];
+		$virtualization_id = $parameter_array[13];
 		$ha_req = $parameter_array[14];
 		$puppet_groups = $parameter_array[15];
+		$ip_mgmt = $parameter_array[16];
+		$app_hostname = $parameter_array[17];
 		// check all user input
-		for ($i = 0; $i <= 15; $i++) {
+		for ($i = 0; $i <= 17; $i++) {
 			if(!$this->check_param($parameter_array[$i])) {
 				$event->log("cloudsoap->CloudProvision", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Not allowing user-intput with special-characters : $parameter_array[$i]", "", "", 0, 0, 0);
 				return;
@@ -118,7 +120,7 @@ class cloudsoap {
 		}
 		// check parameter count
 		$parameter_count = count($parameter_array);
-		if ($parameter_count != 16) {
+		if ($parameter_count != 18) {
 				$event->log("cloudsoap->CloudProvision", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Wrong parameter count $parameter_count ! Exiting.", "", "", 0, 0, 0);
 				return;
 		}
@@ -199,7 +201,7 @@ class cloudsoap {
 			}
 			// kernel
 			$cs_kernel = new kernel();
-			$cs_kernel->get_instance_by_name($kernel_name);
+			$cs_kernel->get_instance_by_id($kernel_id);
 			if (!$cloudselector->product_exists_enabled("kernel", $cs_kernel->id)) {
 				$event->log("cloudsoap->CloudProvision", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud User $cloud_username: Cloud Kernel Product ($cs_kernel->id) is not existing", "", "", 0, 0, 0);
 				return;
@@ -216,7 +218,7 @@ class cloudsoap {
 			}
 			// puppet
 			if (strlen($puppet_groups)) {
-				$puppet_groups_array = explode(",", $puppet_groups);
+				$puppet_groups_array = explode(":", $puppet_groups);
 				if (is_array($puppet_groups_array)) {
 					foreach($puppet_groups_array as $puppet_group) {
 						if (!$cloudselector->product_exists_enabled("puppet", $puppet_group)) {
@@ -225,6 +227,8 @@ class cloudsoap {
 						}
 					}
 				}
+				// reformat with , instead of :
+				$puppet_groups = str_replace(":", ",", $puppet_groups);
 			}
 			// quantity
 			if (!$cloudselector->product_exists_enabled("quantity", $resource_quantity)) {
@@ -233,7 +237,7 @@ class cloudsoap {
 			}
 			// resource type
 			$cs_resource = new virtualization();
-			$cs_resource->get_instance_by_name($virtualization_name);
+			$cs_resource->get_instance_by_id($virtualization_id);
 			if (!$cloudselector->product_exists_enabled("resource", $cs_resource->id)) {
 				$event->log("cloudsoap->CloudProvision", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud User $cloud_username: Virtualization Product ($cs_resource->id) is not existing", "", "", 0, 0, 0);
 				return;
@@ -241,6 +245,13 @@ class cloudsoap {
 
 			// ####### end of cloudselector case #######
 		}
+
+		// reformat the ip-mgmt string
+		// separators are :
+		//  / for :
+		//  _ for ,
+		$ip_mgmt_str_reformated = str_replace('/', ':', $ip_mgmt);
+		$ip_mgmt_str_reformated = str_replace('_', ',', $ip_mgmt_str_reformated);
 
 		$event->log("cloudsoap->CloudProvision", $_SERVER['REQUEST_TIME'], 5, "cloud-soap-server.php", "Provisioning appliance in the openQRM Cloud for user $cloud_username", "", "", 0, 0, 0);
 		// fill the array
@@ -256,9 +267,11 @@ class cloudsoap {
 		$request_fields['cr_cpu_req'] = $cpu_req;
 		$request_fields['cr_disk_req'] = $disk_req;
 		$request_fields['cr_puppet_groups'] = $puppet_groups;
+		$request_fields['cr_ip_mgmt'] = $ip_mgmt_str_reformated;
+		$request_fields['cr_appliance_hostname'] = $app_hostname;
 		// translate kernel- and image-name to their ids
 		$kernel = new kernel();
-		$kernel->get_instance_by_name($kernel_name);
+		$kernel->get_instance_by_id($kernel_id);
 		$kernel_id = $kernel->id;
 		$image = new image();
 		$image->get_instance_by_name($image_name);
@@ -267,7 +280,7 @@ class cloudsoap {
 		$request_fields['cr_image_id'] = $image_id;
 		// translate the virtualization type
 		$virtualization = new virtualization();
-		$virtualization->get_instance_by_name($virtualization_name);
+		$virtualization->get_instance_by_id($virtualization_id);
 		$virtualization_id = $virtualization->id;
 		$request_fields['cr_resource_type_req'] = $virtualization_id;
 
@@ -427,6 +440,7 @@ class cloudsoap {
 		$cl_user->get_instance_by_name($clouduser_name);
 		$cloud_user_array = array();
 		$cloud_user_array['id'] = $cl_user->id;
+		$cloud_user_array['cg_id'] = $cl_user->cg_id;
 		$cloud_user_array['name'] = $cl_user->name;
 		$cloud_user_array['lastname'] = $cl_user->lastname;
 		$cloud_user_array['forename'] = $cl_user->forename;
@@ -848,14 +862,10 @@ class cloudsoap {
 		$cu_id = $clouduser->id;
 		$event->log("cloudsoap->CloudRequestGetList", $_SERVER['REQUEST_TIME'], 5, "cloud-soap-server.php", "Providing list of Cloud-requests for Cloud User $clouduser_name ($cu_id)", "", "", 0, 0, 0);
 		$cloudrequest = new cloudrequest();
-		$cloudrequest_id_list = $cloudrequest->get_all_ids();
+		$cloudrequest_id_list = $cloudrequest->get_all_active_ids_per_user($cu_id);
 		foreach($cloudrequest_id_list as $cr_id_list) {
 			foreach($cr_id_list as $cr_id) {
-				$cr = new cloudrequest();
-				$cr->get_instance_by_id($cr_id);
-				if ($cr->cu_id == $cu_id) {
-					$cloudrequest_list[] = $cr_id;
-				}
+				$cloudrequest_list[] = $cr_id;
 			}
 		}
 		return $cloudrequest_list;
@@ -1046,6 +1056,133 @@ class cloudsoap {
 
 
 
+
+
+	//--------------------------------------------------
+	/**
+	* Gets cost for a Cloud request
+	* @access public
+	* @param string $method_parameters
+	*  -> mode,user-name,user-password,virtualization_id,kernel_id,memory_val,cpu_val,disk_val,network_val,ha_val,apps_val
+	* @return array cloudrequest-parameters
+	*/
+	//--------------------------------------------------
+	function CloudRequestGetCost($method_parameters) {
+		global $event;
+		$parameter_array = explode(',', $method_parameters);
+		$mode = $parameter_array[0];
+		$username = $parameter_array[1];
+		$password = $parameter_array[2];
+		$virtualization_id = $parameter_array[3];
+		$kernel_id = $parameter_array[4];
+		$memory_val = $parameter_array[5];
+		$cpu_val = $parameter_array[6];
+		$disk_val = $parameter_array[7];
+		$network_val = $parameter_array[8];
+		$ha_val = $parameter_array[9];
+		$apps_val = $parameter_array[10];
+
+		$cloud_config = new cloudconfig();
+
+		// check all user input
+		for ($i = 0; $i <= 9; $i++) {
+			if(!$this->check_param($parameter_array[$i])) {
+				$event->log("cloudsoap->CloudRequestGetCost", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Not allowing user-intput with special-characters : $parameter_array[$i]", "", "", 0, 0, 0);
+				return;
+			}
+		}
+		// check parameter count
+		$parameter_count = count($parameter_array);
+		if ($parameter_count != 11) {
+			$event->log("cloudsoap->CloudRequestGetCost", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Wrong parameter count $parameter_count ! Exiting.", "", "", 0, 0, 0);
+			return;
+		}
+		// check authentication
+		if (!$this->check_user($mode, $username, $password)) {
+			$event->log("cloudsoap->CloudRequestGetCost", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "User authentication failed (mode $mode)", "", "", 0, 0, 0);
+			return;
+		}
+
+		// calcuating the price
+		$cloudselector = new cloudselector();
+		// resource type
+		$cost_virtualization = 0;
+		if (strlen($virtualization_id)) {
+			$virtualization = new virtualization();
+			$virtualization->get_instance_by_id($virtualization_id);
+			$cost_virtualization = $cloudselector->get_price($virtualization->id, "resource");
+		}
+		// kernel
+		$cost_kernel = 0;
+		if (strlen($kernel_id)) {
+			$kernel = new kernel();
+			$kernel->get_instance_by_id($kernel_id);
+			$cost_kernel = $cloudselector->get_price($kernel->id, "kernel");
+		}
+		// memory
+		$cost_memory = 0;
+		if (strlen($memory_val)) {
+			$cost_memory = $cloudselector->get_price($memory_val, "memory");
+		}
+		// cpu
+		$cost_cpu = 0;
+		if (strlen($cpu_val)) {
+			$cost_cpu = $cloudselector->get_price($cpu_val, "cpu");
+		}
+		// disk
+		$cost_disk = 0;
+		if (strlen($disk_val)) {
+			$cost_disk = $cloudselector->get_price($disk_val, "disk");
+		}
+		// network
+		$cost_network = 0;
+		if (strlen($network_val)) {
+			$cost_network = $cloudselector->get_price($network_val, "network");
+		}
+
+		// ha
+		$cost_ha = 0;
+		if ($ha_val == 1) {
+			$cost_ha = $cloudselector->get_price($ha_val, "ha");
+		}
+
+
+		// puppet apps
+		$cost_app_total = 0;
+		if (strlen($apps_val)) {
+			$apps_val = rtrim($apps_val, ':');
+			$apps_val = ltrim($apps_val, ':');
+			$application_array = explode(":", $apps_val);
+			foreach ($application_array as $cloud_app) {
+				$cost_app = $cloudselector->get_price($cloud_app, "puppet");
+				$cost_app_total = $cost_app_total + $cost_app;
+			}
+		}
+		
+		// get cloud currency
+		$cloud_currency = $cloud_config->get_value(23);   // 23 is cloud_currency
+		$cloud_1000_ccus_value = $cloud_config->get_value(24);   // 24 is cloud_1000_ccus
+
+		// summary
+		$summary_per_appliance = $cost_virtualization + $cost_kernel + $cost_memory + $cost_cpu + $cost_disk + $cost_network + $cost_app_total + $cost_ha;
+		$one_ccu_cost_in_real_currency = $cloud_1000_ccus_value / 1000;
+		$appliance_cost_in_real_currency_per_hour = $summary_per_appliance * $one_ccu_cost_in_real_currency;
+		$appliance_cost_in_real_currency_per_hour_disp = number_format($appliance_cost_in_real_currency_per_hour, 2, ",", "");
+		$appliance_cost_in_real_currency_per_day = $appliance_cost_in_real_currency_per_hour * 24;
+		$appliance_cost_in_real_currency_per_day_disp = number_format($appliance_cost_in_real_currency_per_day, 2, ",", "");
+		$appliance_cost_in_real_currency_per_month = $appliance_cost_in_real_currency_per_day * 31;
+		$appliance_cost_in_real_currency_per_month_disp = number_format($appliance_cost_in_real_currency_per_month, 2, ",", "");
+
+		// returns string
+		// cost_virtualization,cost_kernel,cost_memory,cost_cpu,cost_disk,cost_network,cost_ha,cost_app_total,cloud_currency,summary_per_appliance,appliance_cost_in_real_currency_per_hour,appliance_cost_in_real_currency_per_day,appliance_cost_in_real_currency_per_month
+		$cloudrequest_costs = $cost_virtualization.":".$cost_kernel.":".$cost_memory.":".$cost_cpu.":".$cost_disk.":".$cost_network.":".$cost_ha.":".$cost_app_total.":".$cloud_currency.":".$summary_per_appliance.":".$appliance_cost_in_real_currency_per_hour_disp.":".$appliance_cost_in_real_currency_per_day_disp.":".$appliance_cost_in_real_currency_per_month_disp;
+		return $cloudrequest_costs;
+	}
+
+
+
+
+
 	// ######################### cloud appliance methods #############################
 
 	//--------------------------------------------------
@@ -1151,6 +1288,7 @@ class cloudsoap {
 	//--------------------------------------------------
 	function CloudApplianceGetDetails($method_parameters) {
 		global $event;
+		global $RootDir;
 		$parameter_array = explode(',', $method_parameters);
 		$mode = $parameter_array[0];
 		$username = $parameter_array[1];
@@ -1237,38 +1375,44 @@ class cloudsoap {
 		$appliance_resources=$appliance->resources;
 		if ($appliance_resources >=0) {
 			// an appliance with a pre-selected resource
-			// get its ips from the iptables table
-
-	// ########### TODO ###################################################################################
-
-	/*
-			$cloud_iptable = new cloudiptables();
-			$app_ips = $cloud_iptable->get_ip_list_by_appliance($appliance->id);
-			$app_ips_len = count($app_ips);
-			if ((is_array($app_ips)) && ($app_ips_len > 0)) {
-				foreach ($app_ips as $index => $app_ip_arr) {
-					$res_ip_loop++;
-					// we keep the first ip for the ssh-login
-					if ($res_ip_loop == 1) {
-						$appliance_ip = $app_ip_arr['ip_address'];
+			// ip-mgmt enabled ? if yes try to get the external ip
+			$cloud_ip_mgmt_config = new cloudconfig();
+			$cloud_ip_mgmt = $cloud_ip_mgmt_config->get_value(26);	// ip-mgmt enabled ?
+			if (!strcmp($cloud_ip_mgmt, "true")) {
+				if (file_exists($RootDir."/plugins/ip-mgmt/.running")) {
+					require_once $RootDir."/plugins/ip-mgmt/class/ip-mgmt.class.php";
+					$ip_mgmt = new ip_mgmt();
+					$ip_mgmt_id = $ip_mgmt->get_id_by_appliance($cr_appliance->appliance_id, 1);
+					if ($ip_mgmt_id>0) {
+						$ipmgmt_config_arr = $ip_mgmt->get_config_by_id($ip_mgmt_id);
+						if (!strlen($ipmgmt_config_arr[0]['ip_mgmt_address'])) {
+							$event->log("cloudsoap->CloudApplianceGetDetails", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Failed to get the external ip address for appliance id ".$cr_appliance->appliance_id.". Falling back to internal ip!", "", "", 0, 0, 0);
+						} else {
+							$appliance_ip = $ipmgmt_config_arr[0]['ip_mgmt_address'];
+						}
+					} else {
+						$resource->get_instance_by_id($appliance->resources);
+						$appliance_ip = $resource->ip;
 					}
+				} else {
+					// use internal ip
+					$event->log("cloudsoap->CloudApplianceGetDetails", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "IP-Mgmt is not enabled/available on this openQRM Cloud!", "", "", 0, 0, 0);
+					$resource->get_instance_by_id($appliance->resources);
+					$appliance_ip = $resource->ip;
 				}
+
+
+
 			} else {
-	*
-	*/
 				// in case no external ip was given to the appliance we show the internal ip
 				$resource->get_instance_by_id($appliance->resources);
 				$appliance_ip = $resource->ip;
-	//			}
-	// ########### TODO ###################################################################################
-
+			}
 		} else {
 			// an appliance with resource auto-select enabled
 			$appliance_ip = "auto-select";
 		}
 		$cloudappliance_details['cloud_appliance_ip'] = $appliance_ip;
-
-
 		return $cloudappliance_details;
 	}
 
@@ -1311,6 +1455,11 @@ class cloudsoap {
 		}
 		$cr_appliance = new cloudappliance();
 		$cr_appliance->get_instance_by_id($ca_id);
+		// is there a command already running ?
+		if ($cr_appliance->cmd > 0) {
+			$event->log("cloudsoap->CloudApplianceCommand", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "There is another command already running for Cloud appliance ".$ca_id."!", "", "", 0, 0, 0);
+			return 1;
+		}
 		// get the request to check for the user
 		$cr = new cloudrequest();
 		$cr->get_instance_by_id($cr_appliance->cr_id);
@@ -1715,7 +1864,7 @@ class cloudsoap {
 	* Get a list of available Images in the openQRM Cloud
 	* @access public
 	* @param string $method_parameters
-	*  -> mode,user-name,user-password
+	*  -> mode,user-name,user-password,cloud-user-name
 	* @return array List of Image-names
 	*/
 	//--------------------------------------------------
@@ -1725,8 +1874,10 @@ class cloudsoap {
 		$mode = $parameter_array[0];
 		$username = $parameter_array[1];
 		$password = $parameter_array[2];
+		$cloudusername = $parameter_array[3];
+
 		// check all user input
-		for ($i = 0; $i <= 2; $i++) {
+		for ($i = 0; $i <= 3; $i++) {
 			if(!$this->check_param($parameter_array[$i])) {
 				$event->log("cloudsoap->ImageGetList", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Not allowing user-intput with special-characters : $parameter_array[$i]", "", "", 0, 0, 0);
 				return;
@@ -1734,7 +1885,7 @@ class cloudsoap {
 		}
 		// check parameter count
 		$parameter_count = count($parameter_array);
-		if ($parameter_count != 3) {
+		if ($parameter_count != 4) {
 			$event->log("cloudsoap->ImageGetList", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Wrong parameter count $parameter_count ! Exiting.", "", "", 0, 0, 0);
 			return;
 		}
@@ -1746,61 +1897,66 @@ class cloudsoap {
 		$event->log("cloudsoap->ImageGetList", $_SERVER['REQUEST_TIME'], 5, "cloud-soap-server.php", "Providing list of available images", "", "", 0, 0, 0);
 
 		$pcloud_user = new clouduser();
-		$pcloud_user->get_instance_by_name($username);
+		$pcloud_user->get_instance_by_name($cloudusername);
 
 		// check if private image feature is enabled
 		$image_name_list = array();
 		$cc_so_conf = new cloudconfig();
 		$show_private_image = $cc_so_conf->get_value(21);	// show_private_image
-		// show all images in admin mode
-		if (!strcmp($mode, "admin")) {
+		if (!strcmp($show_private_image, "true")) {
+			// private image feature enabled
+			$private_cimage = new cloudprivateimage();
+			$private_image_list = $private_cimage->get_all_ids();
+			foreach ($private_image_list as $index => $cpi) {
+				$cpi_id = $cpi["co_id"];
+				$priv_image = new cloudprivateimage();
+				$priv_image->get_instance_by_id($cpi_id);
+				if ($pcloud_user->id == $priv_image->cu_id) {
+					$priv_im = new image();
+					$priv_im->get_instance_by_id($priv_image->image_id);
+					// do not show active images
+					if ($priv_im->isactive == 1) {
+						continue;
+					}
+					// only show the non-shared image to the user if it is not attached to a resource
+					// because we don't want users to assign the same image to two appliances
+					$priv_cloud_im = new cloudimage();
+					$priv_cloud_im->get_instance_by_image_id($priv_image->image_id);
+					if(!$priv_cloud_im->id) {
+						if($priv_cloud_im->resource_id == 0 || $priv_cloud_im->resource_id == -1) {
+							$image_name_list[] = $priv_im->name;
+						}
+					}
+				} else if ($priv_image->cu_id == 0) {
+					$priv_im = new image();
+					$priv_im->get_instance_by_id($priv_image->image_id);
+					// do not show active images
+					if ($priv_im->isactive == 1) {
+						continue;
+					}
+					$image_name_list[] = $priv_im->name;
+				}
+			}
+		} else {
+			// private image feature disabled
 			$image = new image();
 			$image_list = $image->get_list();
 			foreach($image_list as $images) {
+				$iid = $images['value'];
+				$iimage = new image();
+				$iimage->get_instance_by_id($iid);
+				// do not show active images
+				if ($iimage->isactive == 1) {
+					continue;
+				}
 				$image_name_list[] = $images['label'];
 			}
 			// remove openqrm and idle image
 			array_splice($image_name_list, 0, 1);
 			array_splice($image_name_list, 0, 1);
-		} else {
-			if (!strcmp($show_private_image, "true")) {
-				// private image feature enabled
-				$private_cimage = new cloudprivateimage();
-				$private_image_list = $private_cimage->get_all_ids();
-				foreach ($private_image_list as $index => $cpi) {
-					$cpi_id = $cpi["co_id"];
-					$priv_image = new cloudprivateimage();
-					$priv_image->get_instance_by_id($cpi_id);
-					if ($pcloud_user->id == $priv_image->cu_id) {
-						$priv_im = new image();
-						$priv_im->get_instance_by_id($priv_image->image_id);
-						// only show the non-shared image to the user if it is not attached to a resource
-						// because we don't want users to assign the same image to two appliances
-						$priv_cloud_im = new cloudimage();
-						$priv_cloud_im->get_instance_by_image_id($priv_image->image_id);
-						if(!$priv_cloud_im->id) {
-						$image_name_list[] = $priv_im->name;
-						}
-					} else if ($priv_image->cu_id == 0) {
-						$priv_im = new image();
-						$priv_im->get_instance_by_id($priv_image->image_id);
-						$image_name_list[] = $priv_im->name;
-					}
-				}
-			} else {
-				// private image feature disabled
-				$image = new image();
-				$image_list = $image->get_list();
-				foreach($image_list as $images) {
-					$image_name_list[] = $images['label'];
-				}
-				// remove openqrm and idle image
-				array_splice($image_name_list, 0, 1);
-				array_splice($image_name_list, 0, 1);
-			}
 		}
 		return $image_name_list;
-		}
+	}
 
 
 
@@ -1988,7 +2144,10 @@ class cloudsoap {
 		$cloudselector = new cloudselector();
 		$product_array = $cloudselector->display_overview_per_type($product_type);
 		foreach ($product_array as $index => $cloudproduct) {
-			$product_id_list[] = $cloudproduct["id"];
+			$cloudselector->get_instance_by_id($cloudproduct["id"]);
+			if ($cloudselector->state == 1) {
+				$product_id_list[] = $cloudproduct["id"];
+			}
 		}
 		return $product_id_list;
 	}
@@ -2059,6 +2218,78 @@ class cloudsoap {
 		$cloudproduct_details['state'] = $cloudselector->state;
 		return $cloudproduct_details;
 	}
+
+
+
+
+	// ############################ ip-mgmt methods #################################
+
+
+	//--------------------------------------------------
+	/**
+	* Get a list of ip-addresses from the pool(s) dedicated for the user
+	* @access public
+	* @param string $method_parameters
+	*  -> mode,user-name,user-password
+	* @return array of ip-addresses to put in a select box
+	*/
+	//--------------------------------------------------
+	function GetIpSelectPerUser($method_parameters) {
+		global $event;
+		global $RootDir;
+		$parameter_array = explode(',', $method_parameters);
+		$mode = $parameter_array[0];
+		$username = $parameter_array[1];
+		$password = $parameter_array[2];
+		$cloud_username = $parameter_array[3];
+		// check all user input
+		for ($i = 0; $i <= 3; $i++) {
+			if(!$this->check_param($parameter_array[$i])) {
+				$event->log("cloudsoap->GetIpSelectPerUser", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Not allowing user-intput with special-characters : $parameter_array[$i]", "", "", 0, 0, 0);
+				return;
+			}
+		}
+		// check parameter count
+		$parameter_count = count($parameter_array);
+		if ($parameter_count != 4) {
+			$event->log("cloudsoap->GetIpSelectPerUser", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Wrong parameter count $parameter_count ! Exiting.", "", "", 0, 0, 0);
+			return;
+		}
+		// check authentication
+		if (!$this->check_user($mode, $username, $password)) {
+			$event->log("cloudsoap->GetIpSelectPerUser", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "User authentication failed (mode $mode)", "", "", 0, 0, 0);
+			return;
+		}
+		$cloud_ip_user = new clouduser();
+		$cloud_ip_user->get_instance_by_name($cloud_username);
+
+		// check ip-mgmt
+		$cc_conf = new cloudconfig();
+		$show_ip_mgmt = $cc_conf->get_value(26);	// ip-mgmt enabled ?
+		if (strcmp($show_ip_mgmt, "true")) {
+			$event->log("cloudsoap->GetIpSelectPerUser", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "IP-Mgmt is not enabled on this Cloud.", "", "", 0, 0, 0);
+			return;
+		}
+		if (!file_exists($RootDir."/plugins/ip-mgmt/.running")) {
+			$event->log("cloudsoap->GetIpSelectPerUser", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "IP-Mgmt is not enabled on this openQRM Server.", "", "", 0, 0, 0);
+			return;
+		}
+		$event->log("cloudsoap->GetIpSelectPerUser", $_SERVER['REQUEST_TIME'], 5, "cloud-soap-server.php", "Providing a list of IP-Mgmt addresses for Cloud User ".$cloud_username, "", "", 0, 0, 0);
+		require_once $RootDir."/plugins/ip-mgmt/class/ip-mgmt.class.php";
+		$ip_mgmt_list_per_user_arr = array();
+		$ip_mgmt = new ip_mgmt();
+		$ip_mgmt_list_per_user = $ip_mgmt->get_list_by_user($cloud_ip_user->cg_id);
+		$ip_mgmt_list_per_user_arr[] = array("value" => -2, "label" => "Auto");
+		$ip_mgmt_list_per_user_arr[] = array("value" => -1, "label" => "None");
+		foreach($ip_mgmt_list_per_user as $list) {
+			$ip_mgmt_id = $list['ip_mgmt_id'];
+			$ip_mgmt_name = trim($list['ip_mgmt_name']);
+			$ip_mgmt_address = trim($list['ip_mgmt_address']);
+			$ip_mgmt_list_per_user_arr[] = array("value" => $ip_mgmt_id, "label" => $ip_mgmt_name."-".$ip_mgmt_address);
+		}
+		return $ip_mgmt_list_per_user_arr;
+	}
+
 
 
 	// ############################ helper methods #################################

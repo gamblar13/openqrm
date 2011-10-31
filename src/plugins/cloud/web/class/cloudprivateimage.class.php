@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -46,6 +46,7 @@ class cloudprivateimage {
 	var $id = '';
 	var $image_id = '';
 	var $cu_id = '';
+	var $clone_on_deploy = '';
 	var $comment = '';
 	var $state = '';
 	var $_db_table;
@@ -98,6 +99,7 @@ class cloudprivateimage {
 			$this->id = $cloudprivateimage["co_id"];
 			$this->image_id = $cloudprivateimage["co_image_id"];
 			$this->cu_id = $cloudprivateimage["co_cu_id"];
+			$this->clone_on_deploy = $cloudprivateimage["co_clone_on_deploy"];
 			$this->comment = $cloudprivateimage["co_comment"];
 			$this->state = $cloudprivateimage["co_state"];
 		}
@@ -148,6 +150,8 @@ class cloudprivateimage {
 			$event->log("add", $_SERVER['REQUEST_TIME'], 2, "cloudprivateimage.class.php", "cloudprivateimage_field not well defined", "", "", 0, 0, 0);
 			return 1;
 		}
+		// set clone_on_deploy to 1 (true) by default
+		$cloudprivateimage_fields['co_clone_on_deploy'] = 1;
 		// set stop time and status to now
 		$now=$_SERVER['REQUEST_TIME'];
 		$db=openqrm_get_db_connection();

@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
@@ -42,6 +42,14 @@ fi
 
 function cloud_start() {
 	echo "Starting the openQRM cloud-plugin"
+	# set the image password
+	local id=$image_id
+	if  wget -q $WGET_NO_CERT_CHECK -O /tmp/iauth.$id $openqrm_web_protocol://$resource_openqrmserver/openqrm/action/image-auth/iauth.$id 2>/tmp/iauth.log; then
+		cryptedpassword=`cat /tmp/iauth.$id`
+		rm -f /tmp/iauth.$id /tmp/iauth.log
+		sed -i "s#^root:[^:]*#root:$cryptedpassword#" /etc/shadow
+		sed -i "s#^root:[^:]*#root:$cryptedpassword#" /etc/shadow-
+	fi
 }
 
 

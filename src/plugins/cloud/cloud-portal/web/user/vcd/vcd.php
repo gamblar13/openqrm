@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -100,6 +100,7 @@ function check_param($param, $value, $empty) {
 if (htmlobject_request('action') != '') {
 	switch (htmlobject_request('action')) {
 		case 'newvcd':
+
 			$profile_name = htmlobject_request('profile_name');
 			if (isset($_GET["kernel"])) {
 				$kernel=$_GET["kernel"];
@@ -175,6 +176,11 @@ if (htmlobject_request('action') != '') {
 				$cr_stop = $_GET['cr_stop'];
 			} else {
 				$cr_stop = '';
+			}
+			if (isset($_GET["cr_appliance_hostname"])) {
+				$cr_appliance_hostname = $_GET['cr_appliance_hostname'];
+			} else {
+				$cr_appliance_hostname = '';
 			}
 			if (isset($_GET["ha"])) {
 				$highavailable = $_GET['ha'];
@@ -263,7 +269,27 @@ if (htmlobject_request('action') != '') {
 			if (!check_param("Application4", $application4, false)) {
 					exit(false);
 			}
+			if (!check_param("Hostname", $cr_appliance_hostname, false)) {
+					exit(false);
+			}
 
+			// check if hostname is free
+			$appliance_requested_hostname = "";
+			if (strlen($cr_appliance_hostname)) {
+				// check if appliance hostname is free
+				$appliance_requested_hostname = $cr_appliance_hostname;
+				for ($appliance_hostname_resource = 1; $appliance_hostname_resource <= $quantity; $appliance_hostname_resource++) {
+					if ($quantity > 1) {
+						$appliance_requested_hostname = $appliance_requested_hostname."_".$appliance_hostname_resource;
+					}
+					$appliance_check_hostname = new appliance();
+					$appliance_check_hostname->get_instance_by_name($appliance_requested_hostname);
+					if ($appliance_check_hostname->id > 0) {
+						// appliance with the requested hostname already exists
+						exit(false);
+					}
+				}
+			}
 
 			// set the eventual selected puppet groups
 			$puppet_groups = "";
@@ -359,7 +385,6 @@ if (htmlobject_request('action') != '') {
 				$request_fields['cr_shared_req']=1;
 			}
 
-
 			// ####### start of cloudselector case #######
 			// if cloudselector is enabled check if products exist
 			$cloud_selector_enabled = $cc_disk_conf->get_value(22);	// cloudselector
@@ -417,8 +442,6 @@ if (htmlobject_request('action') != '') {
 				// ####### end of cloudselector case #######
 			}
 
-
-
 			// save or submit ?
 			if (strlen($profile_name)) {
 				// save as cloud profile, profile name valid ?
@@ -460,6 +483,7 @@ if (htmlobject_request('action') != '') {
 				$pr_request_fields['pr_ip_mgmt'] = 0;
 				$pr_request_fields['pr_appliance_id'] = 0;
 				$pr_request_fields['pr_name'] = $profile_name;
+				$pr_request_fields['pr_appliance_hostname'] = $appliance_requested_hostname;
 				// set user id
 				$pr_request_fields['pr_cu_id'] = $request_user->id;
 				// id
@@ -469,6 +493,7 @@ if (htmlobject_request('action') != '') {
 				exit(true);
 
 			} else {
+
 				// submitting request to the cloud
 				// adding everything to the request_fields array
 				$request_fields['cr_cu_id'] = $request_user_id;
@@ -484,6 +509,8 @@ if (htmlobject_request('action') != '') {
 				$request_fields['cr_resource_type_req'] = $virtualization_id;
 				$request_fields['cr_kernel_id'] = $kernel_id;
 				$request_fields['cr_image_id'] = $image_id;
+				$request_fields['cr_appliance_hostname'] = $appliance_requested_hostname;
+
 				// get a new cr id
 				$request_fields['cr_id'] = openqrm_db_get_free_id('cr_id', $CLOUD_REQUEST_TABLE);
 				$cr_request = new cloudrequest();
@@ -723,6 +750,7 @@ if (htmlobject_request('action') != '') {
 			}
 
 			// puppet
+			$cost_app_total = 0;
 			$cost_app0 = 0;
 			if (strlen($application0)) {
 				$cost_app0 = $cloudselector->get_price($application0, "puppet");
@@ -743,6 +771,7 @@ if (htmlobject_request('action') != '') {
 			if (strlen($application4)) {
 				$cost_app4 = $cloudselector->get_price($application4, "puppet");
 			}
+			$cost_app_total = $cost_app0 + $cost_app1 + $cost_app2 + $cost_app3 + $cost_app4;
 
 			// ha
 			$cost_ha = 0;
@@ -755,7 +784,7 @@ if (htmlobject_request('action') != '') {
 			$cloud_1000_ccus_value = $cb_config->get_value(24);   // 24 is cloud_1000_ccus
 
 			// summary
-			$summary_per_appliance = $cost_res_type + $cost_kernel + $cost_cpu + $cost_memory + $cost_disk + $cost_network + $cost_ha;
+			$summary_per_appliance = $cost_res_type + $cost_kernel + $cost_cpu + $cost_memory + $cost_disk + $cost_network + $cost_app_total + $cost_ha;
 			$summary_overall = $quantity * $summary_per_appliance;
 			$one_ccu_cost_in_real_currency = $cloud_1000_ccus_value / 1000;
 			$appliance_cost_in_real_currency_per_hour = $summary_overall * $one_ccu_cost_in_real_currency;
@@ -773,6 +802,7 @@ if (htmlobject_request('action') != '') {
 			echo "Network : $cost_network\n";
 			echo "Disk : $cost_disk\n";
 			echo "HA : $cost_ha\n";
+			echo "Apps : $cost_app_total\n";
 			echo "---------------------------------------\n";
 			echo "Costs per Appliance : $summary_per_appliance CCUs\n";
 			echo "\n";
@@ -1251,6 +1281,10 @@ function my_cloud_create_request() {
 			if ($cl_user->id == $priv_image->cu_id) {
 				$priv_im = new image();
 				$priv_im->get_instance_by_id($priv_image->image_id);
+				// do not show active images
+				if ($priv_im->isactive == 1) {
+					continue;
+				}
 				if ($image_count == 0) {
 					$image_list .= "\"$priv_im->name\"";
 				} else {
@@ -1260,6 +1294,10 @@ function my_cloud_create_request() {
 			} else if ($priv_image->cu_id == 0) {
 				$priv_im = new image();
 				$priv_im->get_instance_by_id($priv_image->image_id);
+				// do not show active images
+				if ($priv_im->isactive == 1) {
+					continue;
+				}
 				if ($image_count == 0) {
 					$image_list .= "\"$priv_im->name\"";
 				} else {
@@ -1275,6 +1313,12 @@ function my_cloud_create_request() {
 		foreach($image_list_tmp as $list) {
 			$iname = $list['label'];
 			$iid = $list['value'];
+			// do not show active images
+			$iimage = new image();
+			$iimage->get_instance_by_id($iid);
+			if ($iimage->isactive == 1) {
+				continue;
+			}
 			if (!strstr($iname, ".cloud_")) {
 				if ($image_count == 0) {
 					$image_list .= "\"$iname\"";

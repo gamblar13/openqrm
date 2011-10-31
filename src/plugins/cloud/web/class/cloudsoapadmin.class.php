@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -36,6 +36,7 @@ require_once "$RootDir/class/deployment.class.php";
 
 // special cloud classes
 require_once "$RootDir/plugins/cloud/class/clouduser.class.php";
+require_once "$RootDir/plugins/cloud/class/cloudusergroup.class.php";
 require_once "$RootDir/plugins/cloud/class/clouduserslimits.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudrequest.class.php";
 require_once "$RootDir/plugins/cloud/class/cloudconfig.class.php";
@@ -111,7 +112,7 @@ class cloudsoapadmin extends cloudsoap {
 			$event->log("cloudsoap->CloudUserGetList", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud method only available in admin mode", "", "", 0, 0, 0);
 			return;
 		}
-		$event->log("cloudsoap->CloudUserGetList", $_SERVER['REQUEST_TIME'], 5, "cloud-soap-server.php", "Providing list of available Cloud Users", "", "", 0, 0, 0);
+		// $event->log("cloudsoap->CloudUserGetList", $_SERVER['REQUEST_TIME'], 5, "cloud-soap-server.php", "Providing list of available Cloud Users", "", "", 0, 0, 0);
 		$clouduser = new clouduser();
 		$clouduser_list = $clouduser->get_list();
 		$clouduser_name_list = array();
@@ -141,8 +142,17 @@ class cloudsoapadmin extends cloudsoap {
 		$clouduser_name = $parameter_array[3];
 		$clouduser_password = $parameter_array[4];
 		$clouduser_email = $parameter_array[5];
+		$clouduser_group_name = $parameter_array[6];
+		$clouduser_forename = $parameter_array[7];
+		$clouduser_lastname = $parameter_array[8];
+		$clouduser_street = $parameter_array[9];
+		$clouduser_city = $parameter_array[10];
+		$clouduser_country = $parameter_array[11];
+		$clouduser_phone = $parameter_array[12];
+		$clouduser_ccus = $parameter_array[13];
+
 		// check all user input
-		for ($i = 0; $i <= 5; $i++) {
+		for ($i = 0; $i <= 13; $i++) {
 			if(!$this->check_param($parameter_array[$i])) {
 				$event->log("cloudsoap->CloudUserCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Not allowing user-intput with special-characters : $parameter_array[$i]", "", "", 0, 0, 0);
 				return;
@@ -150,7 +160,7 @@ class cloudsoapadmin extends cloudsoap {
 		}
 		// check parameter count
 		$parameter_count = count($parameter_array);
-		if ($parameter_count != 6) {
+		if ($parameter_count != 14) {
 				$event->log("cloudsoap->CloudUserCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Wrong parameter count $parameter_count ! Exiting.", "", "", 0, 0, 0);
 				return;
 		}
@@ -169,10 +179,6 @@ class cloudsoapadmin extends cloudsoap {
 			$event->log("cloudsoap->CloudUserCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud user name is empty. Not adding new user.", "", "", 0, 0, 0);
 			return;
 		}
-		if (!strlen($clouduser_password)) {
-			$event->log("cloudsoap->CloudUserCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud user password is empty. Not adding new user.", "", "", 0, 0, 0);
-			return;
-		}
 		if (!strlen($clouduser_email)) {
 			$event->log("cloudsoap->CloudUserCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud user email is empty. Not adding new user.", "", "", 0, 0, 0);
 			return;
@@ -182,6 +188,53 @@ class cloudsoapadmin extends cloudsoap {
 		if (!$cloud_email->checkEmail($clouduser_email)) {
 			$event->log("cloudsoap->CloudUserCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud user email address is invalid. Not adding new user.", "", "", 0, 0, 0);
 			return;
+		}
+		// set the user group
+		if (!strlen($clouduser_group_name)) {
+			$user_fields['cu_cg_id'] = 0;  // 0 = default user group
+		} else {
+			$cloudusergroup = new cloudusergroup();
+			$cloudusergroup->get_instance_by_name($clouduser_group_name);
+			$user_fields['cu_cg_id'] = $cloudusergroup->id;
+		}
+		// set defaults
+		if (!strlen($clouduser_forename)) {
+			$user_fields['cu_forename'] = "Cloud-User";
+		} else {
+			$user_fields['cu_forename'] = $clouduser_forename;
+		}
+		if (!strlen($clouduser_lastname)) {
+			$user_fields['cu_lastname'] = $clouduser_name;
+		} else {
+			$user_fields['cu_lastname'] = $clouduser_lastname;
+		}
+		if (!strlen($clouduser_street)) {
+			$user_fields['cu_street'] = "na";
+		} else {
+			$user_fields['cu_street'] = $clouduser_street;
+		}
+		if (!strlen($clouduser_city)) {
+			$user_fields['cu_city'] = "na";
+		} else {
+			$user_fields['cu_city'] = $clouduser_city;
+		}
+		if (!strlen($clouduser_country)) {
+			$user_fields['cu_country'] = "na";
+		} else {
+			$user_fields['cu_country'] = $clouduser_country;
+		}
+		if (!strlen($clouduser_phone)) {
+			$user_fields['cu_phone'] = "0";
+		} else {
+			$user_fields['cu_phone'] = $clouduser_phone;
+		}
+		if (!strlen($clouduser_ccus)) {
+			// check how many ccunits to give for a new user
+			$cc_conf = new cloudconfig();
+			$cc_auto_give_ccus = $cc_conf->get_value(12);  // 12 is auto_give_ccus
+			$user_fields['cu_ccunits'] = $cc_auto_give_ccus;
+		} else {
+			$user_fields['cu_ccunits'] = $clouduser_ccus;
 		}
 
 		// username free ?
@@ -195,20 +248,8 @@ class cloudsoapadmin extends cloudsoap {
 		$user_fields['cu_name'] = $clouduser_name;
 		$user_fields['cu_password'] = $clouduser_password;
 		$user_fields['cu_email'] = $clouduser_email;
-		$user_fields['cu_lastname'] = $clouduser_name;
-		$user_fields['cu_forename'] = "Cloud-User";
-		$user_fields['cu_street'] = "na";
-		$user_fields['cu_city'] = "na";
-		$user_fields['cu_country'] = "na";
-		$user_fields['cu_phone'] = "0";
-		// default user group
-		$user_fields['cu_cg_id'] = 0;
 		// enabled by default
 		$user_fields['cu_status'] = 1;
-		// check how many ccunits to give for a new user
-		$cc_conf = new cloudconfig();
-		$cc_auto_give_ccus = $cc_conf->get_value(12);  // 12 is auto_give_ccus
-		$user_fields['cu_ccunits'] = $cc_auto_give_ccus;
 		// get a new clouduser id
 		$user_fields['cu_id'] = openqrm_db_get_free_id('cu_id', $cl_user->_db_table);
 		$cl_user->add($user_fields);
@@ -288,6 +329,7 @@ class cloudsoapadmin extends cloudsoap {
 		$openqrm_server_command="htpasswd -D $CloudDir/user/.htpasswd $clouduser_name";
 		$output = shell_exec($openqrm_server_command);
 		// remove permissions and limits
+		$cl_user->get_instance_by_name($clouduser_name);
 		$cloud_user_limit = new clouduserlimits();
 		$cloud_user_limit->remove_by_cu_id($cl_user->id);
 		$cl_user->remove_by_name($clouduser_name);
@@ -411,6 +453,184 @@ class cloudsoapadmin extends cloudsoap {
 		$clouduser_limit->update($clouduser_limit->id, $cloud_user_limits_fields);
 		return 0;
 	}
+
+
+
+	// ######################### cloud usergroups methods #############################
+
+
+	//--------------------------------------------------
+	/**
+	* Get an array of Cloud Usergroups
+	* @access public
+	* @param string $method_parameters
+	*  -> mode,user-name,user-password
+	* @return array clouduser limits
+	*/
+	//--------------------------------------------------
+	function CloudUserGroupGetList($method_parameters) {
+		global $event;
+		$parameter_array = explode(',', $method_parameters);
+		$mode = $parameter_array[0];
+		$username = $parameter_array[1];
+		$password = $parameter_array[2];
+		// check all user input
+		for ($i = 0; $i <= 2; $i++) {
+			if(!$this->check_param($parameter_array[$i])) {
+				$event->log("cloudsoap->CloudUserGetUserGroups", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Not allowing user-intput with special-characters : $parameter_array[$i]", "", "", 0, 0, 0);
+				return;
+			}
+		}
+		// check parameter count
+		$parameter_count = count($parameter_array);
+		if ($parameter_count != 3) {
+			$event->log("cloudsoap->CloudUserGetUserGroups", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Wrong parameter count $parameter_count ! Exiting.", "", "", 0, 0, 0);
+			return;
+		}
+		// check authentication
+		if (!$this->check_user($mode, $username, $password)) {
+			$event->log("cloudsoap->CloudUserGetUserGroups", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "User authentication failed (mode $mode)", "", "", 0, 0, 0);
+			return;
+		}
+		$cloud_user_group = new cloudusergroup();
+		$cloud_user_group_id_array = $cloud_user_group->get_all_ids();
+		$cloud_user_groups_array = array();
+		foreach($cloud_user_group_id_array as $cg_arr) {
+			$cloud_user_group->get_instance_by_id($cg_arr['cg_id']);
+			$cloud_user_groups_array[] = $cloud_user_group->name;
+		}
+		return $cloud_user_groups_array;
+	}
+
+
+
+
+
+	//--------------------------------------------------
+	/**
+	* Creates a Cloud Users Group
+	* @access public
+	* @param string $method_parameters
+	*  -> mode,user-name,user-password,cloud-user-name,cloud-user-password, user-email
+	* @return int id of the new Cloud User
+	*/
+	//--------------------------------------------------
+	function CloudUserGroupCreate($method_parameters) {
+		global $CloudDir;
+		global $event;
+		$parameter_array = explode(',', $method_parameters);
+		$mode = $parameter_array[0];
+		$username = $parameter_array[1];
+		$password = $parameter_array[2];
+		$cloudusergroup_name = $parameter_array[3];
+		$cloudusergroup_role_id = $parameter_array[4];
+		$cloudusergroup_description = $parameter_array[5];
+		// check all user input
+		for ($i = 0; $i <= 5; $i++) {
+			if(!$this->check_param($parameter_array[$i])) {
+				$event->log("cloudsoap->CloudUserGroupCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Not allowing user-intput with special-characters : $parameter_array[$i]", "", "", 0, 0, 0);
+				return;
+			}
+		}
+		// check parameter count
+		$parameter_count = count($parameter_array);
+		if ($parameter_count != 6) {
+				$event->log("cloudsoap->CloudUserGroupCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Wrong parameter count $parameter_count ! Exiting.", "", "", 0, 0, 0);
+				return;
+		}
+		// check authentication
+		if (!$this->check_user($mode, $username, $password)) {
+			$event->log("cloudsoap->CloudUserGroupCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "User authentication failed (mode $mode)", "", "", 0, 0, 0);
+			return;
+		}
+		// check for admin
+		if (strcmp($mode, "admin")) {
+			$event->log("cloudsoap->CloudUserGroupCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud method only available in admin mode", "", "", 0, 0, 0);
+			return;
+		}
+		// user input checking
+		if (!strlen($cloudusergroup_name)) {
+			$event->log("cloudsoap->CloudUserGroupCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud User Group name is empty. Not adding new User Group.", "", "", 0, 0, 0);
+			return;
+		}
+		if (!strlen($cloudusergroup_role_id)) {
+			$event->log("cloudsoap->CloudUserGroupCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud User Group role-id is empty. Not adding new User Group.", "", "", 0, 0, 0);
+			return;
+		}
+		if (!strlen($cloudusergroup_description)) {
+			$event->log("cloudsoap->CloudUserGroupCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud User Group description is empty. Not adding new User Group.", "", "", 0, 0, 0);
+			return;
+		}
+
+		// usergrpoup name free ?
+		$cl_usergroup = new cloudusergroup();
+		if (!$cl_usergroup->is_name_free($cloudusergroup_name)) {
+			$event->log("cloudsoap->CloudUserGroupCreate", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud User Group name $cloudusergroup_name already exists in the Cloud. Not adding !", "", "", 0, 0, 0);
+			return;
+		}
+		$event->log("cloudsoap->CloudUserGroupCreate", $_SERVER['REQUEST_TIME'], 5, "cloud-soap-server.php", "Creating new Cloud User Group $cloudusergroup_name", "", "", 0, 0, 0);
+		// create usergroups_fields array
+		$usergroups_fields['cg_name'] = $cloudusergroup_name;
+		$usergroups_fields['cg_role_id'] = $cloudusergroup_role_id;
+		$usergroups_fields['cg_description'] = "$cloudusergroup_description";
+		// get a new cloudusergroup id
+		$usergroups_fields['cg_id'] = openqrm_db_get_free_id('cg_id', $cl_usergroup->_db_table);
+		$cl_usergroup->add($usergroups_fields);
+		return $usergroups_fields['cg_id'];
+	}
+
+
+	//--------------------------------------------------
+	/**
+	* Removes a Cloud User Group
+	* @access public
+	* @param string $method_parameters
+	*  -> mode,user-name,user-password,cloud-user-name
+	* @return int 0 for success, 1 for error
+	*/
+	//--------------------------------------------------
+	function CloudUserGroupRemove($method_parameters) {
+		global $CloudDir;
+		global $event;
+		$parameter_array = explode(',', $method_parameters);
+		$mode = $parameter_array[0];
+		$username = $parameter_array[1];
+		$password = $parameter_array[2];
+		$cloudusergroup_name = $parameter_array[3];
+		// check all user input
+		for ($i = 0; $i <= 3; $i++) {
+			if(!$this->check_param($parameter_array[$i])) {
+				$event->log("cloudsoap->CloudUserGroupRemove", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Not allowing user-intput with special-characters : $parameter_array[$i]", "", "", 0, 0, 0);
+				return;
+			}
+		}
+		// check parameter count
+		$parameter_count = count($parameter_array);
+		if ($parameter_count != 4) {
+			$event->log("cloudsoap->CloudUserGroupRemove", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Wrong parameter count $parameter_count ! Exiting.", "", "", 0, 0, 0);
+			return;
+		}
+		// check authentication
+		if (!$this->check_user($mode, $username, $password)) {
+			$event->log("cloudsoap->CloudUserGroupRemove", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "User authentication failed (mode $mode)", "", "", 0, 0, 0);
+			return;
+		}
+		// check for admin
+		if (strcmp($mode, "admin")) {
+			$event->log("cloudsoap->CloudUserGroupRemove", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud method only available in admin mode", "", "", 0, 0, 0);
+			return;
+		}
+		$cl_usergroup = new cloudusergroup();
+		if ($cl_usergroup->is_name_free($cloudusergroup_name)) {
+			$event->log("cloudsoap->CloudUserGroupRemove", $_SERVER['REQUEST_TIME'], 2, "cloud-soap-server.php", "Cloud User Group name $cloudusergroup_name does not exists in this Cloud !", "", "", 0, 0, 0);
+			return 1;
+		}
+		$event->log("cloudsoap->CloudUserGroupRemove", $_SERVER['REQUEST_TIME'], 5, "cloud-soap-server.php", "Removing Cloud User Group $cloudusergroup_name", "", "", 0, 0, 0);
+		$cl_usergroup->remove_by_name($cloudusergroup_name);
+		return 0;
+	}
+
+
 
 
 

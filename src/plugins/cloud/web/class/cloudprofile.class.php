@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -68,6 +68,7 @@ class cloudprofile {
 	var $puppet_groups = '';
 	var $ip_mgmt = '';
 	var $appliance_id = '';
+	var $appliance_hostname = '';
 	var $lastbill = '';
 	var $description = '';
 
@@ -137,6 +138,7 @@ class cloudprofile {
 			$this->puppet_groups = $cloudprofile["pr_puppet_groups"];
 			$this->ip_mgmt = $cloudprofile["pr_ip_mgmt"];
 			$this->appliance_id = $cloudprofile["pr_appliance_id"];
+			$this->appliance_hostname = $cloudprofile["pr_appliance_hostname"];
 			$this->lastbill = $cloudprofile["pr_lastbill"];
 			$this->description = $cloudprofile["pr_description"];
 

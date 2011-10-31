@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -67,6 +67,7 @@ class cloudrequest {
 	var $puppet_groups = '';
 	var $ip_mgmt = '';
 	var $appliance_id = '';
+	var $appliance_hostname = '';
 	var $lastbill = '';
 
 
@@ -107,6 +108,7 @@ class cloudrequest {
 			$this->puppet_groups = $cloudrequest["cr_puppet_groups"];
 			$this->ip_mgmt = $cloudrequest["cr_ip_mgmt"];
 			$this->appliance_id = $cloudrequest["cr_appliance_id"];
+			$this->appliance_hostname = $cloudrequest["cr_appliance_hostname"];
 			$this->lastbill = $cloudrequest["cr_lastbill"];
 		}
 		return $this;
@@ -241,7 +243,7 @@ class cloudrequest {
 		global $CLOUD_REQUEST_TABLE;
 		global $event;
 		$cloudrequest_list = array();
-		$query = "select cr_id from $CLOUD_REQUEST_TABLE";
+		$query = "select cr_id from ".$CLOUD_REQUEST_TABLE." order by cr_id DESC";
 		$db=openqrm_get_db_connection();
 		$rs = $db->Execute($query);
 		if (!$rs)
@@ -262,7 +264,7 @@ class cloudrequest {
 		global $CLOUD_REQUEST_TABLE;
 		global $event;
 		$cloudrequest_list = array();
-		$query = "select cr_id from $CLOUD_REQUEST_TABLE where cr_status=1 or cr_status=2";
+		$query = "select cr_id from ".$CLOUD_REQUEST_TABLE." where cr_status=1 or cr_status=2 order by cr_id DESC";
 		$db=openqrm_get_db_connection();
 		$rs = $db->Execute($query);
 		if (!$rs)
@@ -282,7 +284,7 @@ class cloudrequest {
 		global $CLOUD_REQUEST_TABLE;
 		global $event;
 		$cloudrequest_list = array();
-		$query = "select cr_id from $CLOUD_REQUEST_TABLE where cr_status=3";
+		$query = "select cr_id from ".$CLOUD_REQUEST_TABLE." where cr_status=3 order by cr_id DESC";
 		$db=openqrm_get_db_connection();
 		$rs = $db->Execute($query);
 		if (!$rs)
@@ -302,7 +304,7 @@ class cloudrequest {
 		global $CLOUD_REQUEST_TABLE;
 		global $event;
 		$cloudrequest_list = array();
-		$query = "select cr_id from $CLOUD_REQUEST_TABLE where cr_status=5";
+		$query = "select cr_id from ".$CLOUD_REQUEST_TABLE." where cr_status=5 order by cr_id DESC";
 		$db=openqrm_get_db_connection();
 		$rs = $db->Execute($query);
 		if (!$rs)
@@ -323,7 +325,7 @@ class cloudrequest {
 		global $CLOUD_REQUEST_TABLE;
 		global $event;
 		$cloudrequest_list = array();
-		$query = "select cr_id from $CLOUD_REQUEST_TABLE where cr_cu_id=$cu_id";
+		$query = "select cr_id from ".$CLOUD_REQUEST_TABLE." where cr_cu_id=".$cu_id." order by cr_id DESC";
 		$db=openqrm_get_db_connection();
 		$rs = $db->Execute($query);
 		if (!$rs)
@@ -344,7 +346,7 @@ class cloudrequest {
 		global $CLOUD_REQUEST_TABLE;
 		global $event;
 		$cloudrequest_list = array();
-		$query = "select cr_id from $CLOUD_REQUEST_TABLE where cr_cu_id=$cu_id and cr_status>0 and cr_status<4";
+		$query = "select cr_id from ".$CLOUD_REQUEST_TABLE." where cr_cu_id=".$cu_id." and cr_status>0 and cr_status<4 order by cr_id DESC";
 		$db=openqrm_get_db_connection();
 		$rs = $db->Execute($query);
 		if (!$rs)

@@ -172,6 +172,73 @@ body {
 	background-repeat: no-repeat;
 }
 
+#start_input {
+	position: relative;
+	left: 0px;
+	top: 0px;
+	width: 120px;
+	height: 15px;
+	padding: 0px;
+}
+
+
+#cr_start {
+	left: 50px;
+	top: 0px;
+	width: 80px;
+	height: 15px;
+	padding: 0px;
+}
+
+
+#stop_input {
+	position: relative;
+	left: 0px;
+	top: 3px;
+	width: 120px;
+	height: 15px;
+	padding: 0px;
+}
+
+
+#cr_stop {
+	left: 50px;
+	top: 0px;
+	width: 80px;
+	height: 15px;
+	padding: 0px;
+}
+
+
+#name_input {
+	position: relative;
+	left: 0px;
+	top: 3px;
+	width: 120px;
+	height: 15px;
+	padding: 0px;
+}
+
+
+#cr_appliance_hostname {
+	left: 50px;
+	top: 0px;
+	width: 80px;
+	height: 15px;
+	padding: 0px;
+}
+
+
+#drop_here {
+	position: relative;
+	left: 0px;
+	top: 55px;
+	width: 120px;
+	height: 15px;
+	padding: 0px;
+}
+
+
 #builder {
 	position: absolute;
 	left: 8px;

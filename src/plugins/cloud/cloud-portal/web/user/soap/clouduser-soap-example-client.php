@@ -36,7 +36,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -81,7 +81,7 @@ switch ($action) {
 	// ######################### cloud Provisioning example ####################
 	case 'provision':
 		try {
-			$provision_parameters = "user,".$cloud_user.",".$cloud_password.",".$request_fields['cr_username'].",".$request_fields['cr_start'].",".$request_fields['cr_stop'].",".$request_fields['cr_kernel'].",".$request_fields['cr_image'].",".$request_fields['cr_ram_req'].",".$request_fields['cr_cpu_req'].",".$request_fields['cr_disk_req'].",".$request_fields['cr_network_req'].",".$request_fields['cr_resource_quantity'].",".$request_fields['cr_virtualization'].",".$request_fields['cr_ha_req'].",".$request_fields['cr_puppet'];
+			$provision_parameters = "user,".$cloud_user.",".$cloud_password.",".$request_fields['cr_username'].",".$request_fields['cr_start'].",".$request_fields['cr_stop'].",".$request_fields['cr_kernel'].",".$request_fields['cr_image'].",".$request_fields['cr_ram_req'].",".$request_fields['cr_cpu_req'].",".$request_fields['cr_disk_req'].",".$request_fields['cr_network_req'].",".$request_fields['cr_resource_quantity'].",".$request_fields['cr_virtualization'].",".$request_fields['cr_ha_req'].",".$request_fields['cr_puppet'].",,";;
 			echo "provision params : $provision_parameters <br>";
 			$res = $client->CloudProvision($provision_parameters);
 		} catch (Exception $e) {
@@ -235,7 +235,7 @@ try {
 
 // a select-box including all images
 try {
-	$imagegetlist_parameter = "user,$cloud_user,$cloud_password";
+	$imagegetlist_parameter = "user,$cloud_user,$cloud_password,$cloud_user";
 	$image_list = $client->ImageGetList($imagegetlist_parameter);
 	echo 'Image</td><td><select name="cr_image" size="1">';
 	foreach($image_list as $image) {

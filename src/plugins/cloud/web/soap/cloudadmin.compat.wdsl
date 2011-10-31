@@ -96,6 +96,27 @@
   <part name='Result' type='xsd:string'/>
 </message>
 
+<message name='CloudUserGroupGetListRequest'>
+  <part name='symbol' type='xsd:string'/>
+</message>
+<message name='CloudUserGroupGetListResponse'>
+  <part name='Result' type='xsd:string'/>
+</message>
+
+<message name='CloudUserGroupCreateRequest'>
+  <part name='symbol' type='xsd:string'/>
+</message>
+<message name='CloudUserGroupCreateResponse'>
+  <part name='Result' type='xsd:string'/>
+</message>
+
+<message name='CloudUserGroupRemoveRequest'>
+  <part name='symbol' type='xsd:string'/>
+</message>
+<message name='CloudUserGroupRemoveResponse'>
+  <part name='Result' type='xsd:string'/>
+</message>
+
 <message name='CloudPushTransactionRequest'>
   <part name='symbol' type='xsd:string'/>
 </message>
@@ -142,6 +163,13 @@
   <part name='symbol' type='xsd:string'/>
 </message>
 <message name='CloudRequestExtendResponse'>
+  <part name='Result' type='xsd:string'/>
+</message>
+
+<message name='CloudRequestGetCostRequest'>
+  <part name='symbol' type='xsd:string'/>
+</message>
+<message name='CloudRequestGetCostResponse'>
   <part name='Result' type='xsd:string'/>
 </message>
 
@@ -229,6 +257,12 @@
   <part name='Result' type='xsd:string'/>
 </message>
 
+<message name='GetIpSelectPerUserRequest'>
+  <part name='Result' type='xsd:string'/>
+</message>
+<message name='GetIpSelectPerUserResponse'>
+  <part name='Result' type='xsd:string'/>
+</message>
 
 <portType name='CloudPortType'>
 
@@ -292,6 +326,21 @@
     <output message='tns:CloudUserGetLimitsResponse'/>
   </operation>
 
+  <operation name='CloudUserGroupGetList'>
+    <input message='tns:CloudUserGroupGetListRequest'/>
+    <output message='tns:CloudUserGroupGetListResponse'/>
+  </operation>
+
+  <operation name='CloudUserGroupCreate'>
+    <input message='tns:CloudUserGroupCreateRequest'/>
+    <output message='tns:CloudUserGroupCreateResponse'/>
+  </operation>
+
+  <operation name='CloudUserGroupRemove'>
+    <input message='tns:CloudUserGroupRemoveRequest'/>
+    <output message='tns:CloudUserGroupRemoveResponse'/>
+  </operation>
+
   <operation name='CloudPushTransaction'>
     <input message='tns:CloudPushTransactionRequest'/>
     <output message='tns:CloudPushTransactionResponse'/>
@@ -325,6 +374,11 @@
   <operation name='CloudRequestExtend'>
     <input message='tns:CloudRequestExtendRequest'/>
     <output message='tns:CloudRequestExtendResponse'/>
+  </operation>
+
+  <operation name='CloudRequestGetCost'>
+    <input message='tns:CloudRequestGetCostRequest'/>
+    <output message='tns:CloudRequestGetCostResponse'/>
   </operation>
 
   <operation name='CloudApplianceGetList'>
@@ -385,6 +439,11 @@
   <operation name='ProductGetDetails'>
     <input message='tns:ProductGetDetailsRequest'/>
     <output message='tns:ProductGetDetailsResponse'/>
+  </operation>
+
+  <operation name='GetIpSelectPerUser'>
+    <input message='tns:GetIpSelectPerUserRequest'/>
+    <output message='tns:GetIpSelectPerUserResponse'/>
   </operation>
 
 </portType>
@@ -540,6 +599,42 @@
     </output>
   </operation>
 
+  <operation name='CloudUserGroupGetList'>
+    <soap:operation soapAction='urn:localhost-cloud#CloudUserGroupGetList'/>
+    <input>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </input>
+    <output>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </output>
+  </operation>
+
+  <operation name='CloudUserGroupCreate'>
+    <soap:operation soapAction='urn:localhost-cloud#CloudUserGroupCreate'/>
+    <input>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </input>
+    <output>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </output>
+  </operation>
+
+  <operation name='CloudUserGroupRemove'>
+    <soap:operation soapAction='urn:localhost-cloud#CloudUserGroupRemove'/>
+    <input>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </input>
+    <output>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </output>
+  </operation>
+
   <operation name='CloudPushTransaction'>
     <soap:operation soapAction='urn:localhost-cloud#CloudPushTransaction'/>
     <input>
@@ -620,6 +715,18 @@
     </input>
     <output>
       <soap:body use='literal' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </output>
+  </operation>
+
+  <operation name='CloudRequestGetCost'>
+    <soap:operation soapAction='urn:localhost-cloud#CloudRequestGetCost'/>
+    <input>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </input>
+    <output>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
         encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
     </output>
   </operation>
@@ -768,7 +875,17 @@
     </output>
   </operation>
 
-
+  <operation name='GetIpSelectPerUser'>
+    <soap:operation soapAction='urn:localhost-cloud#GetIpSelectPerUser'/>
+    <input>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </input>
+    <output>
+      <soap:body use='encoded' namespace='urn:localhost-cloud'
+        encodingStyle='http://schemas.xmlsoap.org/soap/encoding/'/>
+    </output>
+  </operation>
 
 </binding>
 

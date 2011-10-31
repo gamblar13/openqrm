@@ -17,7 +17,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
 <head>
@@ -145,6 +145,7 @@ function submitrequest(s, action)
 	});
 
 	var o = str.join(delimiter);
+	var appliance_requested_hostname = document.getElementById('cr_appliance_hostname').value;
 
 	// check for systemtype
 	var v = check_exists_uniq(o, "systemtype");
@@ -227,6 +228,9 @@ function submitrequest(s, action)
 	var crstop_timestamp = Date.parse(cstop);
 	str.push("cr_stop=" + crstop_timestamp);
 
+	if (appliance_requested_hostname.length) {
+		str.push("cr_appliance_hostname=" + appliance_requested_hostname);
+	}
 
 	// filter out whitespaces
 	var tmpstr = str.join(delimiter);
@@ -604,16 +608,19 @@ and check to have enough CCU's (Cloud Computing Units) when requesting a System.
   <small>(construct your cloud appliance here)</small>
 	<div id="server" class="server">
 		<center><b><u>Cloud Appliance</u></b></center>
-		<br />
-		<b>Start&nbsp;<input name="cr_start" id="cr_start" class="date-pick" size="7" value="{cloud_request_start}"/></b>
-		<br />
+		<div id="start_input" name="start_input">
+		<b>Start&nbsp;&nbsp;<input name="cr_start" id="cr_start" class="date-pick" size="7" value="{cloud_request_start}"/></b>
+		</div>
+		<div id="stop_input" name="stop_input">
 		<b>End&nbsp;&nbsp;&nbsp;<input name="cr_stop" id="cr_stop" class="date-pick" size="7" value="{cloud_request_stop}"/></b>
+		</div>
 		<br />
-		<br />
-		<br />
-		<br />
-		<br />
+		<div id="stop_input" name="stop_input">
+		<b>Name<input name="cr_appliance_hostname" id="cr_appliance_hostname" size="7" value=""/></b>
+		</div>
+		<div id="drop_here" name="drop_here">
 		<center><small>Drop components below</small></center>
+		</div>
 		<div id="builder" class="column">
 		</div>
 	</div>

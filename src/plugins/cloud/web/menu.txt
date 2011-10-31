@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 #	Title
 #	Href
@@ -43,6 +43,9 @@
 ...|Power-Saver|plugins/cloud/cloud-power-saver.php|Power Saver Manager|cloud/cloudprivateimage.png
 ...|Ip-Mgmt|plugins/cloud/cloud-ip-manager.php|Setup IP-Adressing for the Cloud|cloud/cloudipgroups.png
 ...|Cloud NAT|plugins/cloud/cloud-nat-manager.php|Configure NAT for the Cloud|cloud/cloudnat.png
+...|Transactions|plugins/cloud/cloud-transactions.php|List of Cloud Transactions|cloud/cloudprivateimage.png
+....|Done|plugins/cloud/cloud-transactions.php|List of Cloud Transactions|cloud/cloudprivateimage.png
+....|Failed|plugins/cloud/cloud-transactions-failed.php|List of Failed Cloud Transactions|cloud/cloudprivateimage.png
 ..|WebService
 ...|Main|plugins/cloud/soap/index.php|Documenation for the Cloud SOAP WebService|cloud/cloudsoap.png
 ...|Admin WebService|plugins/cloud/soap/soap-admin.php|Documenation for the Cloud Admin SOAP WebService|cloud/cloudsoap.png

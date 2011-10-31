@@ -31,7 +31,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -381,6 +381,10 @@ function portal_home() {
 	global $thisfile;
 	global $cloud_portal_howto;
 
+	$cc_conf = new cloudconfig();
+	$public_register_enabled = $cc_conf->get_value(14);  // 14 is public_register_enabled
+	$cc_admin_email = $cc_conf->get_value(1);  // 1 is admin_email
+
 	$disp = "<h1>openQRM Cloud Portal</h1>";
 	$disp = $disp."This is the openQRM Cloud Portal providing computing power on-demand.";
 	$disp = $disp."<br>";
@@ -388,15 +392,25 @@ function portal_home() {
 	$disp = $disp."Here how it works :";
 	$disp = $disp."<br>";
 	$disp = $disp."<br>";
-	$disp = $disp."- First <a href=\"$thisfile?currenttab=tab1\">register</a> yourself to the openQRM Cloud portal";
-	$disp = $disp."<br>";
-	$disp = $disp."- You will receive a mail how to activate</a> your account";
-	$disp = $disp."<br>";
-	$disp = $disp."- <a href=\"$thisfile?activate=yes\">Activate</a> your account";
-	$disp = $disp."<br>";
-	$disp = $disp."- Get some Cloud Computing Units (CCU's), the virtual currency in the Cloud";
-	$disp = $disp."<br>";
-	$disp = $disp."- Request your systems from the openQRM Cloud";
+	if ($public_register_enabled == 'true') {
+		$disp = $disp."- First <a href=\"$thisfile?currenttab=tab1\">register</a> yourself to the openQRM Cloud portal";
+		$disp = $disp."<br>";
+		$disp = $disp."- You will receive a mail how to activate your account";
+		$disp = $disp."<br>";
+		$disp = $disp."- <a href=\"$thisfile?activate=yes\">Activate</a> your account";
+		$disp = $disp."<br>";
+		$disp = $disp."- Get some Cloud Computing Units (CCU's), the virtual currency in the Cloud";
+		$disp = $disp."<br>";
+		$disp = $disp."- Request your systems from the openQRM Cloud";
+	} else {
+		$disp = $disp."- Please contact <a href=\"mailto:$cc_admin_email?subject=openQRM Cloud: Account request\">$cc_admin_email</a> to ask for an account.";
+		$disp = $disp."<br>";
+		$disp = $disp."- You will receive a mail how to access the cloud";
+		$disp = $disp."<br>";
+		$disp = $disp."- Get some Cloud Computing Units (CCU's), the virtual currency in the Cloud";
+		$disp = $disp."<br>";
+		$disp = $disp."- Request your systems from the openQRM Cloud";
+	}
 	$disp = $disp."<br>";
 	$disp = $disp."<br>";
 	$disp = $disp."Enjoy !";
@@ -418,7 +432,7 @@ function register_user() {
 	$cc_conf = new cloudconfig();
 	$public_register_enabled = $cc_conf->get_value(14);  // 14 is public_register_enabled
 	$cc_admin_email = $cc_conf->get_value(1);  // 1 is admin_email
-
+	$disp = "";
 	if ($public_register_enabled == 'true') {
 		$disp = "<h1>Register to the openQRM Cloud</h1>";
 		$disp = $disp."<br>";
@@ -439,22 +453,16 @@ function register_user() {
 		$disp = $disp."<br>";
 		$disp = $disp."<input type=submit value='Register'>";
 		$disp = $disp."<br>";
+		$disp = $disp."<br>";
 		$disp = $disp."By registering I accept the <a href=\"/cloud-portal/web/conditions.php\" target=\"_BLANK\">general terms and conditions of this Cloud portal</a>";
 		$disp = $disp."<br>";
 		$disp = $disp."<br>";
+		$disp = $disp."<hr>";
 		$disp = $disp."</form>";
-	} else {
-		$disp = "<h1>Public registration disabled !</h1>";
-		$disp = $disp."<br>";
-		$disp = $disp."This openQRM Cloud does not allow public registration.";
-		$disp = $disp."<br>";
-		$disp = $disp."Please contact <a href=\"mailto:$cc_admin_email?subject=openQRM Cloud: Account request\">$cc_admin_email</a> to ask for an account.";
-		$disp = $disp."<br>";
 	}
 
 	$disp = $disp."<form action=$thisfile method=post>";
 	$disp = $disp."<br>";
-	$disp = $disp."<hr>";
 	$disp = $disp."<h4>Forgot the password ?</h4>";
 	$disp = $disp."You already have an existing account on the openQRM Cloud but forgot your password ?";
 	$disp = $disp."<br>";
@@ -530,7 +538,7 @@ if (!strcmp($activate, "yes")) {
 	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab0\">Activate your Account</a>", 'value' => activate_user());
 } else {
 	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab0\">Welcome to the openQRM Cloud</a>", 'value' => portal_home());
-	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab1\">Register</a>", 'value' => register_user());
+	$output[] = array('label' => "<a href=\"$thisfile?currenttab=tab1\">Reset Password</a>", 'value' => register_user());
 	$output[] = array('label' => "<a href=\"/cloud-portal/user/mycloud.php\">Login</a>", 'value' => login_user());
 }
 echo htmlobject_tabmenu($output);
