@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
@@ -173,12 +173,14 @@ case "$SANBOOT_COMMAND" in
 		# create new config
 		cat $DHCPD_CONF.first_part $DHCPD_CONF.sanboot_part $DHCPD_CONF.last_part > $DHCPD_CONF
 		# restart dhcpd
-		$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd stop
-		if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start; then
-			dhcpd_log openqrm-dhcpd-manager "Removing Resource  $SANBOOT_HOSTNAME $SANBOOT_RESOURCE_ID $SANBOOT_RESOURCE_MAC $SANBOOT_RESOURCE_IP failed. Reverting dhcpd-configuration."
-			# restore previous version, better not to add it than to corrupt the config
-			cp -f $DHCPD_CONF.openqrm-dhcpd-manager $DHCPD_CONF
-			$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start
+		if [ -f "$OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/dhcpd/.running" ]; then
+			$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd stop
+			if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start; then
+				dhcpd_log openqrm-dhcpd-manager "Removing Resource  $SANBOOT_HOSTNAME $SANBOOT_RESOURCE_ID $SANBOOT_RESOURCE_MAC $SANBOOT_RESOURCE_IP failed. Reverting dhcpd-configuration."
+				# restore previous version, better not to add it than to corrupt the config
+				cp -f $DHCPD_CONF.openqrm-dhcpd-manager $DHCPD_CONF
+				$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start
+			fi
 		fi
 		dhcpd_lock release
 
@@ -215,12 +217,14 @@ case "$SANBOOT_COMMAND" in
 		# create new config
 		cat $DHCPD_CONF.first_part $DHCPD_CONF.host_part $DHCPD_CONF.last_part > $DHCPD_CONF
 		# restart dhcpd
-		$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd stop
-		if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start; then
-			dhcpd_log openqrm-dhcpd-manager "Removing Resource  $SANBOOT_HOSTNAME $SANBOOT_RESOURCE_ID $SANBOOT_RESOURCE_MAC $SANBOOT_RESOURCE_IP failed. Reverting dhcpd-configuration."
-			# restore previous version, better not to add it than to corrupt the config
-			cp -f $DHCPD_CONF.openqrm-dhcpd-manager $DHCPD_CONF
-			$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start
+		if [ -f "$OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/dhcpd/.running" ]; then
+			$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd stop
+			if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start; then
+				dhcpd_log openqrm-dhcpd-manager "Removing Resource  $SANBOOT_HOSTNAME $SANBOOT_RESOURCE_ID $SANBOOT_RESOURCE_MAC $SANBOOT_RESOURCE_IP failed. Reverting dhcpd-configuration."
+				# restore previous version, better not to add it than to corrupt the config
+				cp -f $DHCPD_CONF.openqrm-dhcpd-manager $DHCPD_CONF
+				$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start
+			fi
 		fi
 		dhcpd_lock release
 
