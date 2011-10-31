@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
@@ -544,6 +544,8 @@ EOF
 					# we have a real dev-name, mount it on top of root
 					umount -f $LXC_VM_DISK $OPENQRM_VM_DIR/$LXC_VM_NAME/root 1>/dev/null 2>&1
 					# rescan all lvols
+					pvscan >/dev/null
+					vgscan >/dev/null
 					lvscan >/dev/null
 					# activate the lvol
 					lvchange -ay $LXC_VM_DISK
@@ -721,7 +723,7 @@ EOF
 			LXC_VM_MAC=`grep lxc.network.hwaddr $OPENQRM_VM_DIR/$lxcvm/config | awk {' print $3 '} | head -n1`
 			echo "$lxcvm""@""$LXC_VM_STATUS""@""$LXC_VM_MAC""@""" >> $VM_LIST_TMP
 		done
-		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LXC_OPENQRM_USERNAME --http-password=$LXC_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_LIST_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lxc_server_command=get_lxc_server; then
+		if ! $WGET -q -O /dev/null --http-user=$LXC_OPENQRM_USERNAME --http-password=$LXC_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_LIST_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lxc_server_command=get_lxc_server; then
 			openqrm_post_event 0 "post_vm_list" 2 "openqrm-lxc-storage" "Could not post vm list to the openQRM-server at $OPENQRM_SERVER_IP!"
 			lxc_storage_log post_lv "ERROR: Could not post vm list to the openQRM-server at $OPENQRM_SERVER_IP!"
 		fi
@@ -739,7 +741,7 @@ EOF
 			echo "##$LXC_CGROUP_FILE" >> $VM_CONFIG_TMP
 			cat $CGROUPMOUNT/$LXC_VM_NAME/$LXC_CGROUP_FILE >> $VM_CONFIG_TMP
 		done
-		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LXC_OPENQRM_USERNAME --http-password=$LXC_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_CONFIG_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lxc_server_command=get_lxc_config; then
+		if ! $WGET -q -O /dev/null --http-user=$LXC_OPENQRM_USERNAME --http-password=$LXC_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_CONFIG_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lxc_server_command=get_lxc_config; then
 			openqrm_post_event 0 "post_vm_config" 2 "openqrm-lxc-storage" "Could not post vm config for Lxc vm $LXC_VM_NAME!"
 			lxc_storage_log post_lv "ERROR: Could not post vm config for Lxc vm $LXC_VM_NAME!"
 		fi
@@ -795,7 +797,7 @@ EOF
 		echo "OPENQRM_LXC_STORAGE_BRIDGE_NET3=\"$OPENQRM_PLUGIN_LXC_BRIDGE_NET3\"" >> $VM_CONFIG_TMP
 		echo "OPENQRM_LXC_STORAGE_BRIDGE_NET4=\"$OPENQRM_PLUGIN_LXC_BRIDGE_NET4\"" >> $VM_CONFIG_TMP
 
-		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LXC_OPENQRM_USERNAME --http-password=$LXC_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_CONFIG_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lxc_server_command=get_lxc_net_config; then
+		if ! $WGET -q -O /dev/null --http-user=$LXC_OPENQRM_USERNAME --http-password=$LXC_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_CONFIG_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lxc-storage/lxc-storage-action.php?lxc_server_command=get_lxc_net_config; then
 			openqrm_post_event 0 "post_vm_net_config" 2 "openqrm-lxc-storage" "Could not post vm network config for Lxc vm $LXC_VM_NAME!"
 			lxc_storage_log post_lv "ERROR: Could not post vm network config for Lxc vm $LXC_VM_NAME!"
 		fi
