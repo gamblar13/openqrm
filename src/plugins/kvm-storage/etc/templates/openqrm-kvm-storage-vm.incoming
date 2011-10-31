@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 KVM_MIGRATION_PORT=$1
@@ -63,12 +63,23 @@ VM_NAME=`basename $VM_CONF_DIR`
 . $VM_CONF_DIR/net5
 . $VM_CONF_DIR/vnc
 . $VM_CONF_DIR/boot
-
+if [ -f "$VM_CONF_DIR/vncpassword" ]; then
+	. $VM_CONF_DIR/vncpassword
+fi
 KVM_VM_DISK="$KVM_VM_DISK_1 $KVM_VM_DISK_2 $KVM_VM_DISK_3 $KVM_VM_DISK_4"
 KVM_VM_NET="$KVM_VM_NET_1 $KVM_VM_NET_2 $KVM_VM_NET_3 $KVM_VM_NET_4 $KVM_VM_NET_5"
 
 echo "KVM vm $VM_NAME starting up ..." | logger
 $RUNSCREEN -dmS $KVM_VM_MAC_1 $KVM $KVM_VM_DISK $KVM_VM_CDROM -m $KVM_VM_RAM -smp $KVM_VM_CPUS $KVM_VM_BOOT $KVM_VM_NET -vnc $KVM_VM_VNC -balloon virtio -monitor unix:/var/run/openqrm/kvm-storage/kvm.$VM_NAME.mon,server,nowait -incoming tcp:0:$KVM_MIGRATION_PORT
-
+# set vnc password
+if [ "$KVM_VM_VNCPASSWORD" ]; then
+	while ! echo "change vnc password $KVM_VM_VNCPASSWORD" | socat stdio unix:/var/run/openqrm/kvm-storage/kvm.$VM_NAME.mon; do
+		sleep 1
+		LOOP=$(( LOOP + 1 ))
+		if [ "$LOOP" == 10 ]; then
+			break
+		fi
+	done
+fi
 
 

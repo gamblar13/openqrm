@@ -50,7 +50,7 @@ function wait_for_identfile($sfile) {
 }
 
 
-function get_image_rootdevice_identifier($kvm_lvm_storage_id) {
+function get_image_rootdevice_identifier($kvm_bf_storage_id) {
 	global $OPENQRM_SERVER_BASE_DIR;
 	global $OPENQRM_ADMIN;
 	global $event;
@@ -59,7 +59,7 @@ function get_image_rootdevice_identifier($kvm_lvm_storage_id) {
 	$StorageDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/plugins/kvm-storage/storage';
 	$rootdevice_identifier_array = array();
 	$storage = new storage();
-	$storage->get_instance_by_id($kvm_lvm_storage_id);
+	$storage->get_instance_by_id($kvm_bf_storage_id);
 	// get deployment type
 	$deployment = new deployment();
 	$deployment->get_instance_by_id($storage->type);
@@ -67,7 +67,7 @@ function get_image_rootdevice_identifier($kvm_lvm_storage_id) {
 	$storage_resource = new resource();
 	$storage_resource->get_instance_by_id($storage->resource_id);
 	$storage_resource_id = $storage_resource->id;
-	$ident_file = $StorageDir."/".$storage_resource_id.".lv.kvm-lvm-deployment.ident";
+	$ident_file = $StorageDir."/".$storage_resource_id.".lv.kvm-bf-deployment.ident";
 	if (file_exists($ident_file)) {
 		unlink($ident_file);
 	}
@@ -75,14 +75,14 @@ function get_image_rootdevice_identifier($kvm_lvm_storage_id) {
 	$resource_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/kvm-storage/bin/openqrm-kvm-storage post_identifier -u ".$OPENQRM_ADMIN->name." -p ".$OPENQRM_ADMIN->password." -t ".$deployment->type;
 	$storage_resource->send_command($storage_resource->ip, $resource_command);
 	if (!wait_for_identfile($ident_file)) {
-		$event->log("get_image_rootdevice_identifier", $_SERVER['REQUEST_TIME'], 2, "image.kvm-lvm-deployment", "Timeout while requesting image identifier from storage id $storage->id", "", "", 0, 0, 0);
+		$event->log("get_image_rootdevice_identifier", $_SERVER['REQUEST_TIME'], 2, "image.kvm-bf-deployment", "Timeout while requesting image identifier from storage id $storage->id", "", "", 0, 0, 0);
 		return;
 	}
 	$fcontent = file($ident_file);
 	foreach($fcontent as $lun_info) {
-		$tpos = strpos($lun_info, ":");
-		$timage_name = trim(substr($lun_info, 0, $tpos));
-		$troot_device = trim(substr($lun_info, $tpos+1));
+		$ident_params = explode(":", $lun_info);
+		$timage_name = trim($ident_params[0]);
+		$troot_device = trim($ident_params[1]);
 		$rootdevice_identifier_array[] = array("value" => "$troot_device", "label" => "$timage_name");
 	}
 	return $rootdevice_identifier_array;

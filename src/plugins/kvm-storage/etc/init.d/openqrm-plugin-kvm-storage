@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
@@ -117,11 +117,13 @@ function openqrm_plugin_kvm_storage_uninstall() {
 	echo "Uninstalling the openQRM kvm-storage-plugin"
 	openqrm_plugin_kvm_storage_stop
 	openqrm_server_remove_deployment_type $USERNAME $PASSWORD kvm-lvm-deployment
+	openqrm_server_remove_deployment_type $USERNAME $PASSWORD kvm-bf-deployment
 	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD kvm-storage
 	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD kvm-storage-vm
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/kvm-storage
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-kvm-storage.tgz
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.kvm-lvm-deployment.php
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.kvm-bf-deployment.php
 
 }
 
@@ -138,6 +140,7 @@ function openqrm_plugin_kvm_storage_init() {
 	fi
 	echo "Initializing the openQRM kvm-storage-plugin"
 	openqrm_server_add_deployment_type $USERNAME $PASSWORD kvm-lvm-deployment kvm-lvm-deployment "LVM deployment for KVM" kvm-storage "KVM LVM Storage"
+	openqrm_server_add_deployment_type $USERNAME $PASSWORD kvm-bf-deployment kvm-bf-deployment "Blockfile deployment for KVM" kvm-storage "KVM Blockfile Storage"
 	openqrm_server_add_virtualization_type $USERNAME $PASSWORD kvm-storage "KVM-Storage Host"
 	openqrm_server_add_virtualization_type $USERNAME $PASSWORD kvm-storage-vm "KVM-Storage VM"
 
@@ -147,27 +150,10 @@ function openqrm_plugin_kvm_storage_init() {
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/web/boot-service-kvm-storage.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-kvm-storage.tgz
 	# linking the image deployment parameters menu
 	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/web/image.kvm-lvm-deployment.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.kvm-lvm-deployment.php
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/web/image.kvm-bf-deployment.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.kvm-bf-deployment.php
 	# create storage dir for stat files
 	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/web/storage
 	chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/web/storage
-
-	# preparing the nic-bios in case the openQRM server itself is the kvm-host
-	if [ ! -d /usr/share/kvm/ ]; then
-		mkdir -p /usr/share/kvm
-	fi
-	if [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/include/pxe/kvm-nic-bios-1.1.tgz ]; then
-		if [ -f /usr/share/kvm/pxe-e1000.bin ] && [ ! -f /usr/share/kvm/pxe-e1000.bin.openqrm-backup ]; then
-			cp -f /usr/share/kvm/pxe-e1000.bin /usr/share/kvm/pxe-e1000.bin.openqrm-backup
-		fi
-		if [ -f /usr/share/kvm/pxe-rtl8139.bin ] && [ ! -f /usr/share/kvm/pxe-rtl8139.bin.openqrm-backup ]; then
-			cp -f /usr/share/kvm/pxe-rtl8139.bin /usr/share/kvm/pxe-rtl8139.bin.openqrm-backup
-		fi
-		if [ -f /usr/share/kvm/pxe-virtio.bin ] && [ ! -f /usr/share/kvm/pxe-virtio.bin.openqrm-backup ]; then
-			cp -f /usr/share/kvm/pxe-virtio.bin /usr/share/kvm/pxe-virtio.bin.openqrm-backup
-		fi
-		tar -C /usr/share/kvm/ -xzf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/include/pxe/kvm-nic-bios-1.1.tgz
-		chown root:root /usr/share/kvm/pxe-e1000.bin /usr/share/kvm/pxe-rtl8139.bin /usr/share/kvm/pxe-virtio.bin
-	fi
 
 	# setting the kvm-ifup +kvm-ifdown script to the internal and external bridge
 	# internal
@@ -197,9 +183,27 @@ function openqrm_plugin_kvm_storage_init() {
 	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-ovs-kvm-storage-ifup | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET5/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#4#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-ovs-kvm-ifup-net5
 	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-ovs-kvm-storage-ifdown | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET5/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#4#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-ovs-kvm-ifdown-net5
 	chmod +x $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/*
+
+	# ifup/down scripts for bridged vlans
+	# internal
+	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-vlan-kvm-storage-ifup | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET1/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#0#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-vlan-kvm-ifup-net1
+	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-vlan-kvm-storage-ifdown | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET1/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#0#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-vlan-kvm-ifdown-net1
+	# external
+	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-vlan-kvm-storage-ifup | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET2/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#1#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-vlan-kvm-ifup-net2
+	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-vlan-kvm-storage-ifdown | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET2/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#1#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-vlan-kvm-ifdown-net2
+	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-vlan-kvm-storage-ifup | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET3/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#2#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-vlan-kvm-ifup-net3
+	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-vlan-kvm-storage-ifdown | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET3/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#2#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-vlan-kvm-ifdown-net3
+	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-vlan-kvm-storage-ifup | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET4/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#3#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-vlan-kvm-ifup-net4
+	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-vlan-kvm-storage-ifdown | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET4/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#3#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-vlan-kvm-ifdown-net4
+	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-vlan-kvm-storage-ifup | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET5/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#4#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-vlan-kvm-ifup-net5
+	cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/etc/templates/openqrm-vlan-kvm-storage-ifdown | sed -e "s/@@OPENQRM_PLUGIN_KVM_BRIDGE@@/$OPENQRM_PLUGIN_KVM_BRIDGE_NET5/g" | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" | sed -e "s#@@OPENQRM_APP_NIC@@#4#g" > $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-vlan-kvm-ifdown-net5
+	chmod +x $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/*
+
 	# create kvm-stat dir
 	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/web/kvm-stat
 	chmod -R 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/web/kvm-stat
+
+
 
 
 }

@@ -41,7 +41,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -75,6 +75,7 @@ $kvm_nic_model = htmlobject_request('kvm_nic_model');
 $kvm_vm_bridge = htmlobject_request('kvm_vm_bridge');
 $kvm_vm_boot_iso = htmlobject_request('kvm_vm_boot_iso');
 $kvm_vm_boot_dev = htmlobject_request('kvm_vm_boot_dev');
+$kvm_update_vncpassword = htmlobject_request('kvm_update_vncpassword');
 
 
 function redirect_config($strMsg, $kvm_server_id, $kvm_server_name) {
@@ -169,6 +170,37 @@ if(htmlobject_request('action') != '') {
 					}
 					redirect_config($strMsg, $kvm_server_id, $kvm_server_name);
 				break;
+
+			case 'update_vnc':
+					show_progressbar();
+					$kvm_update_vncpassword = htmlobject_request('kvm_update_vncpassword');
+					if (!strlen($kvm_update_vncpassword)) {
+						$strMsg .= "Empty VNC password. Not updating ...<br>";
+						redirect_config($strMsg, $kvm_server_id, $kvm_server_name);
+					}
+					$kvm_server_appliance = new appliance();
+					$kvm_server_appliance->get_instance_by_id($kvm_server_id);
+					$kvm_server = new resource();
+					$kvm_server->get_instance_by_id($kvm_server_appliance->resources);
+					$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/bin/openqrm-kvm-storage-vm update_vm_vnc -n $kvm_server_name -v $kvm_update_vncpassword -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
+					// remove current stat file
+					$kvm_server_resource_id = $kvm_server->id;
+					$statfile="kvm-stat/".$kvm_server_resource_id.".".$kvm_server_name.".vm_config";
+					if (file_exists($statfile)) {
+						unlink($statfile);
+					}
+					// send command
+					$kvm_server->send_command($kvm_server->ip, $resource_command);
+					// and wait for the resulting statfile
+					if (!wait_for_statfile($statfile)) {
+						$strMsg .= "Error during update_vnc of KVM vm $kvm_server_name ! Please check the Event-Log<br>";
+					} else {
+						$strMsg .="Updated VNC password of KVM vm $kvm_server_name<br>";
+					}
+					redirect_config($strMsg, $kvm_server_id, $kvm_server_name);
+				break;
+
+
 
 			case 'add_vm_net':
 					show_progressbar();
@@ -415,7 +447,23 @@ function kvm_vm_config() {
 
 
 	// vnc
-	$vm_vnc_disp = "Vnc-port <b>$store[OPENQRM_KVM_VM_VNC]</b>";
+	$vm_vnc_disp = "<form action=\"$thisfile\" method=post>";
+	$vm_vnc_disp .= "<input type=hidden name=kvm_component value='vnc'>";
+	$vm_vnc_disp .= "<input type=hidden name=kvm_server_id value=$kvm_server_id>";
+	$vm_vnc_disp .= "<input type=hidden name=kvm_server_name value=$kvm_server_name>";
+	$vm_vnc_disp .= "VNC-port <b>".$store['OPENQRM_KVM_VM_VNC']."</b>";
+	$html = new htmlobject_input();
+	$html->name = "vnc";
+	$html->id = 'p'.uniqid();
+	$html->value = $store['OPENQRM_KVM_VM_VNCPASSWORD'];
+	$html->title = "VNC password";
+	$html->type = "password";
+	$html->disabled = true;
+	$html->maxlength="10";
+	$vm_vnc_disp .= htmlobject_box_from_object($html, ' input');
+	$vm_vnc_disp .= "<input type=submit value='Edit'>";
+	$vm_vnc_disp .= "</form>";
+
 	// backlink
 	$backlink = "<a href='kvm-storage-vm-manager.php?kvm_server_id=".$kvm_server_id."'>back</a>";
 
@@ -771,6 +819,43 @@ function kvm_vm_config_boot() {
 
 
 
+function kvm_vm_config_vnc() {
+	global $kvm_server_id;
+	global $kvm_server_name;
+	global $OPENQRM_SERVER_BASE_DIR;
+	global $OPENQRM_USER;
+	global $refresh_delay;
+	global $thisfile;
+
+	$kvm_server_appliance = new appliance();
+	$kvm_server_appliance->get_instance_by_id($kvm_server_id);
+	$kvm_server = new resource();
+	$kvm_server->get_instance_by_id($kvm_server_appliance->resources);
+	$kvm_vm_conf_file="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm-storage/web/kvm-stat/$kvm_server->id.$kvm_server_name.vm_config";
+	$store = openqrm_parse_conf($kvm_vm_conf_file);
+	extract($store);
+	$backlink = "<a href='kvm-storage-vm-config.php?kvm_server_id=".$kvm_server_id."&kvm_server_name=".$kvm_server_name."'>back</a>";
+
+	$vm_config_vnc_disp = "<form action=\"$thisfile\" method=post>";
+	$vm_config_vnc_disp .= "<input type=hidden name=action value='update_vnc'>";
+	$vm_config_vnc_disp .= "<input type=hidden name=kvm_server_id value=$kvm_server_id>";
+	$vm_config_vnc_disp .= "<input type=hidden name=kvm_server_name value=$kvm_server_name>";
+	$vm_config_vnc_disp .= htmlobject_input('kvm_update_vncpassword', array("value" => $store['OPENQRM_KVM_VM_VNCPASSWORD'], "label" => 'VNC password'), 'password', 10);
+	$vm_config_vnc_disp .= "<input type=submit value='Update'>";
+	$vm_config_vnc_disp .= "</form>";
+
+   // set template
+	$t = new Template_PHPLIB();
+	$t->debug = false;
+	$t->setFile('tplfile', './tpl/' . 'kvm-storage-vm-config-vnc.tpl.php');
+	$t->setVar(array(
+		'vm_config_vnc_disp' => $vm_config_vnc_disp,
+		'backlink' => $backlink,
+	));
+	$disp =  $t->parse('out', 'tplfile');
+	return $disp;
+}
+
 
 
 
@@ -786,6 +871,8 @@ if ($OPENQRM_USER->role == "administrator") {
 		$output[] = array('label' => 'Kvm Configure VM', 'value' => kvm_vm_config_net());
 	} else if ("$kvm_component" == "boot") {
 		$output[] = array('label' => 'Kvm Configure VM', 'value' => kvm_vm_config_boot());
+	} else if ("$kvm_component" == "vnc") {
+		$output[] = array('label' => 'Kvm Configure VM', 'value' => kvm_vm_config_vnc());
 	} else {
 		$output[] = array('label' => 'Kvm Configure VM', 'value' => kvm_vm_config());
 	}

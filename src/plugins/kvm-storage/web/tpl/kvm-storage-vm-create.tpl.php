@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
 <style>
@@ -79,6 +79,10 @@ Local Disk <input type="radio" name="kvm_vm_boot_dev" value="local" />
         <input type="radio" name="kvm_nic_model" value="virtio" checked="checked" /> virtio - Best performance, Linux only <br>
         <input type="radio" name="kvm_nic_model" value="e1000" /> e1000 - Server Operating systems <br>
         <input type="radio" name="kvm_nic_model" value="rtl8139" /> rtl8139 - Best supported <br><br>
+    </div>
+    <strong>VNC Password:</strong>
+    <div style="border: solid 1px #ccc; padding: 10px 10px 0 10px;">
+		{kvm_server_vncpassword}
     </div>
 </div>
 
