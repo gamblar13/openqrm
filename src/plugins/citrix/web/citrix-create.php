@@ -41,7 +41,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -228,6 +228,8 @@ if(htmlobject_request('citrix_command') != '') {
 			$resource_ip="0.0.0.0";
 			// send command
 			$citrix_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/bin/openqrm-citrix create -i $citrix_server_ip -n $citrix_name -r $citrix_ram -m $citrix_mac -c $citrix_cpus -t $citrix_template";
+			// send command to the openQRM-server
+			$openqrm_server->send_command("openqrm_server_add_resource $resource_id $citrix_mac $resource_ip");
 			// set resource type
 			$virtualization = new virtualization();
 			$virtualization->get_instance_by_type("citrix-vm");
@@ -305,11 +307,12 @@ function citrix_create() {
 	$template_list_select = array();
 	if (file_exists($template_list)) {
 		$citrix_template_list_content=file($template_list);
-		foreach ($citrix_template_list_content as $index => $citrix_template) {
-			$citrix_template_name = trim(substr($citrix_template, 0));
-			$citrix_display_template_name = trim(str_replace("@", " ", $citrix_template_name));
-			// echo "-> $citrix_template_name , $citrix_display_template_name<br>";
-			$template_list_select[] = array("value" => $citrix_template_name, "label" => $citrix_display_template_name);
+		foreach ($citrix_template_list_content as $citrix_template) {
+			$citrix_template_params_arr = explode(":", $citrix_template);
+			$citrix_template_uuid = $citrix_template_params_arr[0];
+			$citrix_display_template_name = trim(str_replace("@", " ", $citrix_template_params_arr[1]));
+			// echo "-> $citrix_template_uuid , $citrix_display_template_name<br>";
+			$template_list_select[] = array("value" => $citrix_template_uuid, "label" => $citrix_display_template_name);
 		}
 	}
 	// cpus array for the select

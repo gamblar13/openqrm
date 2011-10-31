@@ -14,11 +14,11 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
 <h1><img border=0 src="/openqrm/base/plugins/citrix/img/plugin.png"> Citrix XenServer plugin</h1>
-<strong>This plugin is tested with Citrix XenServer 5.5.0</strong>
+<strong>This plugin is tested with Citrix XenServer 5.6 (SP2)</strong>
 <br>
 <br>
 <b>How to use :</b>

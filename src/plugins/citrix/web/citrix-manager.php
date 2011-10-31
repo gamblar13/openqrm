@@ -41,7 +41,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -147,7 +147,7 @@ if(htmlobject_request('action') != '') {
 			 // already authenticated ?
 			$citrix_auth_file=$_SERVER["DOCUMENT_ROOT"]."/openqrm/base/plugins/citrix/citrix-stat/citrix-host.pwd.".$citrix_server_ip;
 			if (!file_exists($citrix_auth_file)) {
-				$strMsg .= "Citrix XenServer not yet authenticated. Please authenticate !";
+				$strMsg .= "Citrix not yet authenticated. Please authenticate !";
 				redirect($strMsg, "tab0");
 			}
 			// remove current stat file
@@ -179,7 +179,7 @@ if(htmlobject_request('action') != '') {
 					 // already authenticated ?
 					$citrix_auth_file=$_SERVER["DOCUMENT_ROOT"]."/openqrm/base/plugins/citrix/citrix-stat/citrix-host.pwd.".$citrix_server_ip;
 					if (!file_exists($citrix_auth_file)) {
-						$strMsg .= "Citrix XenServer not yet authenticated. Please authenticate !";
+						$strMsg .= "Citrix not yet authenticated. Please authenticate !";
 						redirect($strMsg, "tab0");
 					}
 					// remove current stat file
@@ -220,7 +220,7 @@ if(htmlobject_request('action_table1') != '') {
 					 // already authenticated ?
 					$citrix_auth_file=$_SERVER["DOCUMENT_ROOT"]."/openqrm/base/plugins/citrix/citrix-stat/citrix-host.pwd.".$citrix_server_ip;
 					if (!file_exists($citrix_auth_file)) {
-						$strMsg .= "Citrix XenServer not yet authenticated. Please authenticate !";
+						$strMsg .= "Citrix not yet authenticated. Please authenticate !";
 						redirect($strMsg, "tab0");
 					}
 					// remove current stat file
@@ -254,7 +254,7 @@ if(htmlobject_request('action_table1') != '') {
 					 // already authenticated ?
 					$citrix_auth_file=$_SERVER["DOCUMENT_ROOT"]."/openqrm/base/plugins/citrix/citrix-stat/citrix-host.pwd.".$citrix_server_ip;
 					if (!file_exists($citrix_auth_file)) {
-						$strMsg .= "Citrix XenServer not yet authenticated. Please authenticate !";
+						$strMsg .= "Citrix not yet authenticated. Please authenticate !";
 						redirect($strMsg, "tab0");
 					}
 					// remove current stat file
@@ -288,7 +288,7 @@ if(htmlobject_request('action_table1') != '') {
 					 // already authenticated ?
 					$citrix_auth_file=$_SERVER["DOCUMENT_ROOT"]."/openqrm/base/plugins/citrix/citrix-stat/citrix-host.pwd.".$citrix_server_ip;
 					if (!file_exists($citrix_auth_file)) {
-						$strMsg .= "Citrix XenServer not yet authenticated. Please authenticate !";
+						$strMsg .= "Citrix not yet authenticated. Please authenticate !";
 						redirect($strMsg, "tab0");
 					}
 					// remove current stat file
@@ -322,7 +322,7 @@ if(htmlobject_request('action_table1') != '') {
 					 // already authenticated ?
 					$citrix_auth_file=$_SERVER["DOCUMENT_ROOT"]."/openqrm/base/plugins/citrix/citrix-stat/citrix-host.pwd.".$citrix_server_ip;
 					if (!file_exists($citrix_auth_file)) {
-						$strMsg .= "Citrix XenServer $citrix_server_id not yet authenticated. Please authenticate !";
+						$strMsg .= "Citrix $citrix_server_id not yet authenticated. Please authenticate !";
 						continue;
 					}
 					// check if the resource still belongs to an appliance, if yes we do not remove it
@@ -708,22 +708,22 @@ if(htmlobject_request('action') != '') {
 		switch (htmlobject_request('action')) {
 			case 'select':
 				foreach($_REQUEST['identifier'] as $id) {
-					$output[] = array('label' => 'Citrix XenServer VM Manager', 'value' => citrix_server_display($id));
+					$output[] = array('label' => 'Citrix VM Manager', 'value' => citrix_server_display($id));
 				}
 				break;
 			case 'reload':
 				foreach($_REQUEST['identifier'] as $id) {
-					$output[] = array('label' => 'Citrix XenServer VM Manager', 'value' => citrix_server_display($id));
+					$output[] = array('label' => 'Citrix VM Manager', 'value' => citrix_server_display($id));
 				}
 				break;
 		}
 	} else  {
-		$output[] = array('label' => 'Citrix XenServer VM Manager', 'value' => citrix_server_select());
+		$output[] = array('label' => 'Citrix VM Manager', 'value' => citrix_server_select());
 	}
 } else if (strlen($citrix_server_id)) {
-	$output[] = array('label' => 'Citrix XenServer VM Manager', 'value' => citrix_server_display($citrix_server_id));
+	$output[] = array('label' => 'Citrix VM Manager', 'value' => citrix_server_display($citrix_server_id));
 } else  {
-	$output[] = array('label' => 'Citrix XenServer VM Manager', 'value' => citrix_server_select());
+	$output[] = array('label' => 'Citrix VM Manager', 'value' => citrix_server_select());
 }
 
 

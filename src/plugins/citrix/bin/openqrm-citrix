@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
@@ -133,7 +133,7 @@ fi
 
 CITRIX_SERVER_PASSWD_FILE=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/citrix-host.pwd.$CITRIX_SERVER_IP
 CITRIX_VM_LIST_TMP=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/citrix-vm.lst.$CITRIX_SERVER_IP
-CITRIX_TEMPATE_LIST_TMP=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/citrix-template.lst.$CITRIX_SERVER_IP
+CITRIX_TEMPLATE_LIST_TMP=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/citrix-template.lst.$CITRIX_SERVER_IP
 mkdir -p `dirname $CITRIX_VM_LIST_TMP`
 chmod 777 `dirname $CITRIX_VM_LIST_TMP`
 
@@ -446,19 +446,22 @@ case "$CITRIX_COMMAND" in
 		;;
 
 
-
 	post_template_list)
-		citrix_log openqrm-citrix "Posting template list to the openQRM-server"
+		citrix-log openqrm-citrix "Posting template list to the openQRM-server"
 		VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
 		VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE3=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		> $VM_TMPFILE3
 		# create list of vifs
 		$CITRIX_XE_BINARY template-list -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE > $VM_TMPFILE1
-		grep name-label $VM_TMPFILE1 | grep -i windows | cut -d':' -f2 | awk {' print $1" "$2" "$3" "$4" "$5 '}  > $VM_TMPFILE2
-		sed -i -e "s/ \{1,\}/@/g" $VM_TMPFILE2
-		/bin/cp -f $VM_TMPFILE2 $CITRIX_TEMPATE_LIST_TMP
-		chmod 777 $CITRIX_TEMPATE_LIST_TMP
-		rm -f $VM_TMPFILE1 $VM_TMPFILE2
-		rm -f $VM_TMPFILE
+		cat $VM_TMPFILE1 | grep ^uuid | cut -d':' -f2 > $VM_TMPFILE2
+		for CITRIX_TEMPLATE_UUID in `cat $VM_TMPFILE2`; do
+			CITRIX_TEMPLATE_NAME=`grep -A1 $CITRIX_TEMPLATE_UUID $VM_TMPFILE1 | grep name-label | cut -d':' -f2 | sed -e "s/ \{1,\}/@/g"`
+			echo "$CITRIX_TEMPLATE_UUID:$CITRIX_TEMPLATE_NAME" >> $VM_TMPFILE3
+		done
+		/bin/cp -f $VM_TMPFILE3 $CITRIX_TEMPLATE_LIST_TMP
+		chmod 777 $CITRIX_TEMPLATE_LIST_TMP
+		rm -f $VM_TMPFILE1 $VM_TMPFILE2 $VM_TMPFILE3
 		;;
 
 

@@ -40,7 +40,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -282,7 +282,7 @@ function citrix_vm_config() {
 	extract($store);
 
 	// CPU
-	$vm_cpus_disp .= "<form action=\"$thisfile\" method=post>";
+	$vm_cpus_disp = "<form action=\"$thisfile\" method=post>";
 	$vm_cpus_disp .= "<input type=hidden name=citrix_component value='cpus'>";
 	$vm_cpus_disp .= "<input type=hidden name=citrix_server_id value=$citrix_server_id>";
 	$vm_cpus_disp .= "<input type=hidden name=citrix_vm_name value=$citrix_vm_name>";
@@ -302,7 +302,7 @@ function citrix_vm_config() {
 	$vm_ram_disp = "<form action=\"$thisfile\" method=post>";
 	$vm_ram_disp .= "<input type=hidden name=citrix_component value='ram'>";
 	$vm_ram_disp .= "<input type=hidden name=citrix_server_id value=$citrix_server_id>";
-	$vm_ram_disp .= "<input type=hidden name=citrix_server_name value=$citrix_vm_name>";
+	$vm_ram_disp .= "<input type=hidden name=citrix_vm_name value=$citrix_vm_name>";
 	$MEM_IN_BYTES=$store['OPENQRM_CITRIX_VM_RAM'];
 	$MEM_IN_MB=number_format($MEM_IN_BYTES/1048576, 0);
 	$html = new htmlobject_input();
@@ -320,7 +320,7 @@ function citrix_vm_config() {
 	$vm_net_disp = "<form action=\"$thisfile\" method=post>";
 	$vm_net_disp .= "<input type=hidden name=citrix_component value='net'>";
 	$vm_net_disp .= "<input type=hidden name=citrix_server_id value=$citrix_server_id>";
-	$vm_net_disp .= "<input type=hidden name=citrix_server_name value=$citrix_vm_name>";
+	$vm_net_disp .= "<input type=hidden name=citrix_vm_name value=$citrix_vm_name>";
 
 	// we always have a first nic
 	$html = new htmlobject_input();
@@ -480,7 +480,7 @@ function citrix_vm_config_cpus() {
 	$vm_config_cpus_disp = "<form action=\"$thisfile\" method=post>";
 	$vm_config_cpus_disp .= "<input type=hidden name=action value='update_cpus'>";
 	$vm_config_cpus_disp .= "<input type=hidden name=citrix_server_id value=$citrix_server_id>";
-	$vm_config_cpus_disp .= "<input type=hidden name=citrix_server_name value=$citrix_vm_name>";
+	$vm_config_cpus_disp .= "<input type=hidden name=citrix_vm_name value=$citrix_vm_name>";
 	$vm_config_cpus_disp .= htmlobject_select('citrix_update_cpus', $cpu_identifier_array, 'CPUs', array($store['OPENQRM_CITRIX_VM_CPUS']));
 	$vm_config_cpus_disp .= "<input type=submit value='Update'>";
 	$vm_config_cpus_disp .= "</form>";
@@ -519,6 +519,12 @@ function citrix_vm_config_net() {
 	extract($store);
 	$backlink = "<a href='citrix-vm-config.php?citrix_server_id=".$citrix_server_id."&citrix_vm_name=".$citrix_vm_name."'>back</a>";
 
+	$vm_config_nic1_disp = '';
+	$vm_config_nic2_disp = '';
+	$vm_config_nic3_disp = '';
+	$vm_config_nic4_disp = '';
+	$vm_config_nic5_disp = '';
+
 	// the first nic must not be changed, this is the identifier for openQRM
 	// disable the first nic, this is from what we manage the vm
 	$html = new htmlobject_input();
@@ -536,7 +542,7 @@ function citrix_vm_config_net() {
 		if (strlen($store['OPENQRM_CITRIX_VM_MAC_1'])) {
 			$vm_config_nic2_disp = "<input type=hidden name=action value='remove_vm_net'>";
 			$vm_config_nic2_disp .= "<input type=hidden name=citrix_server_id value=$citrix_server_id>";
-			$vm_config_nic2_disp .= "<input type=hidden name=citrix_server_name value=$citrix_vm_name>";
+			$vm_config_nic2_disp .= "<input type=hidden name=citrix_vm_name value=$citrix_vm_name>";
 			$vm_config_nic2_disp .= "<input type=hidden name=citrix_nic_nr value=1>";
 			$html = new htmlobject_input();
 			$html->name = "remove_vm_net";
@@ -555,7 +561,7 @@ function citrix_vm_config_net() {
 		if (strlen($store['OPENQRM_CITRIX_VM_MAC_2'])) {
 			$vm_config_nic3_disp = "<input type=hidden name=action value='remove_vm_net'>";
 			$vm_config_nic3_disp .= "<input type=hidden name=citrix_server_id value=$citrix_server_id>";
-			$vm_config_nic3_disp .= "<input type=hidden name=citrix_server_name value=$citrix_vm_name>";
+			$vm_config_nic3_disp .= "<input type=hidden name=citrix_vm_name value=$citrix_vm_name>";
 			$vm_config_nic3_disp .= "<input type=hidden name=citrix_nic_nr value=2>";
 
 			$html = new htmlobject_input();
@@ -576,7 +582,7 @@ function citrix_vm_config_net() {
 		if (strlen($store['OPENQRM_CITRIX_VM_MAC_3'])) {
 			$vm_config_nic4_disp = "<input type=hidden name=action value='remove_vm_net'>";
 			$vm_config_nic4_disp .= "<input type=hidden name=citrix_server_id value=$citrix_server_id>";
-			$vm_config_nic4_disp .= "<input type=hidden name=citrix_server_name value=$citrix_vm_name>";
+			$vm_config_nic4_disp .= "<input type=hidden name=citrix_vm_name value=$citrix_vm_name>";
 			$vm_config_nic4_disp .= "<input type=hidden name=citrix_nic_nr value=3>";
 
 			$html = new htmlobject_input();
@@ -597,7 +603,7 @@ function citrix_vm_config_net() {
 		if (strlen($store['OPENQRM_CITRIX_VM_MAC_4'])) {
 			$vm_config_nic5_disp = "<input type=hidden name=action value='remove_vm_net'>";
 			$vm_config_nic5_disp .= "<input type=hidden name=citrix_server_id value=$citrix_server_id>";
-			$vm_config_nic5_disp .= "<input type=hidden name=citrix_server_name value=$citrix_vm_name>";
+			$vm_config_nic5_disp .= "<input type=hidden name=citrix_vm_name value=$citrix_vm_name>";
 			$vm_config_nic5_disp .= "<input type=hidden name=citrix_nic_nr value=4>";
 
 			$html = new htmlobject_input();
@@ -626,7 +632,7 @@ function citrix_vm_config_net() {
 
 		$vm_config_add_nic_disp = "<input type=hidden name=action value='add_vm_net'>";
 		$vm_config_add_nic_disp .= "<input type=hidden name=citrix_server_id value=$citrix_server_id>";
-		$vm_config_add_nic_disp .= "<input type=hidden name=citrix_server_name value=$citrix_vm_name>";
+		$vm_config_add_nic_disp .= "<input type=hidden name=citrix_vm_name value=$citrix_vm_name>";
 		$vm_config_add_nic_disp .= "<input type=hidden name=citrix_nic_nr value=$nic_number>";
 		$vm_config_add_nic_disp .= htmlobject_input('citrix_new_nic', array("value" => $suggested_citrix_mac, "label" => 'Add Network'), 'text', 10);
 
