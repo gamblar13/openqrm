@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
@@ -55,9 +55,9 @@ function openqrm_plugin_tftpd_init() {
 	if [ -f /etc/debian_version ]; then
 		if [ -x "/etc/init.d/tftpd-hpa" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d tftpd-hpa stop || exit $?
+				invoke-rc.d tftpd-hpa stop
 			else
-				/etc/init.d/tftpd-hpa stop || exit $?
+				/etc/init.d/tftpd-hpa stop
 			fi
 		fi
 		# empty config to avoid start at init
@@ -77,9 +77,9 @@ function openqrm_plugin_tftpd_init() {
 		sed -i -e "s/Disable.*/Disable = yes/" /etc/xinetd.d/tftp
 		if [ -x "/etc/init.d/xinetd" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-				invoke-rc.d xinetd restart || exit $?
+				invoke-rc.d xinetd restart
 			else
-				/etc/init.d/xinetd restart || exit $?
+				/etc/init.d/xinetd restart
 			fi
 		fi
 	fi
