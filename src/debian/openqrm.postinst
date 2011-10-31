@@ -1,7 +1,7 @@
 #!/bin/sh
 # openQRM postinstall script
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 # This is free software; you may redistribute it and/or modify
 # it under the terms of the GNU General Public License as

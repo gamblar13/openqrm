@@ -7,13 +7,13 @@ This package was debianized by Matthias Rechenburg <matt@openqrm.com>,
 Martin Alfke <martin@ppcnux.de> and Thomas Halinka <mail@thohal.de>.
 
 Files: *
-Copyright: Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+Copyright: Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 License: GPL-2
 X-Comment: On Debian GNU/Linux systems, the complete text of the
  GNU General Public License can be found in /usr/share/common-licenses/GPL-2
 
 Files: debian/*
-Copyright: Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+Copyright: Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 License: GPL-2
 X-Comment: On Debian GNU/Linux systems, the complete text of the
  GNU General Public License can be found in /usr/share/common-licenses/GPL-2
