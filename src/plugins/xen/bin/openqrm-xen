@@ -15,8 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
+
 OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
 . $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
@@ -45,6 +46,7 @@ OPENQRM_XEN_VM_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/xen/etc/templa
 # the directory to keep the vm files for vms created by openQRM
 OPENQRM_VM_DIR="/var/lib/xen/openqrm"
 VM_XEN_CONFIG=/var/run/xen-vm-config.conf
+XEN_REMOVE_MAX_WAIT=30
 
 # which directory to use for the xen vms -> set by the plugin config file
 if [ -d "$OPENQRM_PLUGIN_XEN_VM_CONFIG_DIR" ]; then
@@ -508,13 +510,25 @@ case "$XEN_COMMAND" in
 		xm destroy $XEN_VM_NAME 1>/dev/null 2>&1
 		rm -f $VM_XEN_CONFIG
 		rm -f $OPENQRM_PLUGIN_XEN_VM_CONFIG_DIR/$XEN_VM_NAME.*
-		if rm -rf $OPENQRM_VM_DIR/$XEN_VM_NAME; then
-			openqrm_post_event 0 "delete" 5 "openqrm-xen" "Deleted Xen vm $XEN_VM_NAME"
-		else
-			openqrm_post_event 0 "delete" 3 "openqrm-xen" "Could not delete Xen vm $XEN_VM_NAME"
-			xen_lock release
-			exit 1
-		fi
+		rm -rf $OPENQRM_VM_DIR/$XEN_VM_NAME
+		# we have to wait here because when having a shared config dir
+		# nfs can still have files in use/lock
+		XEN_REMOVE_WAIT=0
+		while (:); do
+			if [ -d "$OPENQRM_VM_DIR/$XEN_VM_NAME" ]; then
+				openqrm_post_event 0 "remove" 5 "openqrm-xen" "Delete Xen VM $XEN_VM_NAME failed, retrying."
+			else
+				openqrm_post_event 0 "remove" 5 "openqrm-xen" "Delete Xen VM $XEN_VM_NAME success."
+				break
+			fi
+			if [ "$XEN_REMOVE_WAIT" == "$XEN_REMOVE_MAX_WAIT" ]; then
+				openqrm_post_event 0 "remove" 3 "openqrm-xen" "Delete Xen VM $XEN_VM_NAME failed, giving up!"
+				break
+			fi
+			XEN_REMOVE_WAIT=$(( XEN_REMOVE_WAIT + 1 ))
+			rm -rf $OPENQRM_VM_DIR/$XEN_VM_NAME
+			sleep 1
+		done
 		if [ "$XEN_OPENQRM_USERNAME" != "" ] && [ "$XEN_OPENQRM_PASSWORD" != "" ]; then
 			$0 post_vm_list -u $XEN_OPENQRM_USERNAME -p $XEN_OPENQRM_PASSWORD
 		fi
