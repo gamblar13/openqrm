@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
@@ -206,7 +206,8 @@ case "$LVM_COMMAND" in
 		fi
 		#echo -n "Creating logical volume $LVM_IMAGE_NAME size $LVM_IMAGE_SIZE MB using volume group $LVM_STORAGE_SERVER_VOLUME_GROUP"
 		lvm_storage_lock aquire
-		if ! lvcreate -L$LVM_IMAGE_SIZE -n$LVM_IMAGE_NAME $LVM_STORAGE_SERVER_VOLUME_GROUP; then
+		### set size
+		if ! lvcreate -L$LVM_IMAGE_SIZE"M" -n$LVM_IMAGE_NAME $LVM_STORAGE_SERVER_VOLUME_GROUP; then
 			openqrm_post_event 0 "add" 3 "openqrm-lvm-manager" "Error while adding $LVM_IMAGE_NAME to $LVM_STORAGE_SERVER_VOLUME_GROUP"
 			lvm_storage_lock release
 			exit 1
@@ -292,7 +293,8 @@ case "$LVM_COMMAND" in
 		fi
 		#echo -n "Creating snapshot size $LVM_IMAGE_SIZE from logical volume $LVM_IMAGE_NAME -> $LVM_IMAGE_SNAPSHOT_NAME"
 		lvm_storage_lock aquire
-		if ! lvcreate --size $LVM_IMAGE_SIZE""m --snapshot --name $LVM_IMAGE_SNAPSHOT_NAME /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME; then
+		### set size
+		if ! lvcreate --size $LVM_IMAGE_SIZE"M" --snapshot --name $LVM_IMAGE_SNAPSHOT_NAME /dev/$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVM_IMAGE_NAME; then
 			openqrm_post_event 0 "snap" 3 "openqrm-lvm-manager" "Error while adding snapshot $LVM_IMAGE_SNAPSHOT_NAME to $LVM_STORAGE_SERVER_VOLUME_GROUP"
 			lvm_storage_lock release
 			exit 1
@@ -371,7 +373,8 @@ case "$LVM_COMMAND" in
 	post_vg)
 		#echo "Posting current volume group status to the openQRM-server"
 		STORAGE_STATUS_TMP=$resource_id.vg.stat
-		vgs | grep -v VFree | sed -e "s/ \{1,\}//" > $STORAGE_STATUS_TMP
+		### set size
+		vgs --units m | grep -v VFree | sed -e "s/ \{1,\}//" > $STORAGE_STATUS_TMP
 		sed -i -e "s/ \{1,\}/@/g" $STORAGE_STATUS_TMP
 		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LVM_OPENQRM_USERNAME --http-password=$LVM_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lvm-storage/lvm-storage-action.php?lvm_storage_command=get_storage; then
 			openqrm_post_event 0 "post_vg" 3 "openqrm-lvm-manager" "Could not post the volume group status to the openQRM-server at $OPENQRM_SERVER_IP"
@@ -383,28 +386,22 @@ case "$LVM_COMMAND" in
 		STORAGE_STATUS_TMP=$resource_id.$LVM_STORAGE_SERVER_VOLUME_GROUP.lv.stat
 		> $STORAGE_STATUS_TMP
 		for LVOL in `lvs $LVM_STORAGE_SERVER_VOLUME_GROUP | grep -v LSize | sed -e "s/ \{1,\}//" | awk {' print $1 '}`; do
-			case $LVM_IMAGE_TYPE in
-				lvm-nfs-deployment)
-					if grep $LVOL $NFSEXPORTS 1>/dev/null; then
-						# is this a local-storage location ?
-						if [ ! -f /$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVOL/local-storage ]; then
-							lvs $LVM_STORAGE_SERVER_VOLUME_GROUP/$LVOL | grep -v LSize | sed -e "s/ \{1,\}//" >> $STORAGE_STATUS_TMP
-						fi
-					fi
-					;;
-
-				lvm-iscsi-deployment)
-					if grep $LVOL $IETDCONF 1>/dev/null; then
-						lvs $LVM_STORAGE_SERVER_VOLUME_GROUP/$LVOL | grep -v LSize | sed -e "s/ \{1,\}//" >> $STORAGE_STATUS_TMP
-					fi
-					;;
-
-				lvm-aoe-deployment)
-					if grep $LVOL $VBLADECONF 1>/dev/null; then
-						lvs $LVM_STORAGE_SERVER_VOLUME_GROUP/$LVOL | grep -v LSize | sed -e "s/ \{1,\}//" >> $STORAGE_STATUS_TMP
-					fi
-					;;
-			esac
+			if grep $LVOL $NFSEXPORTS 1>/dev/null; then
+				# is this a local-storage location ?
+				if [ ! -f /$LVM_STORAGE_SERVER_VOLUME_GROUP/$LVOL/local-storage ]; then
+					echo -n "lvm-nfs-deployment " >> $STORAGE_STATUS_TMP
+					### set size
+					lvs --units m $LVM_STORAGE_SERVER_VOLUME_GROUP/$LVOL | grep -v LSize | sed -e "s/ \{1,\}//" >> $STORAGE_STATUS_TMP
+				fi
+			elif grep $LVOL $IETDCONF 1>/dev/null; then
+				echo -n "lvm-iscsi-deployment " >> $STORAGE_STATUS_TMP
+				### set size
+				lvs --units m $LVM_STORAGE_SERVER_VOLUME_GROUP/$LVOL | grep -v LSize | sed -e "s/ \{1,\}//" >> $STORAGE_STATUS_TMP
+			elif grep $LVOL $VBLADECONF 1>/dev/null; then
+				echo -n "lvm-aoe-deployment " >> $STORAGE_STATUS_TMP
+				### set size
+				lvs --units m $LVM_STORAGE_SERVER_VOLUME_GROUP/$LVOL | grep -v LSize | sed -e "s/ \{1,\}//" >> $STORAGE_STATUS_TMP
+			fi
 		done
 		sed -i -e "s/ \{1,\}/@/g" $STORAGE_STATUS_TMP
 		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$LVM_OPENQRM_USERNAME --http-password=$LVM_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/lvm-storage/lvm-storage-action.php?lvm_storage_command=get_storage; then
@@ -513,6 +510,11 @@ case "$LVM_COMMAND" in
 			openqrm_post_event 0 "clone" 3 "openqrm-lvm-manager" "No volume name for the clone given"
 			lvm_storage_usage
 		fi
+		# check for rsync
+		if ! which rsync 2>/dev/null; then
+			openqrm_post_event 0 "clone" 3 "openqrm-lvm-manager" "rsync tool missing. Please install rsync!"
+			lvm_storage_usage
+		fi
 		if [ "$LVM_IMAGE_SIZE" == "" ]; then
 			LVM_IMAGE_SIZE=$DEFAULT_IMAGE_SIZE
 		fi
@@ -538,7 +540,8 @@ case "$LVM_COMMAND" in
 
 		# create new volume
 		lvm_storage_lock aquire
-		if ! lvcreate -L$LVM_IMAGE_SIZE -n$LVM_IMAGE_SNAPSHOT_NAME $LVM_STORAGE_SERVER_VOLUME_GROUP; then
+		### set size
+		if ! lvcreate -L$LVM_IMAGE_SIZE"M" -n$LVM_IMAGE_SNAPSHOT_NAME $LVM_STORAGE_SERVER_VOLUME_GROUP; then
 			openqrm_post_event 0 "clone" 3 "openqrm-lvm-manager" "Could not create the new clone volume"
 			lvm_storage_lock release
 			exit 1

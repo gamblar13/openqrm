@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 #	Title
 #	Href
@@ -22,6 +22,4 @@
 #	Target
 ..|Lvm-storage
 ...|About|plugins/lvm-storage/lvm-storage-about.php|How to use|lvm-storage/plugin.png
-...|AOE Volumes|plugins/lvm-storage/lvm-storage-manager.php?type=aoe|AOE Storage Manager|lvm-storage/volumes.png
-...|iSCSI Volumes|plugins/lvm-storage/lvm-storage-manager.php?type=iscsi|iSCSI Storage Manager|lvm-storage/volumes.png
-...|NFS Volumes|plugins/lvm-storage/lvm-storage-manager.php?type=nfs|NFS Storage Manager|lvm-storage/volumes.png
+...|Volume Admin|plugins/lvm-storage/index.php|Volume Admin|lvm-storage/volumes.png
