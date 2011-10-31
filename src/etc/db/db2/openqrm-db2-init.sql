@@ -62,6 +62,7 @@ create table image_info(			\
 	image_storageid bigint,			\
 	image_deployment_parameter varchar(10),	\
 	image_isshared bigint,			\
+	image_isactive bigint,			\
 	image_comment varchar(255),		\
 	image_capabilities varchar(255),	\
 	primary key(image_id)			\

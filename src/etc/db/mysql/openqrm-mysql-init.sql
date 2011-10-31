@@ -67,6 +67,7 @@ create table image_info(
 	# freetext parameter for the deployment plugin
 	image_deployment_parameter VARCHAR(255),
 	image_isshared INT(1),
+	image_isactive INT(1),
 	image_comment VARCHAR(255),
 	image_capabilities VARCHAR(255)
 );

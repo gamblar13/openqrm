@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 if [ "$OPENQRM_SERVER_BASE_DIR" == "" ]; then
@@ -72,15 +72,15 @@ function initialize_database() {
 	chmod +x /etc/cron.daily/$OPENQRM_DATABASE_MAINTENANCE_FNAME
     if [ -x "/etc/init.d/cron" ]; then
         if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-            invoke-rc.d cron reload || exit $?
+            invoke-rc.d cron reload
         else
-            /etc/init.d/cron reload || exit $?
+            /etc/init.d/cron reload
         fi
 	elif [ -x "/etc/init.d/crond" ]; then
         if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-            invoke-rc.d crond reload || exit $?
+            invoke-rc.d crond reload
         else
-            /etc/init.d/crond reload || exit $?
+            /etc/init.d/crond reload
         fi
     else
     	echo "Could not find cron init script in /etc/init.d/. Please reload cron manually!"
@@ -130,15 +130,15 @@ function drop_database() {
 	rm -f /etc/cron.daily/$OPENQRM_DATABASE_MAINTENANCE_FNAME
     if [ -x "/etc/init.d/cron" ]; then
         if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-            invoke-rc.d cron reload || exit $?
+            invoke-rc.d cron reload
         else
-            /etc/init.d/cron reload || exit $?
+            /etc/init.d/cron reload
         fi
 	elif [ -x "/etc/init.d/crond" ]; then
         if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-            invoke-rc.d crond reload || exit $?
+            invoke-rc.d crond reload
         else
-            /etc/init.d/crond reload || exit $?
+            /etc/init.d/crond reload
         fi
     else
     	echo "Could not find cron init script in /etc/init.d/. Please reload cron manually!"
@@ -264,6 +264,16 @@ function db_update()  {
 
     #---------------------------------------------------------------------------
     # from 4.8 to 4.9 the following db changes are needed
+	# 1  > ALTER TABLE image_info ADD image_isactive INT(1);
+	# 2  > ALTER TABLE cloud_private_image ADD co_clone_on_deploy SMALLINT
+	# 3  > ALTER TABLE cloud_requests ADD cr_appliance_hostname VARCHAR(255)
+	# 4  > ALTER TABLE cloud_profiles ADD pr_appliance_hostname VARCHAR(255)
+	# 5 > insert into cloud_config(cc_id, cc_key, cc_value) values (34, 'appliance_hostname', 'true')";
+	# 6 > insert into cloud_config(cc_id, cc_key, cc_value) values (35, 'cloud_zones_client', 'false';
+	# 7 > insert into cloud_config(cc_id, cc_key, cc_value) values (36, 'cloud_zones_master_ip', '';
+	# 8 > create table cloud_transaction_failed(tf_id BIGINT, tf_ct_id BIGINT);
+	# 9 > insert into cloud_config(cc_id, cc_key, cc_value) values (37, 'cloud_external_ip', '')
+
     #---------------------------------------------------------------------------
     # from 4.9 to 5.0 the following db changes are needed
     #---------------------------------------------------------------------------
@@ -435,6 +445,73 @@ function db_update()  {
         fi
     fi
     echo "- Database sanity check for version 4.7 to 4.8 finished"
+
+
+    # 1  > ALTER TABLE image_info ADD image_isactive INT(1);
+	if ! check_column_in_table_exists image_info image_isactive; then
+		echo " -- db change : ALTER TABLE image_info ADD image_isactive INT(1)"
+		run_sql "ALTER TABLE image_info ADD image_isactive INT(1);"
+	fi
+
+    # if cloud enabled .....
+    if [ -e "$OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/cloud" ]; then
+
+		# 2  > ALTER TABLE image_info ADD image_isactive SMALLINT;
+		if ! check_column_in_table_exists cloud_private_image co_clone_on_deploy; then
+			echo " -- db change : ALTER TABLE cloud_private_image ADD co_clone_on_deploy SMALLINT"
+			run_sql "ALTER TABLE cloud_private_image ADD co_clone_on_deploy SMALLINT;"
+		fi
+		# 3  > ALTER TABLE cloud_requests ADD cr_appliance_hostname VARCHAR(255)
+		if ! check_column_in_table_exists cloud_requests cr_appliance_hostname; then
+			echo " -- db change : ALTER TABLE cloud_requests ADD cr_appliance_hostname VARCHAR(255)"
+			run_sql "ALTER TABLE cloud_requests ADD cr_appliance_hostname VARCHAR(255);"
+		fi
+		# 4  > ALTER TABLE cloud_profiles ADD pr_appliance_hostname VARCHAR(255)
+		if ! check_column_in_table_exists cloud_profiles pr_appliance_hostname; then
+			echo " -- db change : ALTER TABLE cloud_profiles ADD pr_appliance_hostname VARCHAR(255)"
+			run_sql "ALTER TABLE cloud_profiles ADD pr_appliance_hostname VARCHAR(255);"
+		fi
+        # 5 > insert into cloud_config(cc_id, cc_key, cc_value) values (34, 'appliance_hostname', 'true')";
+        if check_table_exists cloud_config; then
+            if ! check_if_data_in_column_of_table_exists cloud_config cc_id 34; then
+                echo " -- db change : insert into cloud_config(cc_id, cc_key, cc_value) values (34, 'appliance_hostname', 'true')"
+                run_sql "insert into cloud_config(cc_id, cc_key, cc_value) values (34, 'appliance_hostname', 'true');"
+            fi
+        fi
+		# 6 > insert into cloud_config(cc_id, cc_key, cc_value) values (35, 'cloud_zones_client', 'false');
+        if check_table_exists cloud_config; then
+            if ! check_if_data_in_column_of_table_exists cloud_config cc_id 35; then
+                echo " -- db change : insert into cloud_config(cc_id, cc_key, cc_value) values (35, 'cloud_zones_client', 'false')"
+                run_sql "insert into cloud_config(cc_id, cc_key, cc_value) values (35, 'cloud_zones_client', 'false');"
+            fi
+        fi
+		# 7 > insert into cloud_config(cc_id, cc_key, cc_value) values (36, 'cloud_zones_master_ip', '');
+        if check_table_exists cloud_config; then
+            if ! check_if_data_in_column_of_table_exists cloud_config cc_id 36; then
+                echo " -- db change : insert into cloud_config(cc_id, cc_key, cc_value) values (36, 'cloud_zones_master_ip', '')"
+                run_sql "insert into cloud_config(cc_id, cc_key, cc_value) values (36, 'cloud_zones_master_ip', '');"
+            fi
+        fi
+		# 8 > create table cloud_transaction_failed(tf_id BIGINT, tf_ct_id BIGINT);
+		if ! check_table_exists cloud_transaction_failed; then
+			echo " -- db change : create table cloud_transaction_failed(tf_id BIGINT, tf_ct_id BIGINT);"
+			run_sql "create table cloud_transaction_failed(tf_id BIGINT, tf_ct_id BIGINT);"
+		fi
+		# 9 > insert into cloud_config(cc_id, cc_key, cc_value) values (37, 'cloud_external_ip', '')
+        if check_table_exists cloud_config; then
+            if ! check_if_data_in_column_of_table_exists cloud_config cc_id 37; then
+                echo " -- db change : insert into cloud_config(cc_id, cc_key, cc_value) values (37, 'cloud_external_ip', '')"
+                run_sql "insert into cloud_config(cc_id, cc_key, cc_value) values (37, 'cloud_external_ip', '');"
+            fi
+        fi
+
+
+	fi
+
+    echo "- Database sanity check for version 4.8 to 4.9 finished"
+
+
+
 
 
 

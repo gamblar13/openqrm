@@ -60,6 +60,7 @@ create table image_info(
 	image_storageid INTEGER,
 	image_deployment_parameter VARCHAR2(255),
 	image_isshared INTEGER,
+	image_isactive INTEGER,
 	image_comment VARCHAR2(255),
 	image_capabilities VARCHAR2(255)
 );

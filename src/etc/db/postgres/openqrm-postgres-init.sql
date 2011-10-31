@@ -19,7 +19,7 @@ create table resource_info(
 	resource_uptime int8,
 	resource_cpunumber int8,
 	resource_cpuspeed int8,
-	resource_cpumodel varchar(40),
+	resource_cpumodel varchar(255),
 	resource_memtotal int8,
 	resource_memused int8,
 	resource_swaptotal int8,
@@ -58,6 +58,7 @@ create table image_info(
 	image_storageid int8,
 	image_deployment_parameter varchar(255),
 	image_isshared int8,
+	image_isactive int8,
 	image_comment varchar(255),
 	image_capabilities varchar(255)
 );
@@ -93,12 +94,12 @@ create table appliance_info(
 drop table event_info;
 create table event_info(
 	event_id int8 NOT NULL PRIMARY KEY,
-	event_name varchar(50),
+	event_name varchar(255),
 	event_time varchar(50),
 	event_priority int8,
-	event_source varchar(50),
+	event_source varchar(255),
 	event_description varchar(255),
-	event_comment varchar(100),
+	event_comment varchar(255),
 	event_capabilities varchar(255),
 	event_status int8,
 	event_image_id int8,

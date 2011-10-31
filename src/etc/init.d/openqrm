@@ -30,7 +30,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 export LANG=C
@@ -94,9 +94,50 @@ function openqrm_server_init() {
 		done
 	fi
 
-	# here we start the init
-	# add automatic startup
-	openqrm_chkconfig add openqrm
+	# do some extra checks for redhat/centos regarding selinux + firewall
+	if [ -f /etc/redhat-release ]; then
+		# selinux disabled ?
+		if selinuxenabled; then
+			echo "ERROR: Found SELinux enabled!"
+			echo "ERROR: Please set SELINUX=disabled in /etc/selinux/config and reboot!"
+			exit 1
+		fi
+		# iptables ?
+		if which iptables 1>/dev/null; then
+			if iptables -L | grep REJECT 1>/dev/null; then
+				echo "NOTICE: Found iptables firewall enabled!"
+				echo "NOTICE: An active firewall may cause troubles during the initialization!"
+				echo "NOTICE: openQRM at least needs access to the following ports : 80, 443, $OPENQRM_EXEC_PORT"
+				echo
+				echo "NOTICE: Press 'c' to continue with the current iptables firewall configuration"
+				echo "NOTICE: Press 's' to stop the iptables firewall for the initialization"
+				while (:); do
+					read -n1 IPTABLES
+					if [ "$IPTABLES" == "c" ]; then
+						break
+					fi
+					if [ "$IPTABLES" == "s" ]; then
+						break
+					fi
+				done
+				if [ "$IPTABLES" == "c" ]; then
+					echo "... continuing with the current iptables firewall configuration"
+				elif [ "$IPTABLES" == "s" ]; then
+					echo "NOTICE: Stopping the iptables firewall"
+					if [ -x /etc/init.d/iptables ]; then
+						/etc/init.d/iptables stop
+					else
+						iptables --flush
+					fi
+				else
+					echo "ERROR: No such option!"
+					exit 1
+				fi
+
+
+			fi
+		fi
+	fi
 
 	# need to copy pxelinux.0 to the tftpboot dir
 	# sym-linking it does not work because the tftpd-server does not support symlinks
@@ -328,6 +369,10 @@ function openqrm_server_init() {
 			;;
 	esac
 
+	# here we start the init
+	# add automatic startup
+	openqrm_chkconfig add openqrm
+
 	# create unconfigured file containing a list of available network cards to setup openQRM on
 	ifconfig -a | grep -v inet6  | grep -B1 inet | grep -i link | grep -v '^lo ' | awk {' print $1 '} > $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/unconfigured
 }
@@ -398,6 +443,12 @@ function openqrm_server_start() {
 	elif [ -f /etc/redhat-release ]; then
 		if ! ps ax | grep httpd | grep -v grep 1>/dev/null; then
 			$OPENQRM_WEBSERVER_INIT start
+			openqrm_chkconfig add httpd
+		fi
+		if ! ps ax | grep mysqld | grep -v grep 1>/dev/null; then
+			# make sure the db is up
+			/etc/init.d/mysqld start
+			openqrm_chkconfig add mysqld
 		fi
 	elif [ -f /etc/SuSE-release ]; then
 		if ! ps ax | grep apache | grep -v grep 1>/dev/null; then
