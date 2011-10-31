@@ -1,0 +1,77 @@
+[Package]
+version: 1
+depends: 
+incremental: False
+
+[Product]
+type: localboot
+id: openqrm-client
+name: openQRM-Client
+description: The openQRM-Client for Windows
+advice: 
+version: 4.8.0
+priority: 10
+licenseRequired: False
+productClasses: 
+setupScript: setup.ins
+uninstallScript: uninstall.ins
+updateScript: 
+alwaysScript: 
+onceScript: 
+customScript: 
+userLoginScript: 
+
+[Changelog]
+openqrm-client (4.8.0-1) testing; urgency=low
+
+  * Initial package
+
+ -- testo <testo@noreply-ttt.org>  Sun, 01 May 2011 15:10:38 +0000
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# this is the functions file for the opsi-plugin
+#
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+OPSI_LOCK_FILE=/var/run/opsi/opsi-plugin.lock
+OPSI_LOCK_DELAY=5
+OPSI_LOCK_RETRY=100
+OPSI_LOCK_TIMEOUT=500
+################ common opsi functions
+
+# logs for opsi
+function opsi_log() {
+	local COMPONENT=$1
+	shift
+	local MESSAGE=$@
+	logger -i -t "opsi plug-in" "$COMPONENT : $MESSAGE"
+}
+
+
+# locking function
+function opsi_lock() {
+	local COMMAND=$1
+	local RET=1
+
+	if [ ! -d `dirname $OPSI_LOCK_FILE` ]; then
+		mkdir -p `dirname $OPSI_LOCK_FILE`
+	fi
+	case "$COMMAND" in
+		aquire)
+				lockfile -s $OPSI_LOCK_DELAY -r $OPSI_LOCK_RETRY -l $OPSI_LOCK_TIMEOUT $OPSI_LOCK_FILE
+				RET=$?
+				opsi_log opsi_lock "Aquired the lock"
+				return $RET
+				;;
+		release)
+				/bin/rm -f $OPSI_LOCK_FILE
+				RET=$?
+				opsi_log opsi_lock "Released the lock"
+				return $RET
+				;;
+		*)
+			opsi_log opsi_lock "No such command. Try 'aquire' or 'release'"
+			return 1
+			;;
+	esac
+}
+
+
+
+################ opsi functions
+
+

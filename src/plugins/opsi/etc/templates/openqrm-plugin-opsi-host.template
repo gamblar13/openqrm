@@ -1,0 +1,7 @@
+host @@@@PARAM_RESOURCE_NAME@@@@ {
+	# opsi
+	hardware ethernet @@@@PARAM_RESOURCE_MAC@@@@;
+	fixed-address @@@@PARAM_RESOURCE_IP@@@@;
+	next-server @@@@PARAM_OPSI_SERVER_IP@@@@;
+	filename "linux/pxelinux.0";
+}
