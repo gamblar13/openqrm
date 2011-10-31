@@ -17,7 +17,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
@@ -93,6 +93,12 @@ var $deployment_parameter = '';
 * @var bool
 */
 var $isshared = '';
+/**
+* image is active?
+* @access protected
+* @var bool
+*/
+var $isactive = '';
 /**
 * image comment
 * @access protected
@@ -176,6 +182,7 @@ var $_event;
 			$this->storageid = $image["image_storageid"];
 			$this->deployment_parameter = $image["image_deployment_parameter"];
 			$this->isshared = $image["image_isshared"];
+			$this->isactive = $image["image_isactive"];
 			$this->comment = $image["image_comment"];
 			$this->capabilities = $image["image_capabilities"];
 		}
@@ -220,6 +227,8 @@ var $_event;
 			$this->_event->log("add", $_SERVER['REQUEST_TIME'], 2, "image.class.php", "Image_field not well defined", "", "", 0, 0, 0);
 			return 1;
 		}
+		// set to not active by default when adding
+		$image_fields['image_isactive']=0;
 		$db=openqrm_get_db_connection();
 		$result = $db->AutoExecute($this->_db_table, $image_fields, 'INSERT');
 		if (! $result) {
@@ -240,6 +249,7 @@ var $_event;
 	* $fields['image_storageid'] = 1;
 	* $fields['image_deployment_parameter'] = 1;
 	* $fields['image_isshared'] = 1;
+	* $fields['image_isactive'] = 0;
 	* $fields['image_comment'] = 'sometext';
 	* $fields['image_capabilities'] = 'sometext';
 	* $image = new image();
@@ -323,6 +333,19 @@ var $_event;
 	}
 
 
+	//--------------------------------------------------
+	/**
+	* set the image is currently in use
+	* @access public
+	* @param int $active
+	*/
+	//--------------------------------------------------
+	function set_active($active) {
+		$this->get_instance_by_id($this->id);
+		$image_fields=array();
+		$image_fields["image_isactive"]=$active;
+		$this->update($this->id, $image_fields);
+	}
 
 
 	//--------------------------------------------------
@@ -500,7 +523,6 @@ var $_event;
 		}
 		return $image_array;
 	}
-
 
 	//--------------------------------------------------
 	/**

@@ -9,7 +9,7 @@
 *
  * @package htmlobjects
  * @author Alexander Kuballa <akuballa@users.sourceforge.net>
- * @copyright Copyright (c) 2009, Alexander Kuballa
+ * @copyright Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
  * @license http://opensource.org/licenses/gpl-license.php GNU Public License
  * @version 1.0
 */

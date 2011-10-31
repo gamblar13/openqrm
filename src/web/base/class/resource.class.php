@@ -16,7 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -608,7 +608,7 @@ function send_command($resource_ip, $resource_command) {
 				if (!strcmp($virtual_command_enabled, "true")) {
 					$event->log("start", $_SERVER['REQUEST_TIME'], 5, "resource.class.php", "Found IMAGE_VIRTUAL_RESOURCE_COMMAND enabled, using virtual command.", "", "", 0, 0, $this->id);
 					$plugin_resource_virtual_command_hook = $plugin_resource_virtual_command_hook_image_type;
-					$virtualization_plugin_name="sanboot-storage";
+					$virtualization_plugin_name=$deployment_plugin_name;
 				} else {
 					$event->log("start", $_SERVER['REQUEST_TIME'], 5, "resource.class.php", "Found IMAGE_VIRTUAL_RESOURCE_COMMAND disabled, using regular command.", "", "", 0, 0, $this->id);
 				}
@@ -680,7 +680,7 @@ function send_command($resource_ip, $resource_command) {
 				if (!strcmp($virtual_command_enabled, "true")) {
 					$event->log("stop", $_SERVER['REQUEST_TIME'], 5, "resource.class.php", "Found IMAGE_VIRTUAL_RESOURCE_COMMAND enabled, using virtual command.", "", "", 0, 0, $this->id);
 					$plugin_resource_virtual_command_hook = $plugin_resource_virtual_command_hook_image_type;
-					$virtualization_plugin_name="sanboot-storage";
+					$virtualization_plugin_name=$deployment_plugin_name;
 				} else {
 					$event->log("stop", $_SERVER['REQUEST_TIME'], 5, "resource.class.php", "Found IMAGE_VIRTUAL_RESOURCE_COMMAND disabled, using regular command.", "", "", 0, 0, $this->id);
 				}

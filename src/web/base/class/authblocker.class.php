@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2010, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -66,7 +66,7 @@ var $start_time = '';
 	function init() {
 		global $AUTH_BLOCKER_TABLE, $OPENQRM_SERVER_BASE_DIR;
 		$this->_event = new event();
-		$this->_db_table = $AUTH_BLOCKER_TABLE;
+		$this->_db_table = "auth_blocker_info";
 		$this->_base_dir = $OPENQRM_SERVER_BASE_DIR;
 	}
 
@@ -80,11 +80,11 @@ function get_instance($id, $image_id, $image_name) {
 	global $event;
 	$db=openqrm_get_db_connection();
 	if ("$id" != "") {
-		$authblocker_array = &$db->Execute("select * from $AUTH_BLOCKER_TABLE where ab_id=$id");
+		$authblocker_array = &$db->Execute("select * from ".$this->_db_table." where ab_id=$id");
 	} else if ("$image_id" != "") {
-		$authblocker_array = &$db->Execute("select * from $AUTH_BLOCKER_TABLE where ab_image_id=$image_id");
+		$authblocker_array = &$db->Execute("select * from ".$this->_db_table." where ab_image_id=$image_id");
 	} else if ("$image_name" != "") {
-		$authblocker_array = &$db->Execute("select * from $AUTH_BLOCKER_TABLE where ab_image_name='$image_name'");
+		$authblocker_array = &$db->Execute("select * from ".$this->_db_table." where ab_image_name='$image_name'");
 	} else {
 		$event->log("get_instance", $_SERVER['REQUEST_TIME'], 2, "authblocker.class.php", "Could not create instance of authblocker without data", "", "", 0, 0, 0);
 		return;
@@ -131,7 +131,7 @@ function is_id_free($authblocker_id) {
 	global $AUTH_BLOCKER_TABLE;
 	global $event;
 	$db=openqrm_get_db_connection();
-	$rs = &$db->Execute("select ab_id from $AUTH_BLOCKER_TABLE where ab_id=$authblocker_id");
+	$rs = &$db->Execute("select ab_id from ".$this->_db_table." where ab_id=$authblocker_id");
 	if (!$rs)
 		$event->log("is_id_free", $_SERVER['REQUEST_TIME'], 2, "authblocker.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
 	else
@@ -154,7 +154,7 @@ function add($authblocker_fields) {
 	// set stop time and status to now
 	$now=$_SERVER['REQUEST_TIME'];
 	$db=openqrm_get_db_connection();
-	$result = $db->AutoExecute($AUTH_BLOCKER_TABLE, $authblocker_fields, 'INSERT');
+	$result = $db->AutoExecute($this->_db_table, $authblocker_fields, 'INSERT');
 	if (! $result) {
 		$event->log("add", $_SERVER['REQUEST_TIME'], 2, "authblocker.class.php", "Failed adding new authblocker to database", "", "", 0, 0, 0);
 	}
@@ -166,7 +166,7 @@ function add($authblocker_fields) {
 function remove($authblocker_id) {
 	global $AUTH_BLOCKER_TABLE;
 	$db=openqrm_get_db_connection();
-	$rs = $db->Execute("delete from $AUTH_BLOCKER_TABLE where ab_id=$authblocker_id");
+	$rs = $db->Execute("delete from ".$this->_db_table." where ab_id=$authblocker_id");
 }
 
 
@@ -193,7 +193,7 @@ function get_count() {
 	global $AUTH_BLOCKER_TABLE;
 	$count=0;
 	$db=openqrm_get_db_connection();
-	$rs = $db->Execute("select count(ab_id) as num from $AUTH_BLOCKER_TABLE");
+	$rs = $db->Execute("select count(ab_id) as num from ".$this->_db_table);
 	if (!$rs) {
 		print $db->ErrorMsg();
 	} else {
@@ -209,7 +209,7 @@ function get_all_ids() {
 	global $AUTH_BLOCKER_TABLE;
 	global $event;
 	$authblocker_list = array();
-	$query = "select ab_id from $AUTH_BLOCKER_TABLE";
+	$query = "select ab_id from ".$this->_db_table;
 	$db=openqrm_get_db_connection();
 	$rs = $db->Execute($query);
 	if (!$rs)

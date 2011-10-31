@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 // This class represents a applicance managed by openQRM
@@ -301,6 +301,13 @@ function remove($appliance_id) {
 	$appliance_fields["appliance_virtualization_host"]=$this->virtualization_host;
 	$appliance_fields["appliance_comment"]=$this->comment;
 	$appliance_fields["appliance_event"]=$this->event;
+	// be sure to free the image
+	$appliance_image = new image();
+	$appliance_image->get_instance_by_id($this->imageid);
+	// only if image still exists
+	if ($appliance_image->id > 0) {
+		$appliance_image->set_active(0);
+	}
 	// start the hook
 	$plugin = new plugin();
 	$enabled_plugins = $plugin->enabled();
@@ -318,6 +325,8 @@ function remove($appliance_id) {
 	// remove from db
 	$db=openqrm_get_db_connection();
 	$rs = $db->Execute("delete from $APPLIANCE_INFO_TABLE where appliance_id=$appliance_id");
+
+
 }
 
 // removes appliance from the database by appliance_name
@@ -348,6 +357,13 @@ function remove_by_name($appliance_name) {
 	$appliance_fields["appliance_virtualization_host"]=$this->virtualization_host;
 	$appliance_fields["appliance_comment"]=$this->comment;
 	$appliance_fields["appliance_event"]=$this->event;
+	// be sure to free the image
+	$appliance_image = new image();
+	$appliance_image->get_instance_by_id($this->imageid);
+	// only if image still exists
+	if ($appliance_image->id > 0) {
+		$appliance_image->set_active(0);
+	}
 	// start the hook
 	$plugin = new plugin();
 	$enabled_plugins = $plugin->enabled();
@@ -372,7 +388,7 @@ function remove_by_name($appliance_name) {
 function start() {
 	global $event;
 	global $RootDir;
-	global $appliance_start_timeout;
+	$appliance_start_timeout=360;
 
 	if ($this->resources < 1) {
 		$event->log("start", $_SERVER['REQUEST_TIME'], 1, "appliance.class.php", "No resource available for appliance $this->id", "", "", 0, 0, 0);
@@ -384,6 +400,8 @@ function start() {
 	$kernel->get_instance_by_id($this->kernelid);
 	$image = new image();
 	$image->get_instance_by_id($this->imageid);
+	// set image to active
+	$image->set_active(1);
 
 	// update resource state to transition early
 	$resource_fields=array();
@@ -434,10 +452,12 @@ function start() {
 			if (strlen($check_authblocker->id)) {
 				// ab still existing, check timeout
 				if ($wait_for_storage_auth_loop > $appliance_start_timeout) {
-					$event->log("start", $_SERVER['REQUEST_TIME'], 2, "appliance.class.php", "Storage-authentication for image $image->name timed out! Not starting appliance $this->id.", "", "", 0, 0, $this->resources);
+					$event->log("start", $_SERVER['REQUEST_TIME'], 2, "appliance.class.php", "Storage-authentication for image ".$image->name." timed out! (".$appliance_start_timeout.")", "", "", 0, 0, $this->resources);
+					$event->log("start", $_SERVER['REQUEST_TIME'], 2, "appliance.class.php", "Delaying start of appliance ".$this->id, "", "", 0, 0, $this->resources);
 					// remove authblocker
 					$check_authblocker->remove($check_authblocker->id);
-					return;
+					sleep($appliance_start_timeout);
+					break;
 				}
 				sleep(1);
 				$wait_for_storage_auth_loop++;
@@ -449,9 +469,6 @@ function start() {
 			}
 		}
 	}
-
-	// reboot resource
-	$resource->send_command("$resource->ip", "reboot");
 
 	// unset stoptime + update starttime + state
 	$now=$_SERVER['REQUEST_TIME'];
@@ -496,6 +513,10 @@ function start() {
 			$appliance_function("start", $appliance_fields);
 		}
 	}
+	// delay a bit to make sure all appliance hooks have been executed or at least arrived in the queue
+	sleep(2);
+	// reboot resource after the plugin start hook ran
+	$resource->send_command("$resource->ip", "reboot");
 
 
 }
@@ -574,6 +595,9 @@ function stop() {
 		require_once "$storage_auth_hook";
 		storage_auth_function("stop", $this->id);
 	}
+	// set image to deactive
+	$image->set_active(0);
+
 
 }
 
@@ -769,7 +793,7 @@ function display_overview_per_virtualization($virtualization_id, $offset, $limit
 	global $APPLIANCE_INFO_TABLE;
 	global $event;
 	$db=openqrm_get_db_connection();
-	$recordSet = &$db->SelectLimit("select * from $APPLIANCE_INFO_TABLE where appliance_virtualization=$virtualization_id order by $sort $order", $limit, $offset);
+	$recordSet = &$db->SelectLimit("select * from $APPLIANCE_INFO_TABLE where appliance_virtualization='$virtualization_id' order by $sort $order", $limit, $offset);
 	$appliance_array = array();
 	if (!$recordSet) {
 		$event->log("display_overview_per_virtualization", $_SERVER['REQUEST_TIME'], 2, "appliance.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);

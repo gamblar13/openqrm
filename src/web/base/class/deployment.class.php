@@ -17,7 +17,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 	$RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
@@ -239,6 +239,35 @@ var $_event;
 		$db=openqrm_get_db_connection();
 		$rs = $db->Execute("delete from $this->_db_table where deployment_type='$type'");
 	}
+
+
+	//--------------------------------------------------
+	/**
+	* get an array of all deployment ids
+	* <code>
+	* $image = new deployment();
+	* $arr = deployment->get_ids();
+	* // $arr['value']
+	* </code>
+	* @access public
+	* @return array
+	*/
+	//--------------------------------------------------
+	function get_deployment_ids() {
+		$deployment_array = array();
+		$query = "select deployment_id from $this->_db_table";
+		$db=openqrm_get_db_connection();
+		$rs = $db->Execute($query);
+		if (!$rs)
+			$event->log("get_deployment_ids", $_SERVER['REQUEST_TIME'], 2, "deployment.class.php", $db->ErrorMsg(), "", "", 0, 0, 0);
+		else
+		while (!$rs->EOF) {
+			$deployment_array[] = $rs->fields;
+			$rs->MoveNext();
+		}
+		return $deployment_array;
+	}
+
 
 	//--------------------------------------------------
 	/**

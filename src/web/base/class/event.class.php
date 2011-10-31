@@ -17,7 +17,7 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 $RootDir = $_SERVER["DOCUMENT_ROOT"].'/openqrm/base/';
@@ -31,6 +31,7 @@ require_once "$RootDir/include/openqrm-database-functions.php";
  * @version 1.0
  * @author Alexander Kuballa <akuballa@users.sourceforge.net>
  * @version 1.1 added documentation
+ * @copyright Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
  */
 class event
 {

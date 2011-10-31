@@ -4,7 +4,7 @@
  *
  * @package file
  * @author Alexander Kuballa <akuballa@users.sourceforge.net>
- * @copyright Copyright (c) 2008 - 2010, Alexander Kuballa
+ * @copyright Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
  * @license BSD License (see LICENSE.TXT)
  * @version 1.0
  */
