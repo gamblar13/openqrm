@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
 OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
@@ -43,6 +43,7 @@ OPENQRM_VM_MONITOR_DIR="/var/run/openqrm/kvm"
 OPENQRM_VM_MIGRATION_PORT_RANGE_START="7000"
 KVM_MIGRATION_MAX_WAIT=360
 OPENQRM_FIRST_VNC_ID=1
+KVM_REMOVE_MAX_WAIT=30
 
 export LANG=C
 # define wget to use with https
@@ -67,10 +68,11 @@ fi
 function kvm_usage() {
 	echo "Usage : $0 start/stop/reboot/delete/list <-n vm-name>"
 	echo "        $0 setboot <-m mac-address> <-b local/net>"
-	echo "        $0 create <-n vm-name> <-m mac-address> <-r memory> [-d disk-size ] [-c cpus ]"
+	echo "        $0 create <-n vm-name> <-m mac-address> <-r memory> [-d disk-size ] [-c cpus ] [-v vncpassword ]"
 	echo "        $0 post_vm_list <-u username> <-p password>"
 	echo "        $0 post_vm_config <-n vm-name> <-u username> <-p password>"
 	echo "        $0 update_vm_ram <-r memory> <-n vm-name>"
+	echo "        $0 update_vm_vnc <-v vncpassword> <-n vm-name>"
 	echo "        $0 add_vm_nic <-s nic-number> <-m mac-address> <-n vm-name>"
 	echo "        $0 remove_vm_nic <-s nic-number> <-n vm-name>"
 	echo "        $0 add_vm_disk <-s disk-number> <-d disk-size> <-n vm-name>"
@@ -192,6 +194,10 @@ while [ $# -ne 0 ]; do
 			;;
 		-j)
 			KVM_MIGRATION_PORT=$2
+			shift
+			;;
+		-v)
+			KVM_VM_VNCPASSWORD=$2
 			shift
 			;;
 		*)
@@ -358,6 +364,47 @@ case "$KVM_COMMAND" in
 				fi
 				;;
 
+			vlanbridge)
+				# bridged vlans
+				# copy the ifup/down script to the vm-dir
+				modprobe 8021q
+				/bin/cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/bin/openqrm-vlan-* $OPENQRM_VM_DIR/$KVM_VM_NAME/
+				chmod +x $OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-*
+				# setup the nics
+				echo "KVM_VM_NET_1=\"-net nic,vlan=1,macaddr=$KVM_VM_MAC,model=$KVM_VM_NIC_TYPE -net tap,vlan=1,script=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifup-net1,downscript=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifdown-net1\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net1
+				echo "KVM_VM_MAC_1=\"$KVM_VM_MAC\"" >> $OPENQRM_VM_DIR/$KVM_VM_NAME/net1
+
+				if [ "$KVM_VM_MAC2" != "" ]; then
+					echo "KVM_VM_NET_2=\"-net nic,vlan=2,macaddr=$KVM_VM_MAC2,model=$KVM_VM_NIC_TYPE2 -net tap,vlan=2,script=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifup-net2,downscript=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifdown-net2\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net2
+					echo "KVM_VM_MAC_2=\"$KVM_VM_MAC2\"" >> $OPENQRM_VM_DIR/$KVM_VM_NAME/net2
+				else
+					echo "KVM_VM_NET_2=\"\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net2
+					echo "KVM_VM_MAC_2=\"\"" >> $OPENQRM_VM_DIR/$KVM_VM_NAME/net2
+				fi
+				if [ "$KVM_VM_MAC3" != "" ]; then
+					echo "KVM_VM_NET_3=\"-net nic,vlan=3,macaddr=$KVM_VM_MAC3,model=$KVM_VM_NIC_TYPE3 -net tap,vlan=3,script=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifup-net3,downscript=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifdown-net3\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net3
+					echo "KVM_VM_MAC_3=\"$KVM_VM_MAC3\"" >> $OPENQRM_VM_DIR/$KVM_VM_NAME/net3
+				else
+					echo "KVM_VM_NET_3=\"\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net3
+					echo "KVM_VM_MAC_3=\"\"" >> $OPENQRM_VM_DIR/$KVM_VM_NAME/net3
+				fi
+				if [ "$KVM_VM_MAC4" != "" ]; then
+					echo "KVM_VM_NET_4=\"-net nic,vlan=4,macaddr=$KVM_VM_MAC4,model=$KVM_VM_NIC_TYPE4 -net tap,vlan=4,script=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifup-net4,downscript=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifdown-net4\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net4
+					echo "KVM_VM_MAC_4=\"$KVM_VM_MAC4\"" >> $OPENQRM_VM_DIR/$KVM_VM_NAME/net4
+				else
+					echo "KVM_VM_NET_4=\"\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net4
+					echo "KVM_VM_MAC_4=\"\"" >> $OPENQRM_VM_DIR/$KVM_VM_NAME/net4
+				fi
+				if [ "$KVM_VM_MAC5" != "" ]; then
+					echo "KVM_VM_NET_5=\"-net nic,vlan=5,macaddr=$KVM_VM_MAC5,model=$KVM_VM_NIC_TYPE5 -net tap,vlan=5,script=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifup-net5,downscript=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifdown-net5\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net5
+					echo "KVM_VM_MAC_5=\"$KVM_VM_MAC5\"" >> $OPENQRM_VM_DIR/$KVM_VM_NAME/net5
+				else
+					echo "KVM_VM_NET_5=\"\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/net5
+					echo "KVM_VM_MAC_5=\"\"" >> $OPENQRM_VM_DIR/$KVM_VM_NAME/net5
+				fi
+				;;
+
+
 		esac
 
 		# disk
@@ -431,6 +478,10 @@ case "$KVM_COMMAND" in
 				NEW_VNC_ID=$(( NEW_VNC_ID + 1 ))
 			fi
 		done
+		if [ "$KVM_VM_VNCPASSWORD" == "" ]; then
+			KVM_VM_VNCPASSWORD=`</dev/urandom tr -dc A-Za-z0-9 | head -c8`
+		fi
+		echo "KVM_VM_VNCPASSWORD=\"$KVM_VM_VNCPASSWORD\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/vncpassword
 		# please make sure to protect the vnc ports on the kvm hosts via iptables
 		# only openQRM should be allowed to access those ports
 		echo "KVM_VM_VNC=\"$resource_ip:$NEW_VNC_ID\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/vnc
@@ -496,8 +547,27 @@ case "$KVM_COMMAND" in
 			kill $VM_PID
 			kill -9 $VM_PID 1>/dev/null 2>&1
 		fi
+		sleep 2
 		rm -rf $OPENQRM_VM_DIR/$KVM_VM_NAME
 		rm -f $OPENQRM_VM_MONITOR_DIR/kvm.$KVM_VM_NAME.mon
+		# we have to wait here because when having a shared config dir
+		# nfs can still have files in use/lock
+		KVM_REMOVE_WAIT=0
+		while (:); do
+			if [ -d "$OPENQRM_VM_DIR/$KVM_VM_NAME" ]; then
+				openqrm_post_event 0 "delete" 5 "openqrm-kvm" "Delete KVM VM $KVM_VM_NAME failed, retrying."
+			else
+				openqrm_post_event 0 "delete" 5 "openqrm-kvm" "Delete KVM VM $KVM_VM_NAME success."
+				break
+			fi
+			if [ "$KVM_REMOVE_WAIT" == "$KVM_REMOVE_MAX_WAIT" ]; then
+				openqrm_post_event 0 "delete" 3 "openqrm-kvm" "Delete KVM VM $KVM_VM_NAME failed, giving up!"
+				break
+			fi
+			KVM_REMOVE_WAIT=$(( KVM_REMOVE_WAIT + 1 ))
+			rm -rf $OPENQRM_VM_DIR/$KVM_VM_NAME
+			sleep 1
+		done
 		# quit via the monitor socket does not run ifdown-net-script
 		#echo "quit" | socat stdio unix:$OPENQRM_VM_MONITOR_DIR/kvm.$KVM_VM_NAME.mon
 		# in case we have a username + password post the updated list to the openQRM-server
@@ -550,6 +620,9 @@ case "$KVM_COMMAND" in
 		. $OPENQRM_VM_DIR/$KVM_VM_NAME/disk3
 		. $OPENQRM_VM_DIR/$KVM_VM_NAME/disk4
 		. $OPENQRM_VM_DIR/$KVM_VM_NAME/vnc
+		if [ -f $OPENQRM_VM_DIR/$KVM_VM_NAME/vncpassword ]; then
+			. $OPENQRM_VM_DIR/$KVM_VM_NAME/vncpassword
+		fi
 		echo "OPENQRM_KVM_VM_CPUS=\"$KVM_VM_CPUS\"" > $VM_CONFIG_TMP
 		echo "OPENQRM_KVM_VM_RAM=\"$KVM_VM_RAM\"" >> $VM_CONFIG_TMP
 		echo "OPENQRM_KVM_VM_NET_1=\"$KVM_VM_NET_1\"" >> $VM_CONFIG_TMP
@@ -571,6 +644,7 @@ case "$KVM_COMMAND" in
 		echo "OPENQRM_KVM_VM_DISK_4=\"$KVM_VM_DISK_4\"" >> $VM_CONFIG_TMP
 		echo "OPENQRM_KVM_VM_DISK_SIZE_4=\"$KVM_VM_DISK_SIZE_4\"" >> $VM_CONFIG_TMP
 		echo "OPENQRM_KVM_VM_VNC=\"$KVM_VM_VNC\"" >> $VM_CONFIG_TMP
+		echo "OPENQRM_KVM_VM_VNCPASSWORD=\"$KVM_VM_VNCPASSWORD\"" >> $VM_CONFIG_TMP
 		echo "OPENQRM_KVM_VM_BOOT=\"$KVM_VM_BOOT\"" >> $VM_CONFIG_TMP
 		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$KVM_OPENQRM_USERNAME --http-password=$KVM_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $VM_CONFIG_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/kvm/kvm-action.php?kvm_server_command=get_kvm_config; then
 			openqrm_post_event 0 "post_vm_config" 2 "openqrm-kvm" "Could not post KVM VM $KVM_VM_NAME config to the openQRM-server at $OPENQRM_SERVER_IP!"
@@ -612,6 +686,25 @@ case "$KVM_COMMAND" in
 		kvm_lock release
 		;;
 
+	update_vm_vnc)
+		if [ "$KVM_VM_NAME" == "" ]; then
+			kvm_usage
+		fi
+		if [ "$KVM_VM_VNCPASSWORD" == "" ]; then
+			kvm_usage
+		fi
+		kvm_lock aquire
+		sed -i -e s"#KVM_VM_VNCPASSWORD=.*#KVM_VM_VNCPASSWORD=\"$KVM_VM_VNCPASSWORD\"#g" $OPENQRM_VM_DIR/$KVM_VM_NAME/vncpassword
+		# change it directly if the vm is running
+		echo "change vnc password $KVM_VM_VNCPASSWORD" | socat stdio unix:$OPENQRM_VM_MONITOR_DIR/kvm.$KVM_VM_NAME.mon
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$KVM_OPENQRM_USERNAME" != "" ] && [ "$KVM_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_vm_config -n $KVM_VM_NAME -u $KVM_OPENQRM_USERNAME -p $KVM_OPENQRM_PASSWORD
+		fi
+		kvm_lock release
+		;;
+
+
 	add_vm_nic)
 		if [ "$KVM_VM_NAME" == "" ]; then
 			kvm_usage
@@ -632,6 +725,10 @@ case "$KVM_COMMAND" in
 			openvswitch)
 				# ovs
 				sed -i -e s"#KVM_VM_NET_$KVM_VM_COMPONENT_NUMBER=.*#KVM_VM_NET_$KVM_VM_COMPONENT_NUMBER=\"-net nic,vlan=$KVM_VM_COMPONENT_NUMBER,macaddr=$KVM_VM_MAC,model=$KVM_VM_NIC_TYPE -net tap,vlan=$KVM_VM_COMPONENT_NUMBER,script=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-ovs-kvm-ifup-net$KVM_VM_COMPONENT_NUMBER,downscript=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-ovs-kvm-ifdown-net$KVM_VM_COMPONENT_NUMBER\"#g" $OPENQRM_VM_DIR/$KVM_VM_NAME/net""$KVM_VM_COMPONENT_NUMBER
+				;;
+			vlanbridge)
+				# bridged vlans
+				sed -i -e s"#KVM_VM_NET_$KVM_VM_COMPONENT_NUMBER=.*#KVM_VM_NET_$KVM_VM_COMPONENT_NUMBER=\"-net nic,vlan=$KVM_VM_COMPONENT_NUMBER,macaddr=$KVM_VM_MAC,model=$KVM_VM_NIC_TYPE -net tap,vlan=$KVM_VM_COMPONENT_NUMBER,script=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifup-net$KVM_VM_COMPONENT_NUMBER,downscript=$OPENQRM_VM_DIR/$KVM_VM_NAME/openqrm-vlan-kvm-ifdown-net$KVM_VM_COMPONENT_NUMBER\"#g" $OPENQRM_VM_DIR/$KVM_VM_NAME/net""$KVM_VM_COMPONENT_NUMBER
 				;;
 		esac
 		sed -i -e s"#KVM_VM_MAC_$KVM_VM_COMPONENT_NUMBER=.*#KVM_VM_MAC_$KVM_VM_COMPONENT_NUMBER=\"$KVM_VM_MAC\"#g" $OPENQRM_VM_DIR/$KVM_VM_NAME/net""$KVM_VM_COMPONENT_NUMBER
@@ -729,22 +826,13 @@ case "$KVM_COMMAND" in
 		case "$KVM_VM_BOOT" in
 			local)
 				echo "KVM_VM_BOOT=\"-boot c\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/boot
+				echo "boot_set c" | socat stdio unix:$OPENQRM_VM_MONITOR_DIR/kvm.$KVM_VM_NAME.mon
 				;;
 			net)
 				echo "KVM_VM_BOOT=\"-boot nc\"" > $OPENQRM_VM_DIR/$KVM_VM_NAME/boot
+				echo "boot_set nc" | socat stdio unix:$OPENQRM_VM_MONITOR_DIR/kvm.$KVM_VM_NAME.mon
 				;;
 		esac
-		# hard restart it to apply its configuration
-		# we do it here because the openQRM server engine does not
-		# know anything about the vm name to restart it later
-		. $OPENQRM_VM_DIR/$KVM_VM_NAME/net1
-		VM_PID=`ps ax | grep $KVM_VM_MAC_1 | grep kvm | grep -i screen | grep -v grep | awk {' print $1 '}`
-		if [ "$VM_PID" != "" ]; then
-			kill $VM_PID
-			kill -9 $VM_PID 1>/dev/null 2>&1
-		fi
-		sleep 2
-		$OPENQRM_VM_DIR/$KVM_VM_NAME/$KVM_VM_NAME.kvm
 		kvm_lock release
 		;;
 
@@ -915,6 +1003,8 @@ case "$KVM_COMMAND" in
 		fi
 		# echo "quit" | socat stdio unix:$OPENQRM_VM_MONITOR_DIR/kvm.$KVM_VM_NAME.mon
 		rm -f $OPENQRM_VM_DIR/$KVM_VM_NAME/autostart.$resource_id
+		# delay startup to make sure the old taps are gone
+		sleep 4
 		$OPENQRM_VM_DIR/$KVM_VM_NAME/$KVM_VM_NAME.kvm
 		touch $OPENQRM_VM_DIR/$KVM_VM_NAME/autostart.$resource_id
 		kvm_lock release

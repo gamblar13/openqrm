@@ -23,7 +23,7 @@
 }
 </style>
 
-<h1><img border=0 src="/openqrm/base/plugins/kvm/img/manager.png"> KVM VM RAM Configuration</h1>
+<h1><img border=0 src="/openqrm/base/plugins/kvm/img/manager.png"> KVM VM VNC Configuration</h1>
 {backlink}
 <br>
-{vm_config_ram_disp}
+{vm_config_vnc_disp}

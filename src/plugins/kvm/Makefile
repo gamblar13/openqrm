@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 export OPENQRM_SERVER_CONF=$(shell pwd)/../../etc/openqrm-server.conf
@@ -22,8 +22,6 @@ export OPENQRM_SERVER_CONF=$(shell pwd)/../../etc/openqrm-server.conf
 configure:
 
 compile:
-	../../make-assistant openqrm_cache_or_download kvm-nic-bios etc/build.conf/kvm-nic-bios.conf
-	
 
 install:
 	. $(OPENQRM_SERVER_CONF) && mkdir -p $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/etc
@@ -49,7 +47,6 @@ install:
 	. $(OPENQRM_SERVER_CONF) && cp bin/openqrm* $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/bin/
 	. $(OPENQRM_SERVER_CONF) && chmod +x $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/bin/openqrm*
 	. $(OPENQRM_SERVER_CONF) && mkdir -p $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/include/pxe/
-	. $(OPENQRM_SERVER_CONF) && . etc/build.conf/kvm-nic-bios.conf && if ! cp $$OPENQRM_BUILD_TMP_DIR/openqrm-build/kvm-nic-bios/source/kvm-nic-bios-$$OPENQRM_SOURCE_VERSION.tgz $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/include/pxe/ 2>/dev/null; then cp ../../$$OPENQRM_BUILD_TMP_DIR/openqrm-build/kvm-nic-bios/source/kvm-nic-bios-$$OPENQRM_SOURCE_VERSION.tgz $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/include/pxe/; fi
 	. $(OPENQRM_SERVER_CONF) && tar -C $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm -czvf $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/web/boot-service-kvm.tgz include/ bin/ etc/init.d/kvm etc/templates/ etc/openqrm-plugin-kvm.conf
 	# menu icons
 	. $(OPENQRM_SERVER_CONF) && mkdir -p $(DESTINATION_DIR)$$OPENQRM_SERVER_BASE_DIR/openqrm/web/base/img/menu/kvm

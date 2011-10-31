@@ -40,7 +40,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -800,6 +800,7 @@ function kvm_server_display($appliance_id) {
 					$state_icon="/openqrm/base/img/active.png";
 					$vm_actions = "<nobr><a href=\"$thisfile?identifier[]=$kvm_short_name&action=stop&kvm_server_id=$kvm_server_tmp->id&kvm_vm_mac_ar[$kvm_short_name]=$kvm_vm_mac&kvm_vm_vnc[$kvm_short_name]=$kvm_vm_vnc\" style=\"text-decoration:none;\"><img height=20 width=20 src=\"/openqrm/base/plugins/aa_plugins/img/stop.png\" border=\"0\"> Stop</a>&nbsp;&nbsp;";
 					$vm_actions .= "<a href=\"$thisfile?identifier[]=$kvm_short_name&action=restart&kvm_server_id=$kvm_server_tmp->id&kvm_vm_mac_ar[$kvm_short_name]=$kvm_vm_mac\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/img/active.png\" border=\"0\"> Restart</a>&nbsp;&nbsp;";
+					$vm_actions .= "<a href=\"kvm-vm-config.php?kvm_server_name=$kvm_short_name&kvm_server_id=$kvm_server_tmp->id\" style=\"text-decoration:none;\"><img height=16 width=16 src=\"/openqrm/base/plugins/aa_plugins/img/plugin.png\" border=\"0\"> Config</a>&nbsp;&nbsp;&nbsp;&nbsp;";
 					// remote consle enabled ?
 					if ($remote_console_login_enabled) {
 						// console

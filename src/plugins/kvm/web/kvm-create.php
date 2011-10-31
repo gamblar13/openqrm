@@ -41,7 +41,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -78,6 +78,7 @@ $kvm_server_disk = htmlobject_request('kvm_server_disk');
 $kvm_server_swap = htmlobject_request('kvm_server_swap');
 $kvm_nic_model = htmlobject_request('kvm_nic_model');
 $kvm_server_cpus = htmlobject_request('kvm_server_cpus');
+$kvm_server_vncpassword = htmlobject_request('kvm_server_vncpassword');
 
 
 function redirect_mgmt($strMsg, $file, $kvm_server_id) {
@@ -202,6 +203,15 @@ if(htmlobject_request('action') != '') {
 					$strMsg .= "Invalid vm cpu number. Not creating new vm on KVM Host $kvm_server_id";
 					redirect_mgmt($strMsg, $thisfile, $kvm_server_id);
 				}
+				// check for vnc password
+				if (!strlen($kvm_server_vncpassword)) {
+					$strMsg .= "Empty vm vnc password. Not creating new vm on KVM Host $kvm_server_id";
+					redirect_mgmt($strMsg, $thisfile, $kvm_server_id);
+				} else if (!validate_input($kvm_server_vncpassword, 'string')) {
+					$strMsg .= "Invalid vm vnc password. Not creating new vm on KVM Host $kvm_server_id <br>(allowed characters are [a-z][A-z][0-9].-_)";
+					redirect_mgmt($strMsg, $thisfile, $kvm_server_id);
+				}
+				$kvm_server_vncpassword_parameter = " -v ".$kvm_server_vncpassword;
 
 				// send command to kvm_server-host to create the new vm
 				$kvm_appliance = new appliance();
@@ -209,7 +219,7 @@ if(htmlobject_request('action') != '') {
 				$kvm_server = new resource();
 				$kvm_server->get_instance_by_id($kvm_appliance->resources);
 				// final command
-				$resource_command="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/kvm/bin/openqrm-kvm create -n $kvm_server_name -m $kvm_server_mac -r $kvm_server_ram -c $kvm_server_cpus $kvm_server_disk_parameter $kvm_server_swap_parameter -t $kvm_nic_model -u $OPENQRM_ADMIN->name -p $OPENQRM_ADMIN->password";
+				$resource_command=$OPENQRM_SERVER_BASE_DIR."/openqrm/plugins/kvm/bin/openqrm-kvm create -n ".$kvm_server_name." -m ".$kvm_server_mac." -r ".$kvm_server_ram." -c ".$kvm_server_cpus." ".$kvm_server_disk_parameter." ".$kvm_server_vncpassword_parameter." ".$kvm_server_swap_parameter." -t ".$kvm_nic_model." -u ".$OPENQRM_ADMIN->name." -p ".$OPENQRM_ADMIN->password;
 				// remove current stat file
 				$kvm_server_resource_id = $kvm_server->id;
 				$statfile="kvm-stat/".$kvm_server_resource_id.".vm_list";
@@ -281,6 +291,7 @@ function kvm_server_create($kvm_server_id) {
 		'kvm_server_ram' => htmlobject_input('kvm_server_ram', array("value" => '512', "label" => 'Memory (MB)'), 'text', 10),
 		'kvm_server_disk' => htmlobject_input('kvm_server_disk', array("value" => '2000', "label" => 'Disk (MB)'), 'text', 10),
 		'kvm_server_swap' => htmlobject_input('kvm_server_swap', array("value" => '1024', "label" => 'Swap (MB)'), 'text', 10),
+		'kvm_server_vncpassword' => htmlobject_input('kvm_server_vncpassword', array("value" => '', "label" => 'Password'), 'password', 10),
 		'hidden_kvm_server_id' => "<input type=hidden name=kvm_server_id value=$kvm_server_id>",
 		'submit' => htmlobject_input('action', array("value" => 'new', "label" => 'Create'), 'submit'),
 	));

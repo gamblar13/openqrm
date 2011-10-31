@@ -1,5 +1,5 @@
 #!/bin/bash
-# this is the boot-service init script for the Kvm-server hosts
+# this is the ifup/ifdown kvm script to attach the vm nics to the bridge
 #
 # This file is part of openQRM.
 #
@@ -19,7 +19,6 @@
 #
 
 export OPENQRM_SERVER_BASE_DIR=@@OPENQRM_SERVER_BASE_DIR@@
-export OPENVSWITCH=@@OPENQRM_PLUGIN_KVM_BRIDGE@@
 export APP_NIC=@@OPENQRM_APP_NIC@@
 
 export OPENQRM_SOURCE_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/"
@@ -61,21 +60,67 @@ if [ "$IPT" != "" ]; then
 	IP_TOKEN=`echo $IPT | cut -d'=' -f1`
 	echo "- getting network configuration for token $IP_TOKEN nic $APP_NIC" | logger
 	if ! $WGET -O $VM_BASE_DIR/openqrm-network.$APP_NIC.conf "$openqrm_web_protocol://${resource_openqrmserver}/openqrm/boot-service/ip-mgmt-appliance-config.php?ip_mgmt_command=get_config&appliance_id=$appliance_id&ip_mgmt_nic_id=$APP_NIC&ip_mgmt_token=$IP_TOKEN"; then
-		echo "ERROR: Could not get ip-configuration from openQRM-server at ${resource_openqrmserver}!"
+		echo "ERROR: Could not get ip-configuration from openQRM-server at ${resource_openqrmserver}!" | logger
 		exit -1
 	fi
 	. $VM_BASE_DIR/openqrm-network.$APP_NIC.conf
 else
-	echo "NOTICE: No ip-configuration for VM available. Continuing..." | logger
+	echo "NOTICE: No ip-configuration for VM available. Continuing with regular bridging ..." | logger
 fi
 
-# now attach the tap device to the bridge
-/sbin/ifconfig $1 0.0.0.0 up
-if [ "$VLAN_ID" != "" ]; then
-	VLAN_TAG_PARAMETER="tag=$VLAN_ID"
+if [ "$VLAN_ID" == "" ]; then
+	/sbin/ifconfig $1 0.0.0.0 promisc up
+	/usr/sbin/brctl addif @@OPENQRM_PLUGIN_KVM_BRIDGE@@ $1
+	sleep 2
+else
+	echo "NOTICE: Got ip-configuration for VM -> $APP_NIC nic to $VLAN_ID ..." | logger
+	# find out which interface to use according to which bridge is used
+	# get the brigdge, get the phys ethx interface from the bridge
+	PHYS_MAC=`brctl showmacs @@OPENQRM_PLUGIN_KVM_BRIDGE@@ | grep yes | awk '{ print $2 }' | head -n1`
+	if [ "$PHYS_MAC" == "" ]; then
+		echo "ERROR: Could not find the mac address of the phys. interface of @@OPENQRM_PLUGIN_KVM_BRIDGE@@!" | logger
+		exit -1
+	fi
+	echo "NOTICE: Found phys. interface mac adress $PHYS_MAC belongs to @@OPENQRM_PLUGIN_KVM_BRIDGE@@!" | logger
+	PHYS_NIC=`ifconfig -a | grep -i $PHYS_MAC | grep eth | awk '{ print $1 }' | head -n1`
+	if [ "$PHYS_NIC" == "" ]; then
+		echo "ERROR: Could not find the phys. interface of @@OPENQRM_PLUGIN_KVM_BRIDGE@@!" | logger
+		exit -1
+	fi
+
+	# add vlan dev
+	if ! ifconfig $PHYS_NIC.$VLAN_ID &>/dev/null; then
+		echo "NOTICE: adding vlan dev $VLAN_ID on $PHYS_NIC" | logger
+		/sbin/vconfig add $PHYS_NIC $VLAN_ID
+		/sbin/ifconfig $PHYS_NIC.$VLAN_ID up
+	else
+		echo "NOTICE: vlan dev $VLAN_ID on $PHYS_NIC already exists. Not re-creating it ..." | logger
+	fi
+
+	# add vlan bridge
+	if ! ifconfig brvlan$VLAN_ID &>/dev/null; then
+		echo "NOTICE: adding bridge brvlan$VLAN_ID" | logger
+		/usr/sbin/brctl addbr brvlan$VLAN_ID
+		# add vlan interface to bridge
+		echo "NOTICE: adding eth0.$VLAN_ID to brvlan$VLAN_ID" | logger
+		/usr/sbin/brctl addif brvlan$VLAN_ID $PHYS_NIC.$VLAN_ID
+		# enable stp
+		/usr/sbin/brctl stp brvlan$VLAN_ID on
+		# bring up the bridge
+		/sbin/ifconfig brvlan$VLAN_ID up
+	else
+		echo "NOTICE: bridge brvlan$VLAN_ID already exists. Not re-creating it ..." | logger
+	fi
+
+	# add vms tap to vlan bridge
+	echo "NOTICE: adding VMs $1 to brvlan$VLAN_ID - $PHYS_NIC.$VLAN_ID" | logger
+	/sbin/ifconfig $1 0.0.0.0 promisc up
+	/usr/sbin/brctl addif brvlan$VLAN_ID $1
+	sleep 2
+
+
 fi
-# make sure it is not setup already
-ovs-vsctl del-port ${OPENVSWITCH} $1
-# attach tap
-ovs-vsctl add-port ${OPENVSWITCH} $1 $VLAN_TAG_PARAMETER
+
+
+
 
