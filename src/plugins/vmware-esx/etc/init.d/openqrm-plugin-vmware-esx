@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
 OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
@@ -24,6 +24,14 @@ OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $
 . $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
 . $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/include/openqrm-plugin-vmware-esx-functions
 . $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf
+# get the ip config
+openqrm_server_get_config
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+export LANG=C
+# define wget to use with https
+if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
 
 function openqrm_plugin_vmware_esx_start() {
 	echo "Starting the openQRM vmware-esx-plugin"
@@ -49,6 +57,11 @@ function openqrm_plugin_vmware_esx_uninstall() {
 	fi
 	echo "Uninstalling the openQRM vmware-esx-plugin"
 	openqrm_plugin_vmware_esx_stop
+	# removing the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/vmware-esx/vmware-esx-action.php?vmware_esx_command=uninstall"; then
+		vmware_esx_log init "ERROR: Could not drop the vmware-esx plugin tables in the database!"
+		return 1
+	fi
 	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD vmware-esx
 	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD vmware-esx-vm
 	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/vmware-esx
@@ -67,12 +80,16 @@ function openqrm_plugin_vmware_esx_init() {
 		echo
 	fi
 	echo "Initializing the openQRM vmware-esx-plugin"
+	# linking the web dir
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/vmware-esx
+	# creating the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/vmware-esx/vmware-esx-action.php?vmware_esx_command=init"; then
+		vmware_esx_log init "ERROR: Could not create the vmware-esx plugin tables in the database!"
+		return 1
+	fi
 	# adding virtualization type
 	openqrm_server_add_virtualization_type $USERNAME $PASSWORD vmware-esx "VMware-ESX Host"
 	openqrm_server_add_virtualization_type $USERNAME $PASSWORD vmware-esx-vm "VMware-ESX VM"
-	# linking the web dir
-	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/vmware-esx
-	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-integrate.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/action/
 
 }
 

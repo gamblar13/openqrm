@@ -14,7 +14,7 @@
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -38,9 +38,6 @@ $OPENQRM_SERVER_IP_ADDRESS=$openqrm_server->get_ip_address();
 global $OPENQRM_SERVER_IP_ADDRESS;
 global $RESOURCE_INFO_TABLE;
 
-$vmware_mac_address_space = "00:50:56:20";
-global $vmware_mac_address_space;
-
 // ---------------------------------------------------------------------------------
 // general vmware-esx cloudvm methods
 // ---------------------------------------------------------------------------------
@@ -52,7 +49,8 @@ function create_vmware_esx_vm($host_resource_id, $name, $mac, $memory, $cpu, $sw
 	global $OPENQRM_SERVER_IP_ADDRESS;
 	global $OPENQRM_EXEC_PORT;
 	global $RESOURCE_INFO_TABLE;
-	global $vmware_mac_address_space;
+	$vmware_mac_address_space = "00:50:56:20";
+
 	global $event;
 	$event->log("create_vmware_esx_vm", $_SERVER['REQUEST_TIME'], 5, "vmware-esx-cloud-hook", "Creating VMware ESX VM $name on Host resource $host_resource_id", "", "", 0, 0, 0);
 	// start the vm on the host
@@ -62,13 +60,7 @@ function create_vmware_esx_vm($host_resource_id, $name, $mac, $memory, $cpu, $sw
 	// virtualization commands are sent from openQRM directly
 	$openqrm = new openqrm_server();
 	// send command to create vm
-	// also need to generate a new vmware mac for the first nic
-	$fn_mac_gen_res = new resource();
-	$fn_mac_gen_res->generate_mac();
-	$fn_suggested_mac = $fn_mac_gen_res->mac;
-	$fn_suggested_last_two_bytes = substr($fn_suggested_mac, 12);
-	$fn_mac = $vmware_mac_address_space.":".$fn_suggested_last_two_bytes;
-	$vm_create_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/openqrm-vmware-esx create -i ".$host_resource->ip." -n ".$name." -m ".$fn_mac." -r ".$memory." -c ".$cpu." -s ".$swap." ".$additional_nic_str;
+	$vm_create_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/openqrm-vmware-esx create -i ".$host_resource->ip." -n ".$name." -m ".$mac." -r ".$memory." -c ".$cpu." -s ".$swap." ".$additional_nic_str;
 	$event->log("create_vmware_esx_vm", $_SERVER['REQUEST_TIME'], 5, "vmware-esx-cloud-hook", "Running $vm_create_cmd", "", "", 0, 0, 0);
 	$openqrm->send_command($vm_create_cmd);
 }
@@ -91,7 +83,7 @@ function remove_vmware_esx_vm($host_resource_id, $name, $mac) {
 	// virtualization commands are sent from openQRM directly
 	$openqrm = new openqrm_server();
 	// send command to create the vm on the host
-	$vm_remove_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/openqrm-vmware-esx delete -i ".$host_resource->ip." -n ".$name;
+	$vm_remove_cmd = "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/openqrm-vmware-esx remove -i ".$host_resource->ip." -n ".$name;
 	$event->log("remove_vmware_esx_vm", $_SERVER['REQUEST_TIME'], 5, "vmware-esx-cloud-hook", "Running $vm_remove_cmd", "", "", 0, 0, 0);
 	$openqrm->send_command($vm_remove_cmd);
 }

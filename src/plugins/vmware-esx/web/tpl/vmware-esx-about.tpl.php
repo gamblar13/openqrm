@@ -14,89 +14,58 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
-<h1><img border=0 src="/openqrm/base/plugins/vmware-esx/img/plugin.png"> VMware-ESX plugin</h1>
-<strong>This plugin is tested with VMware ESX 3.5 - ESXi 4.0</strong>
+<h1><img border=0 src="/openqrm/base/plugins/vmware-esx/img/plugin.png"> VMware ESX plugin</h1>
+The VMware ESX plugin is designed for "network-deployment" and is intended to be used with
+ one of the Storage plugins in openQRM (e.g. lvm-storage, iscsi-storage, nfs-storage etc.).
 <br>
 <br>
-This plugin integrates VMware ESX server as another virtual resource provider for openQRM.
- Since VMWare ESX does not provide an API for the linux operation-system yet the integration
- is currently done via 'password-less ssh' to the ESX server (from the openQRM-server).
+<strong>Requirements:</strong>
+<ul type="disc">
+	<li>Please install the latest VMware vSphere Perl SDK on the openQRM Server system.</li>
+	<li>Please enable and start the "dhcpd" and "tftpd" plugin</li>
+	<li>Please enable and start one of the storage plugins</li>
+	<li>Create volumes on the Storage</li>
+	<li>Create "Images" from the created volumes</li>
+</ul>
+
 <br>
 <br>
-How to get ssh enabled and 'password-less' login to the ESX server running is well documented in the internet.
+<strong>Workflow:</strong>
+<ul type="disc">
+	<li>Use the "Discovery" Manager to discover ESX Hosts in your network</li>
+	<li>Integrate one or more discovered ESX Hosts into openQRM via the "Discovery" Manager</li>
+	<li>Use the "DataStore Manager" to connect one or more NAS and/or iSCSI Storages</li>
+	<li>Use the "vSwitch Manager" to configure the Networks and vSwitches on the ESX Host</li>
+	<li>Use the "VM Manager" to create Virtual Machines</li>
+</ul>
 <br>
-<br>
-<b>Please notice that this mode is unsupported by VMware !</b>
-<br>
-... still we would like to be able to manage ESX.
-<br>
-<br>
-<b>Requirements :</b>
-<br>
-- An existing 'DataStore' (Storage) on the ESX server.
-<br>
-DataStores in VMware ESX are the location where the virtual machine files are being saved.
- For the openQRM VMware-ESX plugin the default datastore can be configured in the plugins configuration file.
- By default openQRM will try to gather the first available datastore (e.g. "datastore1" on a fresh installed ESXi 4.0) and use
- it for storing the virtual machines.
-<br>
-<br>
-- password-less ssh access (as user root) from the openQRM server to the ESX server (as mentioned before).
-<br>
-  Hint: make sure to set /.ssh/authorized_keys to mode 0600 on the ESX host (dir and file)
+
+Created Virtual Machines will be automatically added and integerated into openQRM.
+ They will come up as new, "idle" resources (white icon). The can now be used in combination
+ with one of the network-deployment "Images" (as created in the Requirements section) via an "Appliance".
 <br>
 <br>
 
-<br>
-<b>How to use :</b>
-<br>
+<strong>Please notice:</strong>
+<ul type="disc">
+	<li>Since this VMware ESX integration focus on "network-deployment" the (local) disk is used
+ for swap space only. The actually root-disk (the "Image") is provided by one of the Storage plugins
+ and dynamically attached by the Appliance start.</li>
 
-<ul>
-<li>
-How to integrate a VMware ESX server into openQRM :
-</li><li>
-First make sure to enabled 'password-less ssh login' on the ESX server
-<br>
-To check you can run as root on the openQRM-server :
-<br>
-<br>
-<i>ssh [ip-address-of-the-esx-server] ls</i>
-<br>
-<br>
-This should give you a directory listing.
-</li><li>
-Now integrate the ESX server by running the following command :
-<br>
-<br>
-<i>/usr/share/openqrm/plugins/vmware-esx/bin/openqrm-vmware-esx init -i [ip-address-of-the-esx-server]</i>
-<br>
-<br>
-This procedure will ask for a valid openQRM username and password.
-</li><li>
-The above procedure will integrate the ESX server within openQRM fully automatically.
-<br>
-It will create the following components :
-<br>
-- a resource (the ESX server)
-<br>
-- a local storage placeholder for the ESX server resource
-<br>
-- a local image placeholder for the ESX server resource
-<br>
-- a local kernel placeholder for the ESX server resource
-<br>
-- and a local appliance (the ESX server appliance)
-<br>
-</li><li>
-Go to the 'ESX-Manager' within the VMware-ESX plugin menu. Select the ESX-appliance.
-</li><li>
-In the next screen you can now create/start/stop/remove/delete virtual machines on the ESX server.
-<br>
-Created virtual machines will automatically start into openQRM and appear as new idle resources, ready for deployment.
-</li>
+	<li>Updating a VM re-creates its (local) disk on the Datastore. It will destroy all content on the disk!</li>
 </ul>
 <br>
 <br>
+
+<strong>This plugin is tested with VMware ESXi 4.1.0 in combination with the VMware vSphere Perl API 4.1.0</strong>
+
+<br>
+<br>
+<br>
+<br>
+<br>
+
+

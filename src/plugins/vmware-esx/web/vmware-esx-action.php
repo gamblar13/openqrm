@@ -26,7 +26,7 @@ $vmware_esx_id = $_REQUEST["vmware_esx_id"];
 	You should have received a copy of the GNU General Public License
 	along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-	Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+	Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 
 
@@ -71,7 +71,31 @@ unset($vmware_esx_fields["vmware_esx_command"]);
 	$event->log("$vmware_esx_command", $_SERVER['REQUEST_TIME'], 5, "vmware-esx-action", "Processing command $vmware_esx_command", "", "", 0, 0, 0);
 	switch ($vmware_esx_command) {
 
-		// not used any more
+	case 'init':
+		// this command creates the following table
+		// -> vmw_esx_auto_discovery
+		// vmw_esx_ad_id INT(5)
+		// vmw_esx_ad_ip VARCHAR(50)
+		// vmw_esx_ad_mac VARCHAR(50)
+		// vmw_esx_ad_hostname VARCHAR(50)
+		// vmw_esx_ad_user VARCHAR(50)
+		// vmw_esx_ad_password VARCHAR(50)
+		// vmw_esx_ad_comment VARCHAR(255)
+		// vmw_esx_ad_is_integrated SMALLINT
+
+		$create_vmw_auto_discovery_table = "create table vmw_esx_auto_discovery(vmw_esx_ad_id INT(5), vmw_esx_ad_ip VARCHAR(255), vmw_esx_ad_mac VARCHAR(50), vmw_esx_ad_hostname VARCHAR(50), vmw_esx_ad_user VARCHAR(50), vmw_esx_ad_password VARCHAR(50), vmw_esx_ad_comment VARCHAR(255), vmw_esx_ad_is_integrated SMALLINT)";
+		$db=openqrm_get_db_connection();
+		$recordSet = &$db->Execute($create_vmw_auto_discovery_table);
+
+		$db->Close();
+		break;
+
+	case 'uninstall':
+		$drop_vmw_auto_discovery_table = "drop table vmw_esx_auto_discovery";
+		$db=openqrm_get_db_connection();
+		$recordSet = &$db->Execute($drop_vmw_auto_discovery_table);
+		$db->Close();
+		break;
 
 
 

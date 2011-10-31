@@ -14,22 +14,26 @@
     You should have received a copy of the GNU General Public License
     along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+    Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 */
 -->
-<style>
-.htmlobject_tab_box {
-	width:700px;
-}
-</style>
-<form action="{formaction}" method="GET">
 
-<h1><img border=0 src="/openqrm/base/plugins/vmware-esx/img/manager.png"> VMware ESX VM Manager</h1>
-
-<div style="float:left;">
-<h4>Please select a VMWare ESX Host from the list below</h4>
-{vmware_esx_table}
-</div>
-
+<form action="{thisfile}" method="GET">
+<h1><img border=0 src="/openqrm/base/plugins/vmware-esx/img/plugin.png"> {label}</h1>
+{table}
 </form>
 
+
+<table id="wait" style="display:none; border:0px none;">
+<tr>
+	<td style="vertical-align:middle;border:0px none;">{please_wait}</td>
+	<td style="vertical-align:middle;border:0px none;"><img src="img/loading.gif"></td>
+</tr>
+</table>
+
+<script type="text/javascript">
+function wait() {
+	document.getElementById('Tabelle').style.display = 'none';
+	document.getElementById('wait').style.display = 'block';
+}
+</script>

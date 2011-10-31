@@ -1,0 +1,416 @@
+#!/bin/bash
+# this script automatically manages vmware-esx networks (vswitch + porgroups)
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/include/openqrm-plugin-vmware-esx-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+OPENQRM_VMWARE_ESX_HOST_CONF_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/conf/host"
+OPENQRM_VMWARE_ESX_STAT_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/"
+export LANG=C
+ORG_IFS="$IFS"
+
+# http://communities.vmware.com/thread/240659?tstart=0
+export PERL_LWP_SSL_VERIFY_HOSTNAME=0
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	vmware_esx_log "ERROR: Please run this script as root!"
+	exit 6
+fi
+# deps installed ?
+if ! which screen 1>/dev/null; then
+	vmware_esx_log "ERROR: The 'screen' utility is not installed! Please install and try again."
+	exit 6
+fi
+if [ ! -d "$OPENQRM_VMWARE_ESX_HOST_CONF_DIR" ]; then
+	mkdir -p $OPENQRM_VMWARE_ESX_HOST_CONF_DIR
+fi
+if [ ! -d "$OPENQRM_VMWARE_ESX_STAT_DIR" ]; then
+	mkdir -p $OPENQRM_VMWARE_ESX_STAT_DIR
+	chmod 777 $OPENQRM_VMWARE_ESX_STAT_DIR
+fi
+
+
+
+function vmware_esx_usage() {
+	vmware_esx_log "Usage : $0 add_vs <-i esx-server-ip> <-n vs-name> [-p ports]"
+	vmware_esx_log "        $0 remove_vs <-i esx-server-ip> <-n vs-name>"
+	vmware_esx_log "        $0 add_vs_up <-i esx-server-ip> <-n vs-name> <-u uplink>"
+	vmware_esx_log "        $0 remove_vs_up <-i esx-server-ip> <-n vs-name> <-u uplink>"
+	vmware_esx_log "        $0 add_pg <-i esx-server-ip> <-n vs-name> <-g portgroup> [-v vlan-id]"
+	vmware_esx_log "        $0 remove_pg <-i esx-server-ip> <-n vs-name> <-g portgroup>"
+	vmware_esx_log "        $0 add_pg_up <-i esx-server-ip> <-n vs-name> <-g portgroup> <-u uplink>"
+	vmware_esx_log "        $0 remove_pg_up <-i esx-server-ip> <-n vs-name> <-g portgroup> <-u uplink>"
+	vmware_esx_log "        $0 list <-i esx-server-ip>"
+	vmware_esx_log "        $0 post_net_config <-i esx-server-ip>"
+	exit 1
+}
+
+
+
+VMWARE_ESX_COMMAND=$1
+shift
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-i)
+			VMWARE_ESX_HOST_IP=$2
+			shift
+			;;
+		-n)
+			VMWARE_ESX_VSWITCH_NAME=$2
+			shift
+			;;
+		-p)
+			VMWARE_ESX_VSWITCH_PORTS=$2
+			shift
+			;;
+		-g)
+			VMWARE_ESX_PORTGROUP_NAME=$2
+			shift
+			;;
+		-u)
+			VMWARE_ESX_UPLINK=$2
+			shift
+			;;
+		-v)
+			VMWARE_ESX_PORTGROUP_VLAN_ID=$2
+			shift
+			;;
+
+
+		*)
+			vmware_esx_log "ERROR: Free commandline arguments are not allowed"
+			vmware_esx_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+# command set ?
+if [ "$VMWARE_ESX_COMMAND" == "" ]; then
+	openqrm_post_event 0 "parameter_check" 3 "openqrm-vmware-esx-network" "Wrong usage, no command given!"
+	vmware_esx_log parameter-check "Wrong usage, no command given!"
+	vmware_esx_usage
+fi
+# ESX ip set ?
+if [ "$VMWARE_ESX_HOST_IP" == "" ]; then
+	openqrm_post_event 0 "parameter_check" 3 "openqrm-vmware-esx-network" "Wrong usage, no VMware ESX ip-adress given!"
+	vmware_esx_log parameter-check "Wrong usage, no VMware ESX ip-adress given!"
+	vmware_esx_usage
+fi
+# host configured ?
+if [ ! -f "$OPENQRM_VMWARE_ESX_HOST_CONF_DIR/$VMWARE_ESX_HOST_IP.conf" ]; then
+	openqrm_post_event 0 "parameter_check" 3 "openqrm-vmware-esx-network" "VMware ESX Host configuration missing! Please create the configuration first."
+	vmware_esx_log parameter-check "VMware ESX Host configuration missing! Please create the configuration first."
+	vmware_esx_usage
+else
+	# source the host configuration
+	. $OPENQRM_VMWARE_ESX_HOST_CONF_DIR/$VMWARE_ESX_HOST_IP.conf
+fi
+
+
+# main
+case "$VMWARE_ESX_COMMAND" in
+
+
+	add_vs)
+		# check requirements
+		if [ "$VMWARE_ESX_VSWITCH_NAME" == "" ]; then
+			openqrm_post_event 0 "add_vs" 3 "openqrm-vmware-esx-network" "Wrong usage, VSwitch Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_VSWITCH_PORTS" == "" ]; then
+			VS_PORTS="--port 128"
+		else
+			VS_PORTS="--port $VMWARE_ESX_VSWITCH_PORTS"
+		fi
+		# use API to create the vswitch
+		vmware_esx_lock aquire
+		if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl -a $VMWARE_ESX_VSWITCH_NAME $VS_PORTS; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to create VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_vs" 3 "openqrm-vmware-esx-network" "Failed to create VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		vmware_esx_lock release
+		$0 post_net_config -i $VMWARE_ESX_HOST_IP
+		;;
+
+	remove_vs)
+		# check requirements
+		if [ "$VMWARE_ESX_VSWITCH_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_vs" 3 "openqrm-vmware-esx-network" "Wrong usage, VSwitch Name missing!"
+			vmware_esx_usage
+		fi
+		# use API to remove the vswitch
+		vmware_esx_lock aquire
+		if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl -d $VMWARE_ESX_VSWITCH_NAME; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to remove VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "remove_vs" 3 "openqrm-vmware-esx-network" "Failed to remove VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		vmware_esx_lock release
+		$0 post_net_config -i $VMWARE_ESX_HOST_IP
+		;;
+
+	add_vs_up)
+		# check requirements
+		if [ "$VMWARE_ESX_VSWITCH_NAME" == "" ]; then
+			openqrm_post_event 0 "add_vs_up" 3 "openqrm-vmware-esx-network" "Wrong usage, VSwitch Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_UPLINK" == "" ]; then
+			openqrm_post_event 0 "add_vs_up" 3 "openqrm-vmware-esx-network" "Wrong usage, Uplink Name missing!"
+			vmware_esx_usage
+		fi
+		# use API to add the uplink to the vswitch
+		vmware_esx_lock aquire
+		if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl --link $VMWARE_ESX_UPLINK $VMWARE_ESX_VSWITCH_NAME; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to add uplink $VMWARE_ESX_UPLINK to VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_vs_up" 3 "openqrm-vmware-esx-network" "Failed to add uplink $VMWARE_ESX_UPLINK to VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		vmware_esx_lock release
+		$0 post_net_config -i $VMWARE_ESX_HOST_IP
+		;;
+
+	remove_vs_up)
+		# check requirements
+		if [ "$VMWARE_ESX_VSWITCH_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_vs_up" 3 "openqrm-vmware-esx-network" "Wrong usage, VSwitch Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_UPLINK" == "" ]; then
+			openqrm_post_event 0 "remove_vs_up" 3 "openqrm-vmware-esx-network" "Wrong usage, Uplink Name missing!"
+			vmware_esx_usage
+		fi
+		# use API to add the uplink to the vswitch
+		vmware_esx_lock aquire
+		if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl --unlink $VMWARE_ESX_UPLINK $VMWARE_ESX_VSWITCH_NAME; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to remove uplink $VMWARE_ESX_UPLINK to VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "remove_vs_up" 3 "openqrm-vmware-esx-network" "Failed to remove uplink $VMWARE_ESX_UPLINK to VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		vmware_esx_lock release
+		$0 post_net_config -i $VMWARE_ESX_HOST_IP
+		;;
+
+
+	add_pg)
+		# check requirements
+		if [ "$VMWARE_ESX_VSWITCH_NAME" == "" ]; then
+			openqrm_post_event 0 "add_pg" 3 "openqrm-vmware-esx-network" "Wrong usage, VSwitch Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_PORTGROUP_NAME" == "" ]; then
+			openqrm_post_event 0 "add_pg" 3 "openqrm-vmware-esx-network" "Wrong usage, Portgroup Name missing!"
+			vmware_esx_usage
+		fi
+		# use API to add the uplink to the vswitch
+		vmware_esx_lock aquire
+		if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl --add-pg $VMWARE_ESX_PORTGROUP_NAME $VMWARE_ESX_VSWITCH_NAME; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to add portgroup $VMWARE_ESX_PORTGROUP_NAME to VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_pg" 3 "openqrm-vmware-esx-network" "Failed to add portgroup $VMWARE_ESX_PORTGROUP_NAME to VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		# vlan ?
+		if [ "$VMWARE_ESX_PORTGROUP_VLAN_ID" != "" ]; then
+			if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl -p $VMWARE_ESX_PORTGROUP_NAME --vlan $VMWARE_ESX_PORTGROUP_VLAN_ID $VMWARE_ESX_VSWITCH_NAME; then
+				vmware_esx_log openqrm-vmware-esx "ERROR: Failed to set VLAN $VMWARE_ESX_PORTGROUP_VLAN_ID to portgroup $VMWARE_ESX_PORTGROUP_NAME VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+				openqrm_post_event 0 "add_pg" 3 "openqrm-vmware-esx-network" "Failed to set VLAN $VMWARE_ESX_PORTGROUP_VLAN_ID to portgroup $VMWARE_ESX_PORTGROUP_NAME VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+				vmware_esx_lock release
+				exit 1
+			fi
+		fi
+		vmware_esx_lock release
+		$0 post_net_config -i $VMWARE_ESX_HOST_IP
+		;;
+
+	remove_pg)
+		# check requirements
+		if [ "$VMWARE_ESX_VSWITCH_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_pg" 3 "openqrm-vmware-esx-network" "Wrong usage, VSwitch Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_PORTGROUP_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_pg" 3 "openqrm-vmware-esx-network" "Wrong usage, Portgroup Name missing!"
+			vmware_esx_usage
+		fi
+		# use API to add the uplink to the vswitch
+		vmware_esx_lock aquire
+		if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl --del-pg $VMWARE_ESX_PORTGROUP_NAME $VMWARE_ESX_VSWITCH_NAME; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to remove portgroup $VMWARE_ESX_PORTGROUP_NAME to VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "remove_pg" 3 "openqrm-vmware-esx-network" "Failed to remove portgroup $VMWARE_ESX_PORTGROUP_NAME to VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		vmware_esx_lock release
+		$0 post_net_config -i $VMWARE_ESX_HOST_IP
+		;;
+
+	add_pg_up)
+		# check requirements
+		if [ "$VMWARE_ESX_VSWITCH_NAME" == "" ]; then
+			openqrm_post_event 0 "add_pg_up" 3 "openqrm-vmware-esx-network" "Wrong usage, VSwitch Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_PORTGROUP_NAME" == "" ]; then
+			openqrm_post_event 0 "add_pg_up" 3 "openqrm-vmware-esx-network" "Wrong usage, Portgroup Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_UPLINK" == "" ]; then
+			openqrm_post_event 0 "add_pg_up" 3 "openqrm-vmware-esx-network" "Wrong usage, Uplink Name missing!"
+			vmware_esx_usage
+		fi
+		# use API to add the uplink to the vswitch
+		vmware_esx_lock aquire
+		if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl --add-pg-uplink $VMWARE_ESX_UPLINK --pg $VMWARE_ESX_PORTGROUP_NAME $VMWARE_ESX_VSWITCH_NAME; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to add uplink $VMWARE_ESX_UPLINK to portgroup $VMWARE_ESX_PORTGROUP_NAME VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_pg_up" 3 "openqrm-vmware-esx-network" "Failed to add uplink $VMWARE_ESX_UPLINK to portgroup $VMWARE_ESX_PORTGROUP_NAME VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		vmware_esx_lock release
+		$0 post_net_config -i $VMWARE_ESX_HOST_IP
+		;;
+
+	remove_pg_up)
+		# check requirements
+		if [ "$VMWARE_ESX_VSWITCH_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_pg_up" 3 "openqrm-vmware-esx-network" "Wrong usage, VSwitch Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_PORTGROUP_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_pg_up" 3 "openqrm-vmware-esx-network" "Wrong usage, Portgroup Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_UPLINK" == "" ]; then
+			openqrm_post_event 0 "remove_pg_up" 3 "openqrm-vmware-esx-network" "Wrong usage, Uplink Name missing!"
+			vmware_esx_usage
+		fi
+		# use API to add the uplink to the vswitch
+		vmware_esx_lock aquire
+		if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl --del-pg-uplink $VMWARE_ESX_UPLINK --pg $VMWARE_ESX_PORTGROUP_NAME $VMWARE_ESX_VSWITCH_NAME; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to remove uplink $VMWARE_ESX_UPLINK to portgroup $VMWARE_ESX_PORTGROUP_NAME VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "remove_pg_up" 3 "openqrm-vmware-esx-network" "Failed to remove uplink $VMWARE_ESX_UPLINK to portgroup $VMWARE_ESX_PORTGROUP_NAME VSwitch $VMWARE_ESX_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		vmware_esx_lock release
+		$0 post_net_config -i $VMWARE_ESX_HOST_IP
+		;;
+
+	list)
+		# run API command
+		$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl -l
+		;;
+
+	post_net_config)
+		mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/
+		ESX_STATS="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/$VMWARE_ESX_HOST_IP.net_config"
+		ESX_STATS_TMP="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/$VMWARE_ESX_HOST_IP.net_config.tmp"
+		rm -f $ESX_STATS
+		> $ESX_STATS_TMP
+#		ESX_NETWORK_DETAILS=`mktemp /tmp/esx-net.XXXXXX` || exit 1
+		ESX_NETWORK_DETAILS="/tmp/esx-net.conf"
+#		ESX_PORTGROUP_DETAILS=`mktemp /tmp/esx-pg.XXXXXX` || exit 1
+		ESX_PORTGROUP_DETAILS="/tmp/esx-pg.conf"
+		ESX_NETWORK_BROWSE_COMMAND="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/bin/perl/esxcfg-vswitch-lamw-mod.pl -l"
+		$ESX_NETWORK_BROWSE_COMMAND > $ESX_NETWORK_DETAILS
+		NEXT_IS_VSWITCH_NAME=false
+		NEXT_IS_WRITE_CONFIG_LINE=false
+		CONF_VSWITCH_LINE=""
+
+IFS='
+'
+		for n in `cat $ESX_NETWORK_DETAILS`; do
+			if ($NEXT_IS_VSWITCH_NAME); then
+				CONF_VSWITCH_LINE="$n"
+				NEXT_IS_VSWITCH_NAME=false
+				NEXT_IS_WRITE_CONFIG_LINE=true
+			fi
+			if echo $n | grep "Switch Name" 1>/dev/null; then
+				NEXT_IS_VSWITCH_NAME=true
+				continue
+			fi
+			if ($NEXT_IS_WRITE_CONFIG_LINE); then
+				CONF_VSWITCH_NAME=`echo $CONF_VSWITCH_LINE | awk '{ print $1 }'`
+				CONF_VSWITCH_NUM_PORTS=`echo $CONF_VSWITCH_LINE | awk '{ print $2 }'`
+				CONF_VSWITCH_USED_PORTS=`echo $CONF_VSWITCH_LINE | awk '{ print $3 }'`
+				CONF_VSWITCH_CONF_PORTS=`echo $CONF_VSWITCH_LINE | awk '{ print $4 }'`
+				CONF_VSWITCH_MTU=`echo $CONF_VSWITCH_LINE | awk '{ print $5 }'`
+				CONF_VSWITCH_UPLINK=`echo $CONF_VSWITCH_LINE | awk '{ print $6 }'`
+				echo "vs""@""$CONF_VSWITCH_NAME""@""$CONF_VSWITCH_NUM_PORTS""@""$CONF_VSWITCH_USED_PORTS""@""$CONF_VSWITCH_CONF_PORTS""@""$CONF_VSWITCH_MTU""@""$CONF_VSWITCH_UPLINK" >> $ESX_STATS_TMP
+				# get the portgroups on this vswitch
+				cat $ESX_NETWORK_DETAILS | grep -A1000 ^$CONF_VSWITCH_NAME  > $ESX_PORTGROUP_DETAILS
+				echo END_OF_FILE >> $ESX_PORTGROUP_DETAILS
+				sed '/Switch Name/,/END_OF_FILE/d' $ESX_PORTGROUP_DETAILS > $ESX_PORTGROUP_DETAILS.$CONF_VSWITCH_NAME
+				sed -i -e 's/END_OF_FILE//g' $ESX_PORTGROUP_DETAILS.$CONF_VSWITCH_NAME
+				sed -i -e '1,3d' $ESX_PORTGROUP_DETAILS.$CONF_VSWITCH_NAME
+				sed -i -e '/./,/^$/!d' $ESX_PORTGROUP_DETAILS.$CONF_VSWITCH_NAME
+				for p in `cat $ESX_PORTGROUP_DETAILS.$CONF_VSWITCH_NAME`; do
+
+					PG_UPLINK=`echo $p | rev | awk '{ print $1 }' | rev | sed 's/^[ \t]*//' | awk '{ print $1 }' | sed 's/[ \t]*$//'`
+					if echo $PG_UPLINK | grep '[a-z][a-z]' 1>/dev/null; then
+						# this means we have a portgroup uplink parameter
+						PG_NAME=`echo $p | rev | awk '{ print $4" "$5" "$6 }' | rev | sed 's/^[ \t]*//' | awk '{ print $1" "$2 }' | sed 's/[ \t]*$//'`
+						PG_VLAN=`echo $p | rev | awk '{ print $3 }' | rev | sed 's/^[ \t]*//' | awk '{ print $1 }' | sed 's/[ \t]*$//'`
+						PG_PORTS=`echo $p | rev | awk '{ print $2 }' | rev | sed 's/^[ \t]*//' | awk '{ print $1 }' | sed 's/[ \t]*$//'`
+					else
+						# this means the portgroup uplink parameter is emptry
+						PG_UPLINK=""
+						PG_NAME=`echo $p | rev | awk '{ print $3" "$4" "$5 }' | rev | sed 's/^[ \t]*//' | awk '{ print $1" "$2 }' | sed 's/[ \t]*$//'`
+						PG_VLAN=`echo $p | rev | awk '{ print $2 }' | rev | sed 's/^[ \t]*//' | awk '{ print $1 }' | sed 's/[ \t]*$//'`
+						PG_PORTS=`echo $p | rev | awk '{ print $1 }' | rev | sed 's/^[ \t]*//' | awk '{ print $1 }' | sed 's/[ \t]*$//'`
+					fi
+					echo "pg""@""$CONF_VSWITCH_NAME""@""$PG_NAME""@""$PG_VLAN""@""$PG_PORTS""@""$PG_UPLINK" >> $ESX_STATS_TMP
+				done
+				rm -f $ESX_PORTGROUP_DETAILS
+				NEXT_IS_WRITE_CONFIG_LINE=false
+			fi
+		done
+		IFS="$ORG_IFS"
+		/bin/mv $ESX_STATS_TMP $ESX_STATS
+		chmod 777 $ESX_STATS
+		rm -f $ESX_NETWORK_DETAILS
+		;;
+
+
+
+	*)
+		vmware_esx_usage
+		;;
+
+
+esac
+

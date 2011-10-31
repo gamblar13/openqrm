@@ -1,0 +1,455 @@
+#!/bin/bash
+# this script automatically manages vmware-esx datastores
+#
+# This file is part of openQRM.
+#
+# openQRM is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2
+# as published by the Free Software Foundation.
+#
+# openQRM is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/include/openqrm-plugin-vmware-esx-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+OPENQRM_VMWARE_ESX_HOST_CONF_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/conf/host"
+OPENQRM_VMWARE_ESX_STAT_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/"
+export LANG=C
+ORG_IFS="$IFS"
+
+# http://communities.vmware.com/thread/240659?tstart=0
+export PERL_LWP_SSL_VERIFY_HOSTNAME=0
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	vmware_esx_log "ERROR: Please run this script as root!"
+	exit 6
+fi
+# deps installed ?
+if ! which screen 1>/dev/null; then
+	vmware_esx_log "ERROR: The 'screen' utility is not installed! Please install and try again."
+	exit 6
+fi
+if [ ! -d "$OPENQRM_VMWARE_ESX_HOST_CONF_DIR" ]; then
+	mkdir -p $OPENQRM_VMWARE_ESX_HOST_CONF_DIR
+fi
+if [ ! -d "$OPENQRM_VMWARE_ESX_STAT_DIR" ]; then
+	mkdir -p $OPENQRM_VMWARE_ESX_STAT_DIR
+	chmod 777 $OPENQRM_VMWARE_ESX_STAT_DIR
+fi
+
+
+
+function vmware_esx_usage() {
+	vmware_esx_log "Usage : $0 add_nas <-i esx-server-ip> <-s nas-ip> <-p nas-path> <-n ds-name>"
+	vmware_esx_log "        $0 remove_nas <-i esx-server-ip> <-n ds-name>"
+	vmware_esx_log "        $0 add_iscsi <-i esx-server-ip> <-n ds-name> <-t iscsi-target-name> <-q iscsi-target-ip> <-g iscsi-portgroup> <-v vswitch> <-k vmk-name> <-ki vmk-ip> <-ks vmk-subnet>"
+	vmware_esx_log "        $0 remove_iscsi <-i esx-server-ip> <-n ds-name> <-t iscsi-target-name> <-q iscsi-target-ip>"
+	vmware_esx_log "        $0 list <-i esx-server-ip>"
+	vmware_esx_log "        $0 post_ds_list <-i esx-server-ip>"
+#	vmware_esx_log "        $0 post_ds_config <-i esx-server-ip> <-n ds-name>"
+	exit 1
+}
+
+
+
+VMWARE_ESX_COMMAND=$1
+shift
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			VMWARE_ESX_DATASTORE_NAME=$2
+			shift
+			;;
+		-i)
+			VMWARE_ESX_HOST_IP=$2
+			shift
+			;;
+		-s)
+			VMWARE_ESX_DATASTORE_IP=$2
+			shift
+			;;
+		-p)
+			VMWARE_ESX_DATASTORE_NAS_PATH=$2
+			shift
+			;;
+		-g)
+			VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME=$2
+			shift
+			;;
+		-t)
+			VMWARE_ESX_DATASTORE_ISCSI_TARGET_NAME=$2
+			shift
+			;;
+		-q)
+			VMWARE_ESX_DATASTORE_ISCSI_TARGET_IP=$2
+			shift
+			;;
+		-v)
+			VMWARE_ESX_DATASTORE_ISCSI_VSWITCH_NAME=$2
+			shift
+			;;
+		-k)
+			VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME=$2
+			shift
+			;;
+
+		-ki)
+			VMWARE_ESX_DATASTORE_ISCSI_VMK_IP=$2
+			shift
+			;;
+		-ks)
+			VMWARE_ESX_DATASTORE_ISCSI_VMK_SUBNET=$2
+			shift
+			;;
+
+		*)
+			vmware_esx_log "ERROR: Free commandline arguments are not allowed"
+			vmware_esx_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+# command set ?
+if [ "$VMWARE_ESX_COMMAND" == "" ]; then
+	openqrm_post_event 0 "parameter_check" 3 "openqrm-vmware-esx-datastore" "Wrong usage, no command given!"
+	vmware_esx_log parameter-check "Wrong usage, no command given!"
+	vmware_esx_usage
+fi
+# ESX ip set ?
+if [ "$VMWARE_ESX_HOST_IP" == "" ]; then
+	openqrm_post_event 0 "parameter_check" 3 "openqrm-vmware-esx-datastore" "Wrong usage, no VMware ESX ip-adress given!"
+	vmware_esx_log parameter-check "Wrong usage, no VMware ESX ip-adress given!"
+	vmware_esx_usage
+fi
+# host configured ?
+if [ ! -f "$OPENQRM_VMWARE_ESX_HOST_CONF_DIR/$VMWARE_ESX_HOST_IP.conf" ]; then
+	openqrm_post_event 0 "parameter_check" 3 "openqrm-vmware-esx-datastore" "VMware ESX Host configuration missing! Please create the configuration first."
+	vmware_esx_log parameter-check "VMware ESX Host configuration missing! Please create the configuration first."
+	vmware_esx_usage
+else
+	# source the host configuration
+	. $OPENQRM_VMWARE_ESX_HOST_CONF_DIR/$VMWARE_ESX_HOST_IP.conf
+fi
+
+
+# main
+case "$VMWARE_ESX_COMMAND" in
+
+
+	add_nas)
+		# check requirements
+		if [ "$VMWARE_ESX_DATASTORE_IP" == "" ]; then
+			openqrm_post_event 0 "add_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, Datastore IP address missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_NAS_PATH" == "" ]; then
+			openqrm_post_event 0 "add_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, NAS Path missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_NAME" == "" ]; then
+			openqrm_post_event 0 "add_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, Datastore Name missing!"
+			vmware_esx_usage
+		fi
+		# use API to connect the NAS
+		vmware_esx_lock aquire
+		if ! vicfg-nas -a --nasserver $VMWARE_ESX_DATASTORE_IP -s $VMWARE_ESX_DATASTORE_NAS_PATH $VMWARE_ESX_DATASTORE_NAME; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to add NAS Datastore $VMWARE_ESX_DATASTORE_IP:$VMWARE_ESX_DATASTORE_NAS_PATH!"
+			openqrm_post_event 0 "add_nas" 3 "openqrm-vmware-esx-datastore" "Failed to add NAS Datastore $VMWARE_ESX_DATASTORE_IP:$VMWARE_ESX_DATASTORE_NAS_PATH!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		vmware_esx_lock release
+		$0 post_ds_list -i $VMWARE_ESX_HOST_IP
+		;;
+
+	remove_nas)
+		if [ "$VMWARE_ESX_DATASTORE_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, Datastore Name missing!"
+			vmware_esx_usage
+		fi
+		# use API to remove the NAS
+		vmware_esx_lock aquire
+		if ! vicfg-nas -d $VMWARE_ESX_DATASTORE_NAME; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to remove NAS Datastore $VMWARE_ESX_DATASTORE_NAME!"
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Failed to remove NAS Datastore $VMWARE_ESX_DATASTORE_NAME!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		vmware_esx_lock release
+		$0 post_ds_list -i $VMWARE_ESX_HOST_IP
+		;;
+
+	add_iscsi)
+		if [ "$VMWARE_ESX_DATASTORE_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, Datastore Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_ISCSI_TARGET_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, iSCSI Target Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_ISCSI_TARGET_IP" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, iSCSI Target ip missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, iSCSI Portgroup name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_ISCSI_VSWITCH_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, vswitch name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, vmk name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_ISCSI_VMK_IP" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, vmk ip missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_ISCSI_VMK_SUBNET" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, vmk subnet missing!"
+			vmware_esx_usage
+		fi
+
+
+		# TODO initiator username + password
+
+
+
+		vmware_esx_lock aquire
+		# enable software iscsi
+		vicfg-iscsi -e --swiscsi
+		# get the vmhba of the software iscsi initiator
+		echo "- getting iSCSI VMBHA ..."
+		ISCSI_VMHBA=`vicfg-scsidevs -a | grep iscsi_vmk | awk '{ print $1 }'`
+		if [ "$ISCSI_VMHBA" == "" ]; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to enable the iSCSI Software Adapter on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to enable the iSCSI Software Adapter on ESX Host $VMWARE_ESX_HOST_IP!"
+#			vmware_esx_lock release
+#			exit 1
+		fi
+		# add dedicated portgroup
+		echo "- creating/checking portgroup ..."
+		if vicfg-vswitch -l | grep -w $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME 1>/dev/null; then
+			vmware_esx_log openqrm-vmware-esx "NOTICE: iSCSI Portgroup $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME already exists on ESX Host $VMWARE_ESX_HOST_IP."
+			openqrm_post_event 0 "add_iscsi" 5 "openqrm-vmware-esx-datastore" "NOTICE: iSCSI Portgroup $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME already exists on ESX Host $VMWARE_ESX_HOST_IP."
+		else
+			if ! vicfg-vswitch -add-pg $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME $VMWARE_ESX_DATASTORE_ISCSI_VSWITCH_NAME; then
+				vmware_esx_log openqrm-vmware-esx "ERROR: Failed to create iSCSI Portgroup $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME to vswitch $VMWARE_ESX_DATASTORE_ISCSI_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+				openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to create iSCSI Portgroup $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME to vswitch $VMWARE_ESX_DATASTORE_ISCSI_VSWITCH_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+#				vmware_esx_lock release
+#				exit 1
+			fi
+		fi
+
+# debug
+		vicfg-vswitch -l
+
+		# add vmnic to portgroup
+		echo "- creating/checking vmk on portgroup ..."
+		if vicfg-vmknic -l | grep -w $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME | grep -w $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME 1>/dev/null; then
+			vmware_esx_log openqrm-vmware-esx "NOTICE: iSCSI vmk $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME already exists on Portgroup $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME on ESX Host $VMWARE_ESX_HOST_IP."
+			openqrm_post_event 0 "add_iscsi" 5 "openqrm-vmware-esx-datastore" "NOTICE: iSCSI vmk $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME already exists on Portgroup $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME on ESX Host $VMWARE_ESX_HOST_IP."
+		else
+			if ! vicfg-vmknic -add $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME -ip $VMWARE_ESX_DATASTORE_ISCSI_VMK_IP -netmask $VMWARE_ESX_DATASTORE_ISCSI_VMK_SUBNET -portgroup $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME; then
+				vmware_esx_log openqrm-vmware-esx "ERROR: Failed to create iSCSI vmk $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME on Portgroup $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+				openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to create iSCSI vmk $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME on Portgroup $VMWARE_ESX_DATASTORE_ISCSI_PORTGROUP_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+#				vmware_esx_lock release
+#				exit 1
+			fi
+		fi
+
+#debug
+		vicfg-vmknic -l
+
+		# check if the vmk is already connected to the vmhba
+		echo "- connect vmk to vmhba ..."
+		if esxcli swiscsi nic list -d $ISCSI_VMHBA | grep -w ^$VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME; then
+			vmware_esx_log openqrm-vmware-esx "NOTICE: iSCSI vmk $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME already connected to VMHBA $ISCSI_VMHBA on ESX Host $VMWARE_ESX_HOST_IP."
+			openqrm_post_event 0 "add_iscsi" 5 "openqrm-vmware-esx-datastore" "NOTICE: iSCSI vmk $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME already connected to VMHBA $ISCSI_VMHBA on ESX Host $VMWARE_ESX_HOST_IP."
+		else
+			if ! esxcli swiscsi nic add -n $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME -d $ISCSI_VMHBA; then
+				vmware_esx_log openqrm-vmware-esx "ERROR: Failed to add vmk $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME to $ISCSI_VMHBA on ESX Host $VMWARE_ESX_HOST_IP!"
+				openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to add vmk $VMWARE_ESX_DATASTORE_ISCSI_VMK_NAME to $ISCSI_VMHBA on ESX Host $VMWARE_ESX_HOST_IP!"
+#				vmware_esx_lock release
+#				exit 1
+			fi
+		fi
+		
+		# add to discovery
+		echo "- adding $VMWARE_ESX_DATASTORE_ISCSI_TARGET_IP to iSCSI discovery ..."
+		if ! vicfg-iscsi -a --discovery -ip $VMWARE_ESX_DATASTORE_ISCSI_TARGET_IP $ISCSI_VMHBA; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to add iSCSI Target ip $VMWARE_ESX_DATASTORE_ISCSI_TARGET_IP to $ISCSI_VMHBA discovery on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to add iSCSI Target ip $VMWARE_ESX_DATASTORE_ISCSI_TARGET_IP to $ISCSI_VMHBA discovery on ESX Host $VMWARE_ESX_HOST_IP!"
+#			vmware_esx_lock release
+#			exit 1
+		fi
+		echo "... rescaning $ISCSI_VMHBA"
+		if ! vicfg-rescan $ISCSI_VMHBA; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to rescan $ISCSI_VMHBA on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to rescan $ISCSI_VMHBA on ESX Host $VMWARE_ESX_HOST_IP!"
+#			vmware_esx_lock release
+#			exit 1
+		fi
+
+# debug
+		# list target
+		vicfg-iscsi -l -T $ISCSI_VMHBA
+		vicfg-iscsi -l -L $ISCSI_VMHBA
+#		vicfg-iscsi -i 192.168.88.10 -l --discovery $ISCSI_VMHBA
+
+		echo "- getting device name ..."
+		# check discovery for the given target name, get the vmware device name
+		OS_DEVICE_NAME=`vicfg-iscsi -l -L $ISCSI_VMHBA | grep -A5 -w $VMWARE_ESX_DATASTORE_ISCSI_TARGET_NAME | grep "OS.*DEVICE.*NAME" | cut -d':' -f2 | awk '{ print $1 }'`
+		if [ "$OS_DEVICE_NAME" == "" ]; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to discover volume of iSCSI Target $VMWARE_ESX_DATASTORE_ISCSI_TARGET_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to discover volume of iSCSI Target $VMWARE_ESX_DATASTORE_ISCSI_TARGET_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+#			vmware_esx_lock release
+#			exit 1
+		fi
+		OTHER_DEVICE_NAME=`vicfg-scsidevs -l | grep -A12 -w ^$OS_DEVICE_NAME | grep -A1 "Other.*Names:" | grep -v "Other" | awk '{ print $1 }'`
+		if [ "$OTHER_DEVICE_NAME" == "" ]; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to get the device name of iSCSI volume $OS_DEVICE_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to get the device name of iSCSI volume $OS_DEVICE_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+#			vmware_esx_lock release
+#			exit 1
+		fi
+
+		# create vmfs on partition
+		echo "- creating the datastore ..."
+		# partition the iscsi lun, create a 1. partition type VMFS
+		if ! vmkfstools -C vmfs3 -b 1m -S $VMWARE_ESX_DATASTORE_NAME $OTHER_DEVICE_NAME:1; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to create VMFS on iSCSI volume $OS_DEVICE_NAME/$OTHER_DEVICE_NAME:1 on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to create VMFS on iSCSI volume $OS_DEVICE_NAME/$OTHER_DEVICE_NAME:1 on ESX Host $VMWARE_ESX_HOST_IP!"
+#			vmware_esx_lock release
+#			exit 1
+		fi
+		echo "Successfully created Datastore $VMWARE_ESX_DATASTORE_NAME"
+		vmware_esx_lock release
+		$0 post_ds_list -i $VMWARE_ESX_HOST_IP
+		;;
+	remove_iscsi)
+		if [ "$VMWARE_ESX_DATASTORE_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, Datastore Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_ISCSI_TARGET_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, iSCSI Target Name missing!"
+			vmware_esx_usage
+		fi
+		if [ "$VMWARE_ESX_DATASTORE_ISCSI_TARGET_IP" == "" ]; then
+			openqrm_post_event 0 "remove_nas" 3 "openqrm-vmware-esx-datastore" "Wrong usage, iSCSI Target ip missing!"
+			vmware_esx_usage
+		fi
+		vmware_esx_lock aquire
+		# get the vmhba of the software iscsi initiator
+		echo "- getting iSCSI VMBHA ..."
+		ISCSI_VMHBA=`vicfg-scsidevs -a | grep iscsi_vmk | awk '{ print $1 }'`
+		if [ "$ISCSI_VMHBA" == "" ]; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to enable the iSCSI Software Adapter on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to enable the iSCSI Software Adapter on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		# remove target discovery and static connect
+		echo "- removing iSCSI discovery of $VMWARE_ESX_DATASTORE_ISCSI_TARGET_NAME ..."
+		vicfg-iscsi -r --static -name $VMWARE_ESX_DATASTORE_ISCSI_TARGET_NAME -ip $VMWARE_ESX_DATASTORE_ISCSI_TARGET_IP $ISCSI_VMHBA
+		vicfg-iscsi -r --discovery -name $VMWARE_ESX_DATASTORE_ISCSI_TARGET_NAME -ip $VMWARE_ESX_DATASTORE_ISCSI_TARGET_IP $ISCSI_VMHBA
+		echo "- rescaning $ISCSI_VMHBA ..."
+		if ! vicfg-rescan $ISCSI_VMHBA; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to rescan $ISCSI_VMHBA on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to rescan $ISCSI_VMHBA on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		# check that is is gone
+		if $OPENQRM_VMWARE_ESX_SDK_DIR/apps/host/dsbrowse.pl | grep -w ^$VMWARE_ESX_DATASTORE_NAME 1>/dev/null; then
+			vmware_esx_log openqrm-vmware-esx "ERROR: Failed to remove Datastore $VMWARE_ESX_DATASTORE_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-vmware-esx-datastore" "Failed to remove Datastore $VMWARE_ESX_DATASTORE_NAME on ESX Host $VMWARE_ESX_HOST_IP!"
+			vmware_esx_lock release
+			exit 1
+		fi
+		echo "Successfully removed Datastore $VMWARE_ESX_DATASTORE_NAME"
+		vmware_esx_lock release
+		$0 post_ds_list -i $VMWARE_ESX_HOST_IP
+		;;
+
+	list)
+		# run API command
+		$OPENQRM_VMWARE_ESX_SDK_DIR/apps/host/dsbrowse.pl
+		;;
+
+	post_ds_list)
+		mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/
+		ESX_STATS="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/$VMWARE_ESX_HOST_IP.ds_list"
+		ESX_STATS_TMP="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/$VMWARE_ESX_HOST_IP.ds_list.tmp"
+		rm -f $ESX_STATS
+		> $ESX_STATS_TMP
+		ESX_DATASTORE_DATASTORE_DETAILS=`mktemp /tmp/esx-ds.XXXXXX` || exit 1
+		ESX_DATASTORE_BROWSE_COMMAND="$OPENQRM_VMWARE_ESX_SDK_DIR/apps/host/dsbrowse.pl"
+		$ESX_DATASTORE_BROWSE_COMMAND > $ESX_DATASTORE_DATASTORE_DETAILS
+IFS='
+'
+		for n in `cat $ESX_DATASTORE_DATASTORE_DETAILS`; do
+			if echo $n | grep "Information about datastore" 1>/dev/null; then
+				DS_NAME=`echo $n | cut -d':' -f2 | sed -e "s/'//g" | awk '{ print $1 }'`
+			fi
+			if echo $n | grep "Location" 1>/dev/null; then
+				DS_LOCATION=`echo $n | cut -d':' -f2 | awk '{ print $1 }'`
+			fi
+			if echo $n | grep "File system" 1>/dev/null; then
+				DS_FS=`echo $n | cut -d':' -f2 | awk '{ print $1 }'`
+			fi
+			if echo $n | grep "Maximum Capacity" 1>/dev/null; then
+				DS_MAX=`echo $n | cut -d':' -f2 | awk '{ print $1 }'`
+			fi
+			if echo $n | grep "Available space" 1>/dev/null; then
+				DS_FREE=`echo $n | cut -d':' -f2 | awk '{ print $1 }'`
+			fi
+			if [ "$DS_NAME" == "" ] || [ "$DS_LOCATION" == "" ] || [ "$DS_FS" == "" ] || [ "$DS_MAX" == "" ] || [ "$DS_FREE" == "" ]; then
+				continue
+			fi
+			echo "$DS_NAME""@""$DS_LOCATION""@""$DS_FS""@""$DS_MAX""@""$DS_FREE" >> $ESX_STATS_TMP
+			unset DS_NAME
+			unset DS_LOCATION
+			unset DS_FS
+			unset DS_MAX
+			unset DS_FREE
+		done
+		IFS="$ORG_IFS"
+		/bin/mv $ESX_STATS_TMP $ESX_STATS
+		chmod 777 $ESX_STATS
+		rm -f $ESX_DATASTORE_DATASTORE_DETAILS
+		;;
+
+
+
+	*)
+		vmware_esx_usage
+		;;
+
+
+esac
+

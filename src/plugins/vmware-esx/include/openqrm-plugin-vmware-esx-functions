@@ -15,12 +15,22 @@
 # You should have received a copy of the GNU General Public License
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
+# Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 VMWARE_SERVER_LOCK_FILE=/var/run/openqrm/vmware-esx-plugin.lock
+VMWARE_SERVER_DISCOVERY_LOCK_FILE=/var/run/openqrm/vmware-esx-discovery.lock
 VMWARE_SERVER_LOCK_DELAY=5
 VMWARE_SERVER_LOCK_RETRY=100
 VMWARE_SERVER_LOCK_TIMEOUT=500
+
+VM_ACTION_POWERON="poweron"
+VM_ACTION_POWEROFF="poweroff"
+VM_ACTION_SUSPEND="suspend"
+VM_ACTION_RESET="reset"
+VM_ACTION_REBOOT="reboot"
+VM_ACTION_SHUTDOWN="shutdown"
+VM_ACTION_STANDBY="standby"
+
 ################ common vmware-esx functions
 
 # logs for vmware-esx
@@ -61,6 +71,36 @@ function vmware_esx_lock() {
 	esac
 }
 
+
+
+
+# locking function
+function vmware_esx_discovery_lock() {
+	local COMMAND=$1
+	local RET=1
+
+	if [ ! -d `dirname $VMWARE_SERVER_DISCOVERY_LOCK_FILE` ]; then
+		mkdir -p `dirname $VMWARE_SERVER_DISCOVERY_LOCK_FILE`
+	fi
+	case "$COMMAND" in
+		aquire)
+				lockfile -s $VMWARE_SERVER_LOCK_DELAY -r $VMWARE_SERVER_LOCK_RETRY -l $VMWARE_SERVER_LOCK_TIMEOUT $VMWARE_SERVER_DISCOVERY_LOCK_FILE
+				RET=$?
+				vmware_esx_log vmware_esx_discovery_lock "Aquired the lock"
+				return $RET
+				;;
+		release)
+				/bin/rm -f $VMWARE_SERVER_DISCOVERY_LOCK_FILE
+				RET=$?
+				vmware_esx_log vmware_esx_discovery_lock "Released the lock"
+				return $RET
+				;;
+		*)
+			vmware_esx_log vmware_esx_discovery_lock "No such command. Try 'aquire' or 'release'"
+			return 1
+			;;
+	esac
+}
 
 
 ################ vmware-esx functions
