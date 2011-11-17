@@ -6,7 +6,6 @@ $vmware_esx_id = $_REQUEST["vmware_esx_id"];
 <html>
 <head>
 <title>openQRM VMware-server actions</title>
-<meta http-equiv="refresh" content="0; URL=vmware-esx-manager.php?currenttab=tab0&vmware_esx_id=<?php echo $vmware_esx_id; ?>&strMsg=Processing <?php echo $vmware_esx_command; ?>">
 </head>
 <body>
 
