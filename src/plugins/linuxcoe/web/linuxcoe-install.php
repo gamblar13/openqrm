@@ -104,8 +104,8 @@ function linuxcoe_install() {
 	$disp = $disp."Should we run the automated installation and setup of LinuxCOE now ?";
 	$disp = $disp."<br>";
 	$disp = $disp."<form action=$thisfile>";
-	$disp = $disp."<input type=hidden name=action value='runsetup'";
-	$disp = $disp."<input type=submit name=submit value='Yes, run the automated setup procedure'";
+	$disp = $disp."<input type=hidden name=action value='runsetup'>";
+	$disp = $disp."<input type=submit name=submit value='Yes, run the automated setup procedure'>";
 	$disp = $disp."</form>";
 	$disp = $disp."<br>";
 	$disp = $disp."You can follow the installation procedures logs by running :";
@@ -117,8 +117,8 @@ function linuxcoe_install() {
 	$disp = $disp."If everything is working fine please click on the \"Yes, I read this\" button which will remove this install-lock.";
 	$disp = $disp."<br>";
 	$disp = $disp."<form action=$thisfile>";
-	$disp = $disp."<input type=hidden name=action value='confirm'";
-	$disp = $disp."<input type=submit name=submit value='Yes, I read this'";
+	$disp = $disp."<input type=hidden name=action value='confirm'>";
+	$disp = $disp."<input type=submit name=submit value='Yes, I read this'>";
 	$disp = $disp."</form>";
 	$disp = $disp."<br>";
 	$disp = $disp."<br>";
