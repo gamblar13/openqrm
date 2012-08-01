@@ -1,0 +1,24 @@
+.htmlobject_td.event_priority {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.event_id {
+	text-align:center;
+	width:30px;
+	vertical-align:top;
+}
+.htmlobject_td.event_time {
+	text-align:left;
+	width:120px;
+	vertical-align:top;
+}
+.htmlobject_td.event_source {
+	text-align:left;
+	width:200px;
+	vertical-align:top;
+}
+.htmlobject_td.event_description {
+	text-align:left;
+	vertical-align:top;
+}
