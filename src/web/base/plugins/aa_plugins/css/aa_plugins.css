@@ -1,0 +1,33 @@
+.htmlobject_td.icon {
+	text-align:center;
+	width:30px;
+	vertical-align:top;
+}
+.htmlobject_td.name {
+	text-align:center;
+	width:80px;
+	vertical-align:middle;
+}
+.htmlobject_td.type {
+	text-align:center;
+	width:65px;
+	vertical-align:middle;
+}
+.htmlobject_td.description {
+	text-align:center;
+	width:390px;
+	vertical-align:middle;
+}
+.htmlobject_td.enabled {
+	text-align:center;
+	width:40px;
+	vertical-align:middle;
+}
+.htmlobject_td.started {
+	text-align:center;
+	width:40px;
+	vertical-align:middle;
+}
+#page #middle #content #plugins_filter .left {
+	width:110px;
+}
