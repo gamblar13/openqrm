@@ -1,0 +1,216 @@
+#!/bin/bash
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+# this script automatically manages fai
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/fai/include/openqrm-plugin-fai-functions
+OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	OPENQRM_SERVER_IP=$resource_openqrmserver
+else
+	echo "ERROR: This script runs on an integrated Fai-Server only!"
+	exit 6
+fi
+OPENQRM_FAI_CONFIG_DIR="/srv/fai/config"
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+# this script runs on the integrated fai-server only
+if [ -f "$OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf" ]; then
+	echo "ERROR: This script runs on an integrated Fai-Server only!"
+	exit 6
+fi
+# run only on fai-servers
+if ! which fai &>/dev/null; then
+	exit 0
+fi
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+# functions running on the fai-server
+function fai_usage() {
+	echo "Usage : $0 add_fai_client -i <resource-ip> -x <resource-ip> -m <resource-mac> -n <fai-resource-name>"
+	echo "        $0 remove_fai_client -n <fai-resource-name>"
+	echo "        $0 post_profiles -u <openqrm-user-name> -p <openqrm-password>"
+	exit 1
+}
+
+
+FAI_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-i)
+			PARAM_RESOURCE_IP=$2
+			shift
+			;;
+		-x)
+			PARAM_RESOURCE_ID=$2
+			shift
+			;;
+		-m)
+			PARAM_RESOURCE_MAC=$2
+			shift
+			;;
+		-n)
+			PARAM_RESOURCE_NAME=$2
+			shift
+			;;
+		-o)
+			PARAM_FAI_PRODUCTS=$2
+			shift
+			;;
+		-k)
+			PARAM_FAI_PRODUCT_KEY=$2
+			shift
+			;;
+		-u)
+			PARAM_OPENQRM_USER=$2
+			shift
+			;;
+		-p)
+			PARAM_OPENQRM_PASS=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			fai_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+# checks
+if [ "$FAI_COMMAND" == "" ]; then
+	fai_usage
+fi
+
+# main
+case "$FAI_COMMAND" in
+
+	add_fai_client)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			fai_usage
+		fi
+		if [ "$PARAM_RESOURCE_IP" == "" ]; then
+			fai_usage
+		fi
+		if [ "$PARAM_RESOURCE_ID" == "" ]; then
+			fai_usage
+		fi
+		if [ "$PARAM_RESOURCE_MAC" == "" ]; then
+			fai_usage
+		fi
+		if [ "$PARAM_FAI_PRODUCTS" == "" ]; then
+			fai_usage
+		fi
+		OPENQRM_DEFAULT_GATEWAY=`/sbin/ip route list | awk '/^default / { print $3 }'`
+		OPENQRM_SUBNET=`ifconfig | grep "$resource_ip " | cut -d':' -f4`
+		OPENQRM_DOMAIN=`cat /etc/resolv.conf | grep ^search | head -n1 | awk '{ print $2 }'`
+		OPENQRM_DNS=`cat /etc/resolv.conf | grep ^nameserver | head -n1 | awk '{ print $2 }'`
+#		openqrm_post_event 0 "fai" 5 "openqrm-fai" "Adding Fai-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+
+		# prepare products for host
+		mkdir -p $OPENQRM_FAI_CONFIG_DIR/systems
+		FAI_PROFILES=`echo $PARAM_FAI_PRODUCTS | sed -e "s/,/ /g"`
+		echo "echo $FAI_PROFILES" > $OPENQRM_FAI_CONFIG_DIR/systems/$PARAM_RESOURCE_NAME.conf
+		chmod +x $OPENQRM_FAI_CONFIG_DIR/systems/$PARAM_RESOURCE_NAME.conf
+
+		echo "NOTICE: Adding Fai-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		# make sure it is not existing yet
+		fai-chboot -d $PARAM_RESOURCE_NAME &>/dev/null
+		if ! fai-chboot -IBv -k "live-netdev=eth0 monserver=$resource_ip" $PARAM_RESOURCE_NAME; then
+			openqrm_post_event 0 "fai" 2 "openqrm-fai" "Could not add $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC to Fai-server $resource_id/$resource_ip."
+			exit 1
+		fi
+		sleep 10
+		# start fai-monitord to send transition to openQRM while the system is installing
+		if [ -x /usr/bin/screen.real ]; then
+			RUNSCREEN="/usr/bin/screen.real"
+		else
+			RUNSCREEN=`which screen`
+		fi
+		SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+		echo "NOTICE: Starting Fai-monitord on $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		$RUNSCREEN -dmS $SCREEN_NAME $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/fai/sbin/openqrm-fai-monitord $PARAM_RESOURCE_ID $PARAM_RESOURCE_MAC $PARAM_RESOURCE_IP
+		;;
+
+	remove_fai_client)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			fai_usage
+		fi
+#		openqrm_post_event 0 "fai" 5 "openqrm-fai" "Adding Fai-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		echo "NOTICE: Removing Fai-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		if ! fai-chboot -d $PARAM_RESOURCE_NAME; then
+			openqrm_post_event 0 "fai" 2 "openqrm-fai" "Could not remove $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC from Fai-server $resource_id/$resource_ip."
+			exit 1
+		fi
+		rm -f $OPENQRM_FAI_CONFIG_DIR/systems/$PARAM_RESOURCE_NAME.conf
+		;;
+
+
+
+	post_profiles)
+		if [ "$PARAM_OPENQRM_USER" == "" ]; then
+			fai_usage
+		fi
+		if [ "$PARAM_OPENQRM_PASS" == "" ]; then
+			fai_usage
+		fi
+		FAI_STATUS_TMP=$resource_id.fai-profiles.list
+		> $FAI_STATUS_TMP
+		OPENQRM_FAI_PROFILES=""
+		for FCLASS in `find $OPENQRM_FAI_CONFIG_DIR -type f -name '*[A-Z]*'`; do
+			CFILE=`basename $FCLASS`
+			if ! echo $CFILE | grep "\." &>/dev/null; then
+				if ! echo $OPENQRM_FAI_PROFILES | grep -w $CFILE &>/dev/null; then
+					if ! echo $CFILE | grep FAIBASE* &>/dev/null; then
+						if [ "$CFILE" != "DEFAULT" ] && [ "$CFILE" != "GRUB" ]; then
+							OPENQRM_FAI_PROFILES="$OPENQRM_FAI_PROFILES,$CFILE"
+							echo "$CFILE,$CFILE" >> $FAI_STATUS_TMP
+						fi
+					fi
+				fi
+			fi
+		done
+		# add DHCPC
+		echo "DHCPC,DHCPC" >> $FAI_STATUS_TMP
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$PARAM_OPENQRM_USER --http-password=$PARAM_OPENQRM_PASS  --post-file=`$OPENQRM_POSTENCODE $FAI_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/fai/fai-action.php?fai_command=get_profiles; then
+			openqrm_post_event 0 "post_profiles" 3 "openqrm-fai" "Could not post list of profiles to the openQRM-server at $OPENQRM_SERVER_IP!"
+		fi
+		rm -f $FAI_STATUS_TMP
+		rm -f $FAI_STATUS_TMP.post
+		;;
+
+
+
+	*)
+		fai_usage
+		;;
+
+
+esac
+
