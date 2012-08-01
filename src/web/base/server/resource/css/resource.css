@@ -1,0 +1,50 @@
+.htmlobject_td.resource_id,
+.htmlobject_td.resource_icon,
+.htmlobject_td.resource_state {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.resource_hostname {
+	text-align:left;
+	vertical-align:top;
+}
+.htmlobject_td.resource_mac {
+	text-align:left;
+	width:110px;
+	vertical-align:top;
+}
+.htmlobject_td.resource_type {
+	text-align:left;
+	width:150px;
+	vertical-align:top;
+	text-decoration: none;
+}
+.htmlobject_td.resource_type a {
+	text-decoration: none;
+}
+.htmlobject_td.resource_ip {
+	text-align:left;
+	width:110px;
+	vertical-align:top;
+}
+.htmlobject_td.resource_memtotal {
+	text-align:left;
+	width:90px;
+	vertical-align:top;
+}
+.htmlobject_td.resource_cpunumber {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.resource_nics {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.resource_load {
+	text-align:left;
+	width:40px;
+	vertical-align:top;
+}
