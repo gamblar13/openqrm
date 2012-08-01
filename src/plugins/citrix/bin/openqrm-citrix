@@ -1,0 +1,547 @@
+#!/bin/bash
+# this script automatically manages citrix storage
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/include/openqrm-plugin-citrix-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/etc/openqrm-plugin-citrix.conf
+OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+resource_id=0
+resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+OPENQRM_CITRIX_VM_CONF_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/conf/vm"
+OPENQRM_CITRIX_HOST_CONF_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/conf/host"
+OPENQRM_CITRIX_STAT_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/"
+
+export LANG=C
+LINEBR='
+'
+# how long to wait for the VDI authentication
+CITRIX_AUTH_DELAY=10
+# place for clone-stat files
+CITRIX_TMP_DIR="/var/spool/citrix/openqrm"
+if [ ! -d "$CITRIX_TMP_DIR" ]; then
+	mkdir -p $CITRIX_TMP_DIR
+fi
+
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	citrix_log "ERROR: Please run this script as root!"
+	exit 6
+fi
+# deps installed ?
+if ! which screen 1>/dev/null; then
+	citrix_log "ERROR: The 'screen' utility is not installed! Please install and try again."
+	exit 6
+fi
+if [ ! -d "$OPENQRM_CITRIX_HOST_CONF_DIR" ]; then
+	mkdir -p $OPENQRM_CITRIX_HOST_CONF_DIR
+fi
+if [ ! -d "$OPENQRM_CITRIX_STAT_DIR" ]; then
+	mkdir -p $OPENQRM_CITRIX_STAT_DIR
+	chmod 777 $OPENQRM_CITRIX_STAT_DIR
+fi
+
+
+function citrix_usage() {
+
+	echo "Usage : $0 configure <-i citrix-ip> <-eu citrix-username> <-ep citrix-password> <-eh citrix-hostname>"
+	echo "        $0 add <-n image-name> <-i citrix-ip> <-s citrix-uuid> [-m size in MB] [-d description]"
+	echo "        $0 remove  <-i citrix-ip> <-r image-rootdevice> [-t <citrix-deployment>]"
+	echo "        $0 remove  <-i citrix-ip> <-n image-name> [-t <citrix-deployment>]"
+	echo "        $0 clone  <-i citrix-ip> <-r image-rootdevice> <-s image-snapshot-name> [-m size in MB]"
+	echo "        $0 auth  <-i citrix-ip> <-r image-rootdevice> <-a authidentifier>"
+	echo "        $0 post_vdi  <-i citrix-ip>"
+	echo "        $0 post_identifier  <-i citrix-ip> <-u username> <-p password>"
+	echo "        $0 host_shutdown/host_reboot <-i esx-server-ip>"
+	exit 1
+}
+
+
+
+FULL_COMMANDLINE="$0 $@"
+CITRIX_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			CITRIX_IMAGE_NAME=$2
+			shift
+			;;
+		-m)
+			CITRIX_IMAGE_SIZE=$2
+			shift
+			;;
+		-s)
+			CITRIX_IMAGE_SNAPSHOT_NAME=$2
+			shift
+			;;
+		-a)
+			CITRIX_IMAGE_AUTH=$2
+			shift
+			;;
+		-d)
+			CITRIX_IMAGE_DESCRIPTION=$2
+			shift
+			;;
+		-r)
+			CITRIX_IMAGE_ROOTDEVICE=$2
+			shift
+			;;
+		-u)
+			CITRIX_OPENQRM_USERNAME=$2
+			shift
+			;;
+		-p)
+			CITRIX_OPENQRM_PASSWORD=$2
+			shift
+			;;
+		-t)
+			CITRIX_DEPLOYMENT_TYPE=$2
+			shift
+			;;
+		-i)
+			CITRIX_SERVER_IP=$2
+			shift
+			;;
+		-x)
+			CITRIX_UUID=$2
+			shift
+			;;
+		-eu)
+			CITRIX_USERNAME=$2
+			shift
+			;;
+		-ep)
+			CITRIX_PASSWORD=$2
+			shift
+			;;
+		-eh)
+			CITRIX_HOSTNAME=$2
+			shift
+			;;
+
+		*)
+			citrix_log "ERROR: Free commandline arguments are not allowed"
+			citrix_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+
+
+# main
+if [ "$CITRIX_COMMAND" == "" ]; then
+	citrix_usage
+fi
+if [ "$CITRIX_SERVER_IP" == "" ]; then
+	citrix_usage
+fi
+# set default deployment type
+if [ "$CITRIX_DEPLOYMENT_TYPE" == "" ]; then
+	CITRIX_DEPLOYMENT_TYPE="citrix-deployment"
+fi
+# check params
+if [ "$CITRIX_COMMAND" == "post_identifier" ]; then
+		if [ "$CITRIX_OPENQRM_USERNAME" == "" ]; then
+			citrix_usage
+		fi
+		if [ "$CITRIX_OPENQRM_PASSWORD" == "" ]; then
+			citrix_usage
+		fi
+else
+	if [ "$CITRIX_COMMAND" != "list" ] && [ "$CITRIX_COMMAND" != "post_vdi" ] && [ "$CITRIX_COMMAND" != "auth" ] && [ "$CITRIX_COMMAND" != "clone" ] && [ "$CITRIX_COMMAND" != "remove" ] && [ "$CITRIX_COMMAND" != "configure" ] && [ "$CITRIX_COMMAND" != "host_shutdown" ] && [ "$CITRIX_COMMAND" != "host_reboot" ]; then
+		if [ "$CITRIX_IMAGE_NAME" == "" ]; then
+			citrix_usage
+		fi
+	fi
+fi
+CITRIX_SERVER_PASSWD_FILE=$OPENQRM_CITRIX_HOST_CONF_DIR/$CITRIX_SERVER_IP.pwd
+if [ "$CITRIX_COMMAND" != "configure" ]; then
+	if [ ! -f $CITRIX_SERVER_PASSWD_FILE ]; then
+		citrix_log openqrm-citrix "No password file ($CITRIX_SERVER_PASSWD_FILE) existing for Citrix host $CITRIX_SERVER_IP"
+		openqrm_post_event 0 "$CITRIX_COMMAND" 3 "openqrm-citrix" "No password file ($CITRIX_SERVER_PASSWD_FILE) existing for Citrix host $CITRIX_SERVER_IP"
+		exit 1
+	fi
+fi
+CITRIX_VDI_LIST=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/$CITRIX_SERVER_IP.vdi_list
+CITRIX_SR_LIST=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/$CITRIX_SERVER_IP.ds_select
+mkdir -p `dirname $CITRIX_VDI_LIST`
+chmod 777 `dirname $CITRIX_VDI_LIST`
+
+
+case "$CITRIX_COMMAND" in
+
+	configure)
+		if [ "$CITRIX_USERNAME" == "" ]; then
+			openqrm_post_event 0 "configure" 3 "openqrm-citrix" "Wrong usage, Citrix XenServer Host username missing!"
+			citrix_log configure "Wrong usage, Citrix XenServer Host username missing!"
+			citrix_usage
+		fi
+		if [ "$CITRIX_PASSWORD" == "" ]; then
+			openqrm_post_event 0 "configure" 3 "openqrm-citrix" "Wrong usage, Citrix XenServer Host password missing!"
+			citrix_log configure "Wrong usage, Citrix XenServer Host password missing!"
+			citrix_usage
+		fi
+		if [ "$CITRIX_HOSTNAME" == "" ]; then
+			openqrm_post_event 0 "configure" 3 "openqrm-citrix" "Wrong usage, Citrix XenServer Host hostname missing!"
+			citrix_log configure "Wrong usage, Citrix XenServer Host hostname missing!"
+			citrix_usage
+		fi
+		CITRIX_HOST_IP=$CITRIX_SERVER_IP
+		citrix_log "Creating configuration for Citrix XenServer Host $CITRIX_HOST_IP"
+		citrix_lock aquire
+
+		# create the pwd file for the xe tool
+		echo "$CITRIX_USERNAME" > $CITRIX_SERVER_PASSWD_FILE
+		echo "$CITRIX_PASSWORD" >> $CITRIX_SERVER_PASSWD_FILE
+		# test if the connection credentials work
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-list 1>/dev/null; then
+			# notify openQRM
+			rm -f $CITRIX_SERVER_PASSWD_FILE
+			echo "failed" > $OPENQRM_CITRIX_STAT_DIR/$CITRIX_HOST_IP.integrated_successful.tmp
+			chmod 777 $OPENQRM_CITRIX_STAT_DIR/$CITRIX_HOST_IP.integrated_successful.tmp
+			mv $OPENQRM_CITRIX_STAT_DIR/$CITRIX_HOST_IP.integrated_successful.tmp $OPENQRM_CITRIX_STAT_DIR/$CITRIX_HOST_IP.integrated_successful
+			citrix_lock release
+			exit 1
+		fi
+		echo "CITRIX_USERNAME=$CITRIX_USERNAME" > $OPENQRM_CITRIX_HOST_CONF_DIR/$CITRIX_HOST_IP.conf
+		echo "CITRIX_PASSWORD=$CITRIX_PASSWORD" >> $OPENQRM_CITRIX_HOST_CONF_DIR/$CITRIX_HOST_IP.conf
+		echo "CITRIX_HOST_IP=$CITRIX_HOST_IP" >> $OPENQRM_CITRIX_HOST_CONF_DIR/$CITRIX_HOST_IP.conf
+		echo "CITRIX_HOSTNAME=$CITRIX_HOSTNAME" >> $OPENQRM_CITRIX_HOST_CONF_DIR/$CITRIX_HOST_IP.conf
+		# notify openQRM
+		echo "success" > $OPENQRM_CITRIX_STAT_DIR/$CITRIX_HOST_IP.integrated_successful.tmp
+		chmod 777 $OPENQRM_CITRIX_STAT_DIR/$CITRIX_HOST_IP.integrated_successful.tmp
+		mv $OPENQRM_CITRIX_STAT_DIR/$CITRIX_HOST_IP.integrated_successful.tmp $OPENQRM_CITRIX_STAT_DIR/$CITRIX_HOST_IP.integrated_successful
+		citrix_lock release
+		;;
+
+
+	add)
+		if [ "$CITRIX_UUID" == "" ]; then
+			citrix_usage
+		fi
+		if [ "$CITRIX_IMAGE_SIZE" == "" ]; then
+			CITRIX_IMAGE_SIZE=$DEFAULT_IMAGE_SIZE
+		fi
+		export CITRIX_IMAGE_SIZE
+		citrix_lock aquire
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-create sr-uuid=$CITRIX_UUID name-label="$CITRIX_IMAGE_NAME" type="system" virtual-size="$CITRIX_IMAGE_SIZE"; then
+			citrix_log openqrm-citrix "Failed to create new VDI $CITRIX_IMAGE_NAME!"
+			openqrm_post_event 0 "remove" 3 "openqrm-citrix" "Failed to create new VDI $CITRIX_IMAGE_NAME!"
+			citrix_lock release
+			exit 1
+		fi
+		# get the new uuid
+		VDI_UUID=`$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-list | grep -B1 -w "$CITRIX_IMAGE_NAME" | grep ^uuid | cut -d':' -f2 | awk '{ print $1 }'`
+		if [ "$VDI_UUID" == "" ]; then
+			citrix_log openqrm-citrix "Failed to get the UUID from VDI $CITRIX_IMAGE_NAME!"
+			openqrm_post_event 0 "remove" 3 "openqrm-citrix" "Failed to get the UUID from VDI $CITRIX_IMAGE_NAME!"
+			citrix_lock release
+			exit 1
+		fi
+		# set description
+		if [ "$CITRIX_IMAGE_DESCRIPTION" != "" ]; then
+			CITRIX_IMAGE_DESCRIPTION=`echo $CITRIX_IMAGE_DESCRIPTION | sed -e "s#@# #g"`
+			if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-param-set uuid=$VDI_UUID name-description="$CITRIX_IMAGE_DESCRIPTION"; then
+				openqrm_post_event 0 "$CITRIX_IMAGE_SNAPSHOT_NAME" 10 "openqrm-citrix" "Failed to set the description for VDI $CITRIX_IMAGE_NAME!"
+				openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix" "Failed to set the description for VDI $CITRIX_IMAGE_NAME!"
+				citrix_lock release
+				exit 1
+			fi
+		fi
+
+		citrix_lock release
+		# let xenserver settle after adding
+		sleep 2
+		$0 post_vdi -i $CITRIX_SERVER_IP -u $CITRIX_OPENQRM_USERNAME -p $CITRIX_OPENQRM_PASSWORD -t $CITRIX_DEPLOYMENT_TYPE
+		openqrm_post_event 0 "add" 5 "openqrm-citrix" "Created VDI $CITRIX_IMAGE_NAME."
+		;;
+
+	remove)
+		# remove by name or uuid ?
+		if [ "$CITRIX_IMAGE_ROOTDEVICE" == "" ] && [ "$CITRIX_IMAGE_NAME" == "" ]; then
+			citrix_usage
+		fi
+		citrix_lock aquire
+		if [ "$CITRIX_IMAGE_ROOTDEVICE" != "" ]; then
+			VDI_UUID=$CITRIX_IMAGE_ROOTDEVICE
+		else
+			VDI_UUID=`$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-list | grep -B1 -w "$CITRIX_IMAGE_NAME" | grep ^uuid | cut -d':' -f2 | awk '{ print $1 }'`
+			if [ "$VDI_UUID" == "" ]; then
+				citrix_log openqrm-citrix "VDI $CITRIX_IMAGE_NAME does not exist on this Host!"
+				openqrm_post_event 0 "remove" 3 "openqrm-citrix" "VDI $CITRIX_IMAGE_NAME does not exist on this Host!"
+				citrix_lock release
+				exit 1
+			fi
+		fi
+		if [ "$CITRIX_IMAGE_NAME" == "" ]; then
+			CITRIX_IMAGE_NAME=$VDI_UUID
+		fi
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-destroy uuid=$VDI_UUID; then
+			citrix_log openqrm-citrix "Failed to remove VDI $CITRIX_IMAGE_NAME!"
+			openqrm_post_event 0 "remove" 3 "openqrm-citrix" "Failed to remove VDI $CITRIX_IMAGE_NAME!"
+			citrix_lock release
+			exit 1
+		fi
+		citrix_lock release
+		$0 post_vdi -i $CITRIX_SERVER_IP -u $CITRIX_OPENQRM_USERNAME -p $CITRIX_OPENQRM_PASSWORD -t $CITRIX_DEPLOYMENT_TYPE
+		openqrm_post_event 0 "remove" 5 "openqrm-citrix" "Removed VDI $CITRIX_IMAGE_NAME."
+		;;
+
+
+	auth)
+		# this is just for starting auth, make sure the device is there, otherwise wait
+		if [ "$CITRIX_OPENQRM_USERNAME" != "" ] && [ "$CITRIX_OPENQRM_PASSWORD" != "" ] && [ "$CITRIX_IMAGE_NAME" != "" ]; then
+			#sleep $CITRIX_AUTH_DELAY
+			# if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+			if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$CITRIX_OPENQRM_USERNAME --http-password=$CITRIX_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/citrix/citrix-action.php?citrix_command=auth_finished&citrix_image_name=$CITRIX_IMAGE_NAME"; then
+				openqrm_post_event 0 "auth" 2 "openqrm-citrix" "Could not remove auth-blocker for VDI $CITRIX_IMAGE_NAME!"
+			fi
+		fi
+		;;
+
+	list)
+		echo "list"
+		;;
+	post_vdi)
+		VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE3=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE4=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE5=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+
+		# first create the nfs sr-list
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-list type=nfs >$VM_TMPFILE4; then
+			citrix_log openqrm-citrix "Failed get the NFS SR List!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix" "Failed get the NFS SR List!"
+			exit 1
+		fi
+		cat $VM_TMPFILE4 | grep ^uuid | cut -d':' -f2 > $VM_TMPFILE5
+		> $CITRIX_SR_LIST
+		for CITRIX_SR_UUID in `cat $VM_TMPFILE5`; do
+			CITRIX_SR_NAME=`grep -A1 $CITRIX_SR_UUID $VM_TMPFILE4 | grep name-label | cut -d':' -f2 | awk '{ print $1 }' | sed -e "s/ \{1,\}/@/g"`
+			echo "$CITRIX_SR_UUID:$CITRIX_SR_NAME" >> $CITRIX_SR_LIST
+		done
+		>$VM_TMPFILE4
+		# second create the iscsi sr-list
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-list type=lvmoiscsi >$VM_TMPFILE4; then
+			citrix_log openqrm-citrix "Failed get the iSCSI SR List!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix" "Failed get the iSCSI SR List!"
+			exit 1
+		fi
+		cat $VM_TMPFILE4 | grep ^uuid | cut -d':' -f2 > $VM_TMPFILE5
+		for CITRIX_SR_UUID in `cat $VM_TMPFILE5`; do
+			CITRIX_SR_NAME=`grep -A1 $CITRIX_SR_UUID $VM_TMPFILE4 | grep name-label | cut -d':' -f2 | awk '{ print $1 }' | sed -e "s/ \{1,\}/@/g"`
+			echo "$CITRIX_SR_UUID:$CITRIX_SR_NAME" >> $CITRIX_SR_LIST
+		done
+
+		# vdi list
+		> $VM_TMPFILE3
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-list >$VM_TMPFILE1; then
+			citrix_log openqrm-citrix "Failed get the VDI List!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix" "Failed get the VDI List!"
+			exit 1
+		fi
+		cat $VM_TMPFILE1 | grep ^uuid | cut -d':' -f2 > $VM_TMPFILE2
+		for CITRIX_VDI_UUID in `cat $VM_TMPFILE2`; do
+			CITRIX_VDI_NAME=`grep -A1 $CITRIX_VDI_UUID $VM_TMPFILE1 | grep name-label | cut -d':' -f2 | sed -e "s/ \{1,\}/@/g"`
+			CITRIX_VDI_DESCRIPTION=`grep -A2 $CITRIX_VDI_UUID $VM_TMPFILE1 | grep name-description | cut -d':' -f2 | sed -e "s/ \{1,\}/@/g"`
+			CITRIX_VDI_SR_UUID=`grep -A3 $CITRIX_VDI_UUID $VM_TMPFILE1 | grep sr-uuid | cut -d':' -f2`
+			CITRIX_VDI_SR_NAME=`cat $CITRIX_SR_LIST | grep $CITRIX_VDI_SR_UUID | cut -d':' -f2`
+			CITRIX_VDI_SIZE=`grep -A4 $CITRIX_VDI_UUID $VM_TMPFILE1 | grep virtual-size | cut -d':' -f2 | sed -e "s/ \{1,\}/@/g"`
+			echo "$CITRIX_VDI_UUID:$CITRIX_VDI_NAME:$CITRIX_VDI_DESCRIPTION:$CITRIX_VDI_SR_NAME:$CITRIX_VDI_SIZE" >> $VM_TMPFILE3
+		done
+		/bin/cp -f $VM_TMPFILE3 $CITRIX_VDI_LIST
+		chmod 777 $CITRIX_VDI_LIST
+		rm -f $VM_TMPFILE1 $VM_TMPFILE2 $VM_TMPFILE3
+		;;
+
+	post_identifier)
+		STORAGE_STATUS_TMP=$CITRIX_SERVER_IP.vdi.citrix-deployment.ident
+		> $STORAGE_STATUS_TMP
+		VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-list >$VM_TMPFILE1; then
+			citrix_log openqrm-citrix "Failed get the VDI List!"
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix" "Failed get the VDI List!"
+			exit 1
+		fi
+		cat $VM_TMPFILE1 | grep ^uuid | cut -d':' -f2 > $VM_TMPFILE2
+		for CITRIX_VDI_UUID in `cat $VM_TMPFILE2`; do
+			CITRIX_VDI_NAME=`grep -A1 $CITRIX_VDI_UUID $VM_TMPFILE1 | grep name-label | cut -d':' -f2 | sed -e "s/ \{1,\}/@/g"`
+			echo "$CITRIX_VDI_UUID:$CITRIX_VDI_NAME" >> $STORAGE_STATUS_TMP
+		done
+		rm -f $VM_TMPFILE1 $VM_TMPFILE2
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$CITRIX_OPENQRM_USERNAME --http-password=$CITRIX_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/citrix/citrix-action.php?citrix_command=get_ident; then
+			openqrm_post_event 0 "post_identifier" 2 "openqrm-citrix" "Could not post the VDI identifier to the openQRM-server at $OPENQRM_SERVER_IP!"
+		fi
+		rm -f $STORAGE_STATUS_TMP
+		rm -f $STORAGE_STATUS_TMP.post
+		;;
+
+
+
+	clone)
+		if [ "$CITRIX_IMAGE_SNAPSHOT_NAME" == "" ]; then
+			citrix_usage
+		fi
+		# clone by name or uuid ?
+		if [ "$CITRIX_IMAGE_ROOTDEVICE" == "" ] && [ "$CITRIX_IMAGE_NAME" == "" ]; then
+			citrix_usage
+		fi
+
+		# re-run in background via screen
+		if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+			if [ -x /usr/bin/screen.real ]; then
+				RUNSCREEN="/usr/bin/screen.real"
+			else
+				RUNSCREEN=`which screen`
+			fi
+			export RUN_IN_BACKGROUND=true
+			SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+			$RUNSCREEN -dmS $SCREEN_NAME $FULL_COMMANDLINE
+			exit
+		fi
+
+		citrix_lock aquire
+		if [ "$CITRIX_IMAGE_ROOTDEVICE" != "" ]; then
+			VDI_UUID=$CITRIX_IMAGE_ROOTDEVICE
+		else
+			VDI_UUID=`$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-list | grep -B1 -w "$CITRIX_IMAGE_NAME" | grep ^uuid | cut -d':' -f2 | awk '{ print $1 }'`
+			if [ "$VDI_UUID" == "" ]; then
+				citrix_log openqrm-citrix "VDI $CITRIX_IMAGE_NAME does not exist on this Host!"
+				openqrm_post_event 0 "remove" 3 "openqrm-citrix" "VDI $CITRIX_IMAGE_NAME does not exist on this Host!"
+				citrix_lock release
+				exit 1
+			fi
+		fi
+		if [ "$CITRIX_IMAGE_NAME" == "" ]; then
+			CITRIX_IMAGE_NAME=$VDI_UUID
+		fi
+		# active event
+		openqrm_post_event 0 "$CITRIX_IMAGE_SNAPSHOT_NAME" 9 "openqrm-citrix" "Started to clone $CITRIX_IMAGE_NAME to $CITRIX_IMAGE_SNAPSHOT_NAME"
+
+		# get sr uuid
+		VDI_SR_UUID=`$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-list | grep -A3 $VDI_UUID | grep sr-uuid | cut -d':' -f2 | awk '{ print $1 }'`
+		if [ "$VDI_SR_UUID" == "" ]; then
+			openqrm_post_event 0 "$CITRIX_IMAGE_SNAPSHOT_NAME" 10 "openqrm-citrix" "Started to clone $CITRIX_IMAGE_NAME to $CITRIX_IMAGE_SNAPSHOT_NAME"
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix" "Failed get the VDIs SR uuid!"
+			citrix_lock release
+			exit 1
+		fi
+		# send clone command, this command will block until clone is finished
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-copy uuid=$VDI_UUID sr-uuid=$VDI_SR_UUID > $CITRIX_TMP_DIR/$CITRIX_IMAGE_SNAPSHOT_NAME; then
+			openqrm_post_event 0 "$CITRIX_IMAGE_SNAPSHOT_NAME" 10 "openqrm-citrix" "Started to clone $CITRIX_IMAGE_NAME to $CITRIX_IMAGE_SNAPSHOT_NAME"
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix" "Failed to clone VDI $VDI_UUID!"
+			citrix_lock release
+			exit 1
+		fi
+		# here we need to re-name the new vdi to image-snapshot-name
+		NEW_VDI_UUID=`cat $CITRIX_TMP_DIR/$CITRIX_IMAGE_SNAPSHOT_NAME`
+		if [ "$NEW_VDI_UUID" == "" ]; then
+			openqrm_post_event 0 "$CITRIX_IMAGE_SNAPSHOT_NAME" 10 "openqrm-citrix" "Started to clone $CITRIX_IMAGE_NAME to $CITRIX_IMAGE_SNAPSHOT_NAME"
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix" "Failed get the new VDI uuid!"
+			citrix_lock release
+			exit 1
+		fi
+		# set new name
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE vdi-param-set uuid=$NEW_VDI_UUID name-label="$CITRIX_IMAGE_SNAPSHOT_NAME" name-description="Clone from $CITRIX_IMAGE_NAME"; then
+			openqrm_post_event 0 "$CITRIX_IMAGE_SNAPSHOT_NAME" 10 "openqrm-citrix" "Started to clone $CITRIX_IMAGE_NAME to $CITRIX_IMAGE_SNAPSHOT_NAME"
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-citrix" "Failed to re-name new VDI $NEW_VDI_UUID!"
+			citrix_lock release
+			exit 1
+		fi
+		citrix_lock release
+		openqrm_post_event 0 "$CITRIX_IMAGE_SNAPSHOT_NAME" 10 "openqrm-citrix" "Started to clone $CITRIX_IMAGE_NAME to $CITRIX_IMAGE_SNAPSHOT_NAME"
+		# let xenserver settle after cloning
+		sleep 2
+		# here we notify openQRM that cloning has finished
+		# this is for the cloud clone command of private images
+		if [ "$CITRIX_OPENQRM_USERNAME" != "" ] && [ "$CITRIX_OPENQRM_PASSWORD" != "" ]; then
+			CLONE_FINISHED="$CITRIX_IMAGE_SNAPSHOT_NAME.clone"
+			echo "$NEW_VDI_UUID" > $CLONE_FINISHED
+			if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$CITRIX_OPENQRM_USERNAME --http-password=$CITRIX_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $CLONE_FINISHED` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/citrix/citrix-action.php?citrix_command=clone_finished; then
+				openqrm_post_event 0 "clone" 2 "openqrm-citrix" "Could not post clone-finished status to the openQRM-server at $OPENQRM_SERVER_IP!"
+			fi
+			# post vdi
+			$0 post_vdi -i $CITRIX_SERVER_IP -u $CITRIX_OPENQRM_USERNAME -p $CITRIX_OPENQRM_PASSWORD -t $CITRIX_DEPLOYMENT_TYPE
+		fi
+		openqrm_post_event 0 "clone" 5 "openqrm-citrix" "Cloned VDI $VDI_UUID to $CITRIX_IMAGE_SNAPSHOT_NAME"
+		;;
+
+
+	host_shutdown)
+		citrix_log openqrm-citrix "Shutting down XenServer at $CITRIX_SERVER_IP!"
+		citrix_lock aquire
+		if ! $CITRIX_XE_BINARY host-disable -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE; then
+			citrix_log openqrm-citrix "ERROR: Failed to disable XenServer for shutdown at $CITRIX_SERVER_IP!"
+			openqrm_post_event 0 "host_shutdown" 3 "openqrm-citrix" "Failed to disable XenServer for shutdown at $CITRIX_SERVER_IP!"
+			citrix_lock release
+			exit 1
+		fi
+		if ! $CITRIX_XE_BINARY host-shutdown -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE; then
+			citrix_log openqrm-citrix "ERROR: Failed to shutdown XenServer at $CITRIX_SERVER_IP!"
+			openqrm_post_event 0 "host_shutdown" 3 "openqrm-citrix" "Failed to shutdown XenServer at $CITRIX_SERVER_IP!"
+			citrix_lock release
+			exit 1
+		fi
+		citrix_lock release
+		;;
+
+
+	host_reboot)
+		citrix_log openqrm-citrix "Shutting down XenServer at $CITRIX_SERVER_IP!"
+		citrix_lock aquire
+		if ! $CITRIX_XE_BINARY host-disable -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE; then
+			citrix_log openqrm-citrix "ERROR: Failed to disable XenServer for reboot at $CITRIX_SERVER_IP!"
+			openqrm_post_event 0 "host_shutdown" 3 "openqrm-citrix" "Failed to disable XenServer for reboot at $CITRIX_SERVER_IP!"
+			citrix_lock release
+			exit 1
+		fi
+		if ! $CITRIX_XE_BINARY host-reboot -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE; then
+			citrix_log openqrm-citrix "ERROR: Failed to reboot XenServer at $CITRIX_SERVER_IP!"
+			openqrm_post_event 0 "host_shutdown" 3 "openqrm-citrix" "Failed to reboot XenServer at $CITRIX_SERVER_IP!"
+			citrix_lock release
+			exit 1
+		fi
+		citrix_lock release
+		;;
+
+
+	*)
+		citrix_usage
+		;;
+
+
+esac
+

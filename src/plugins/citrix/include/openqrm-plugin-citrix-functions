@@ -1,0 +1,70 @@
+#!/bin/bash
+# this is the functions file for the citrix-plugin
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+CITRIX_SERVER_LOCK_FILE=/var/run/openqrm/citrix-plugin.lock
+CITRIX_DISCOVERY_LOCK_FILE=/var/run/openqrm/citrix-discovery.lock
+CITRIX_SERVER_LOCK_FILE=/var/run/openqrm/citrix-plugin.lock
+CITRIX_SERVER_LOCK_DELAY=5
+CITRIX_SERVER_LOCK_RETRY=100
+CITRIX_SERVER_LOCK_TIMEOUT=500
+
+CITRIX_XE_BINARY=/usr/bin/xe
+
+
+################ common citrix functions
+
+# logs for citrix
+function citrix_log() {
+	local COMPONENT=$1
+	shift
+	local MESSAGE=$@
+	logger -i -t "citrix plug-in" "$COMPONENT : $MESSAGE"
+}
+
+
+# locking function
+function citrix_lock() {
+	local COMMAND=$1
+	local RET=1
+
+	if [ ! -d `dirname $CITRIX_SERVER_LOCK_FILE` ]; then
+		mkdir -p `dirname $CITRIX_SERVER_LOCK_FILE`
+	fi
+	case "$COMMAND" in
+		aquire)
+				lockfile -s $CITRIX_SERVER_LOCK_DELAY -r $CITRIX_SERVER_LOCK_RETRY -l $CITRIX_SERVER_LOCK_TIMEOUT $CITRIX_SERVER_LOCK_FILE
+				RET=$?
+				citrix_log citrix_lock "Aquired the lock"
+				return $RET
+				;;
+		release)
+				/bin/rm -f $CITRIX_SERVER_LOCK_FILE
+				RET=$?
+				citrix_log citrix_lock "Released the lock"
+				return $RET
+				;;
+		*)
+			citrix_log citrix_lock "No such command. Try 'aquire' or 'release'"
+			return 1
+			;;
+	esac
+}
+
+
+
+################ citrix functions
+

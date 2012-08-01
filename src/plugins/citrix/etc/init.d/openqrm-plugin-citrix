@@ -1,0 +1,139 @@
+#!/bin/bash
+# init script for the openQRM citrix-plugin
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/include/openqrm-plugin-citrix-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/etc/openqrm-plugin-citrix.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export LANG=C
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+# define wget to use with https
+if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+
+function openqrm_plugin_citrix_check_for_xe() {
+	if [ ! -x $CITRIX_XE_BINARY ]; then
+		echo "openqrm-plugin-citrix" "Xe binary ($CITRIX_XE_BINARY) missing! Could not enable the Citrix plugin"
+		echo "Please install the Xe binary (xen-server-tools package) !"
+		openqrm_post_event 0 "get" 3 "openqrm-plugin-citrix" "Xe binary ($CITRIX_XE_BINARY) missing! Could not enable the Citrix plugin"
+		openqrm_post_event 0 "get" 3 "openqrm-plugin-citrix" "Please install the Xe binary (xen-server-tools package) !"
+		exit 1
+	fi
+
+}
+
+
+function openqrm_plugin_citrix_start() {
+	echo "Starting the openQRM citrix-plugin"
+	openqrm_plugin_citrix_check_for_xe
+	touch $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/citrix/.running
+}
+
+
+function openqrm_plugin_citrix_stop() {
+	echo "Stopping the openQRM citrix-plugin"
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/citrix/.running
+}
+
+function openqrm_plugin_citrix_uninstall() {
+	local USERNAME=$1
+	local PASSWORD=$2
+	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
+		echo -n "citrix: Please give a username to uninstall the plugin : "
+		read USERNAME
+		echo
+		echo -n "citrix: Please give the password for user $USERNAME : "
+		read PASSWORD
+		echo
+	fi
+	echo "Uninstalling the openQRM citrix-plugin"
+	openqrm_plugin_citrix_stop
+	# removing the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/citrix/citrix-action.php?citrix_command=uninstall"; then
+		citrix_log uninstall "ERROR: Could not drop the citrix plugin tables in the database!"
+	fi
+	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD citrix
+	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD citrix-vm
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/citrix
+	rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat
+}
+
+function openqrm_plugin_citrix_init() {
+	local USERNAME=$1
+	local PASSWORD=$2
+	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
+		echo -n "citrix: Please give a username to init the plugin : "
+		read USERNAME
+		echo
+		echo -n "citrix: Please give the password for user $USERNAME : "
+		read PASSWORD
+		echo
+	fi
+	echo "Initializing the openQRM citrix-plugin"
+	openqrm_plugin_citrix_check_for_xe
+	# adding virtualization type
+	openqrm_server_add_virtualization_type $USERNAME $PASSWORD citrix "Citrix Host"
+	openqrm_server_add_virtualization_type $USERNAME $PASSWORD citrix-vm "Citrix VM"
+	# linking the web dir
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/citrix
+	# creating the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/citrix/citrix-action.php?citrix_command=init"; then
+		citrix_log init "ERROR: Could not create the citrix plugin tables in the database!"
+		return 1
+	fi
+	# create dir for stat files
+	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat
+	chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat
+	
+}
+
+USER=$2
+PASS=$3
+
+case "$1" in
+	start)
+		openqrm_plugin_citrix_start
+		;;
+	stop)
+		openqrm_plugin_citrix_stop
+		;;
+	restart)
+		openqrm_plugin_citrix_stop
+		sleep 1
+		openqrm_plugin_citrix_start
+		;;
+	init)
+		openqrm_plugin_citrix_init $USER $PASS
+		;;
+	uninstall)
+		openqrm_plugin_citrix_uninstall $USER $PASS
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|init|uninstall}"
+		exit 1
+
+esac
+exit $?
+
+
+
+

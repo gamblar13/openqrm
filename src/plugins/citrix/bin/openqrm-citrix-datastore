@@ -1,0 +1,312 @@
+#!/bin/bash
+# this script automatically manages citrix datastores
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/include/openqrm-plugin-citrix-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/etc/openqrm-plugin-citrix.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+OPENQRM_CITRIX_HOST_CONF_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/conf/host"
+OPENQRM_CITRIX_STAT_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/"
+export LANG=C
+ORG_IFS="$IFS"
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	citrix_log "ERROR: Please run this script as root!"
+	exit 6
+fi
+# deps installed ?
+if ! which screen 1>/dev/null; then
+	citrix_log "ERROR: The 'screen' utility is not installed! Please install and try again."
+	exit 6
+fi
+if [ ! -d "$OPENQRM_CITRIX_HOST_CONF_DIR" ]; then
+	mkdir -p $OPENQRM_CITRIX_HOST_CONF_DIR
+fi
+if [ ! -d "$OPENQRM_CITRIX_STAT_DIR" ]; then
+	mkdir -p $OPENQRM_CITRIX_STAT_DIR
+	chmod 777 $OPENQRM_CITRIX_STAT_DIR
+fi
+
+
+
+function citrix_usage() {
+	echo "Usage : $0 add_nas <-i xenserver-ip> <-s nas-ip> <-d nas-path> <-n ds-name>"
+	echo "        $0 remove_nas <-i xenserver-ip> <-n ds-name>"
+	echo "        $0 add_iscsi <-i xenserver-ip> <-n ds-name> <-t iscsi-target-iqn> <-q iscsi-target-ip> [-u iscsi-username] [-p iscsi-password] [-t iscsi-target-iqn]"
+	echo "        $0 remove_iscsi <-i xenserver-ip> <-n ds-name>"
+	echo "        $0 list <-i xenserver-ip>"
+	echo "        $0 post_ds_list <-i xenserver-ip>"
+	exit 1
+}
+
+
+
+CITRIX_COMMAND=$1
+shift
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			CITRIX_DATASTORE_NAME=$2
+			shift
+			;;
+		-i)
+			CITRIX_SERVER_IP=$2
+			shift
+			;;
+		-s)
+			CITRIX_DATASTORE_IP=$2
+			shift
+			;;
+		-d)
+			CITRIX_DATASTORE_NAS_PATH=$2
+			shift
+			;;
+		-t)
+			CITRIX_DATASTORE_ISCSI_TARGET_IQN=$2
+			shift
+			;;
+		-q)
+			CITRIX_DATASTORE_ISCSI_TARGET_IP=$2
+			shift
+			;;
+		-u)
+			CITRIX_DATASTORE_ISCSI_USERNAME=$2
+			shift
+			;;
+		-p)
+			CITRIX_DATASTORE_ISCSI_PASSWORD=$2
+			shift
+			;;
+
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			citrix_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+# command set ?
+if [ "$CITRIX_COMMAND" == "" ]; then
+	openqrm_post_event 0 "parameter_check" 3 "openqrm-citrix-datastore" "Wrong usage, no command given!"
+	citrix_log parameter-check "Wrong usage, no command given!"
+	citrix_usage
+fi
+# XenServer ip set ?
+if [ "$CITRIX_SERVER_IP" == "" ]; then
+	openqrm_post_event 0 "parameter_check" 3 "openqrm-citrix-datastore" "Wrong usage, no XenServer ip-adress given!"
+	citrix_log parameter-check "Wrong usage, no XenServer ip-adress given!"
+	citrix_usage
+fi
+# host configured ?
+CITRIX_SERVER_PASSWD_FILE=$OPENQRM_CITRIX_HOST_CONF_DIR/$CITRIX_SERVER_IP.pwd
+if [ "$CITRIX_COMMAND" != "configure" ]; then
+	if [ ! -f $CITRIX_SERVER_PASSWD_FILE ]; then
+		citrix_log openqrm-citrix "No password file ($CITRIX_SERVER_PASSWD_FILE) existing for Citrix host $CITRIX_SERVER_IP"
+		openqrm_post_event 0 "$CITRIX_COMMAND" 3 "openqrm-citrix" "No password file ($CITRIX_SERVER_PASSWD_FILE) existing for Citrix host $CITRIX_SERVER_IP"
+		exit 1
+	fi
+fi
+CITRIX_VDI_LIST=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/vdi.stat.$CITRIX_SERVER_IP
+CITRIX_SR_LIST=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/sr.stat.$CITRIX_SERVER_IP
+mkdir -p `dirname $CITRIX_VDI_LIST`
+chmod 777 `dirname $CITRIX_VDI_LIST`
+
+# main
+case "$CITRIX_COMMAND" in
+
+
+	add_nas)
+		# check requirements
+		if [ "$CITRIX_DATASTORE_IP" == "" ]; then
+			openqrm_post_event 0 "add_nas" 3 "openqrm-citrix-datastore" "Wrong usage, Datastore IP address missing!"
+			citrix_usage
+		fi
+		if [ "$CITRIX_DATASTORE_NAS_PATH" == "" ]; then
+			openqrm_post_event 0 "add_nas" 3 "openqrm-citrix-datastore" "Wrong usage, NAS Path missing!"
+			citrix_usage
+		fi
+		if [ "$CITRIX_DATASTORE_NAME" == "" ]; then
+			openqrm_post_event 0 "add_nas" 3 "openqrm-citrix-datastore" "Wrong usage, Datastore Name missing!"
+			citrix_usage
+		fi
+		# use API to connect the NAS
+		citrix_lock aquire
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-create content-type=user type=nfs name-label="$CITRIX_DATASTORE_NAME" shared=true device-config-server=$CITRIX_DATASTORE_IP device-config-serverpath="$CITRIX_DATASTORE_NAS_PATH"; then
+			citrix_log openqrm-citrix "ERROR: Failed to add NAS Datastore $CITRIX_DATASTORE_IP:$CITRIX_DATASTORE_NAS_PATH!"
+			openqrm_post_event 0 "add_nas" 3 "openqrm-citrix-datastore" "Failed to add NAS Datastore $CITRIX_DATASTORE_IP:$CITRIX_DATASTORE_NAS_PATH!"
+			citrix_lock release
+			exit 1
+		fi
+		citrix_lock release
+		$0 post_ds_list -i $CITRIX_SERVER_IP
+		;;
+
+	remove_iscsi | remove_nas)
+		if [ "$CITRIX_DATASTORE_NAME" == "" ]; then
+			openqrm_post_event 0 "remove_nas/iscsi" 3 "openqrm-citrix-datastore" "Wrong usage, Datastore Name missing!"
+			citrix_usage
+		fi
+		citrix_lock aquire
+		# get sr uuid
+		SR_UUID=`$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-list name-label="$CITRIX_DATASTORE_NAME" | grep ^uuid | head -n1 | cut -d':' -f2 | awk '{ print $1 }'`
+		if [ "$SR_UUID" ==  "" ]; then
+			citrix_log openqrm-citrix "ERROR: Failed to find UUID of NAS Datastore $CITRIX_DATASTORE_NAME!"
+			openqrm_post_event 0 "remove_nas/iscsi" 3 "openqrm-citrix-datastore" "Failed to find UUID of NAS Datastore $CITRIX_DATASTORE_NAME!"
+			citrix_lock release
+			exit 1
+		fi
+		# get pdb
+		PBD_UUID=`$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE pbd-list sr-uuid=$SR_UUID | grep ^uuid | head -n1 | cut -d':' -f2 | awk '{ print $1 }'`
+		if [ "$PBD_UUID" ==  "" ]; then
+			citrix_log openqrm-citrix "ERROR: Failed to find physical device of NAS Datastore $CITRIX_DATASTORE_NAME!"
+			openqrm_post_event 0 "remove_nas/iscsi" 3 "openqrm-citrix-datastore" "Failed to find physical device of NAS Datastore $CITRIX_DATASTORE_NAME!"
+		else
+			if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE pbd-unplug uuid=$PBD_UUID; then
+				citrix_log openqrm-citrix "ERROR: Failed to remove physical device of Datastore $CITRIX_DATASTORE_NAME!"
+				openqrm_post_event 0 "remove_nas/iscsi" 3 "openqrm-citrix-datastore" "Failed to remove physical device of NAS Datastore $CITRIX_DATASTORE_NAME!"
+			fi
+			if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE pbd-destroy uuid=$PBD_UUID; then
+				citrix_log openqrm-citrix "ERROR: Failed to destroy physical device of Datastore $CITRIX_DATASTORE_NAME!"
+				openqrm_post_event 0 "remove_nas/iscsi" 3 "openqrm-citrix-datastore" "Failed to destroy physical device of NAS Datastore $CITRIX_DATASTORE_NAME!"
+			fi
+		fi
+		$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-destroy uuid=$SR_UUID
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-forget uuid=$SR_UUID; then
+			citrix_log openqrm-citrix "ERROR: Failed to remove SR of Datastore $CITRIX_DATASTORE_NAME!"
+			openqrm_post_event 0 "remove_nas/iscsi" 3 "openqrm-citrix-datastore" "Failed to remove SR of NAS Datastore $CITRIX_DATASTORE_NAME!"
+		fi
+		citrix_lock release
+		$0 post_ds_list -i $CITRIX_SERVER_IP
+		;;
+
+	add_iscsi)
+		if [ "$CITRIX_DATASTORE_NAME" == "" ]; then
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-citrix-datastore" "Wrong usage, Datastore Name missing!"
+			citrix_usage
+		fi
+		if [ "$CITRIX_DATASTORE_ISCSI_TARGET_IP" == "" ]; then
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-citrix-datastore" "Wrong usage, iSCSI Target ip missing!"
+			citrix_usage
+		fi
+		if [ "$CITRIX_DATASTORE_ISCSI_TARGET_IQN" == "" ]; then
+			CITRIX_DATASTORE_ISCSI_TARGET_IQN=$CITRIX_DATASTORE_NAME
+		fi
+		CITRIX_DATASTORE_ISCSI_SCSI_ID=`mktemp /tmp/xen-ds.XXXXXX` || exit 1
+		citrix_lock aquire
+		# probe
+		$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-probe content-type=user name-label="$CITRIX_DATASTORE_NAME" shared=true device-config-target="$CITRIX_DATASTORE_ISCSI_TARGET_IP" type=lvmoiscsi device-config-port=3260 2>/dev/null
+		# create
+		CHAP_AUTHENTICATION=""
+		if [ "$CITRIX_DATASTORE_ISCSI_USERNAME" != "" ]; then
+			CHAP_AUTHENTICATION="device-config-chapuser=$CITRIX_DATASTORE_ISCSI_USERNAME device-config-chappassword=$CITRIX_DATASTORE_ISCSI_PASSWORD"
+		fi
+		$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-create content-type=user name-label="$CITRIX_DATASTORE_NAME" shared=true device-config-target="$CITRIX_DATASTORE_ISCSI_TARGET_IP" type=lvmoiscsi device-config-port=3260 device-config-targetIQN="$CITRIX_DATASTORE_ISCSI_TARGET_IQN" $CHAP_AUTHENTICATION 2> $CITRIX_DATASTORE_ISCSI_SCSI_ID
+		if ! grep "<SCSIid>" $CITRIX_DATASTORE_ISCSI_SCSI_ID 2>&1 1>/dev/null; then
+#			rm -f $CITRIX_DATASTORE_ISCSI_SCSI_ID
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-citrix-datastore" "Error during connection to iSCSI Target! Maybe authentication is wrong?"
+			citrix_lock release
+			exit 1
+		fi
+		DEVICE_CONVIG_SCSI_ID=`grep -A1 "<SCSIid>" $CITRIX_DATASTORE_ISCSI_SCSI_ID | tail -n1 | awk '{ print $1 }'`
+		if [ "$DEVICE_CONVIG_SCSI_ID" == "" ]; then
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-citrix-datastore" "Error during connection to iSCSI Target! The SCSI device did not appear."
+#			rm -f $CITRIX_DATASTORE_ISCSI_SCSI_ID
+			citrix_lock release
+			exit 1
+		fi
+		if ! $CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-create content-type=user name-label="$CITRIX_DATASTORE_NAME" shared=true device-config-target="$CITRIX_DATASTORE_ISCSI_TARGET_IP" type=lvmoiscsi device-config-port=3260 device-config-targetIQN="$CITRIX_DATASTORE_ISCSI_TARGET_IQN" device-config-SCSIid="$DEVICE_CONVIG_SCSI_ID" $CHAP_AUTHENTICATION; then
+			citrix_log openqrm-citrix "ERROR: Failed to add iSCSI SR $CITRIX_DATASTORE_NAME!"
+			openqrm_post_event 0 "add_iscsi" 3 "openqrm-citrix-datastore" "Failed to add iSCSI SR $CITRIX_DATASTORE_NAME!"
+		fi
+#		rm -f $CITRIX_DATASTORE_ISCSI_SCSI_ID
+		citrix_lock release
+		$0 post_ds_list -i $CITRIX_SERVER_IP
+		;;
+
+	list)
+		# run API command
+		$OPENQRM_CITRIX_SDK_DIR/apps/host/dsbrowse.pl
+		;;
+
+	post_ds_list)
+		mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/
+		CITRIX_STATS="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/$CITRIX_SERVER_IP.ds_list"
+		CITRIX_STATS_TMP="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix/web/citrix-stat/$CITRIX_SERVER_IP.ds_list.tmp"
+		rm -f $CITRIX_STATS
+		> $CITRIX_STATS_TMP
+		CITRIX_DATASTORE_DATASTORE_DETAILS=`mktemp /tmp/xen-ds.XXXXXX` || exit 1
+
+		# nfs
+		for UUID in `$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-list type=nfs | grep ^uuid | cut -d':' -f2 | awk '{ print $1 }'`; do
+			$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-param-list type=nfs uuid=$UUID > $CITRIX_DATASTORE_DATASTORE_DETAILS
+			DS_NAME=`grep -w name-label $CITRIX_DATASTORE_DATASTORE_DETAILS | cut -d':' -f2 | awk '{ print $1 }'`
+			DS_FS=`grep -w " type" $CITRIX_DATASTORE_DATASTORE_DETAILS | cut -d':' -f2 | awk '{ print $1 }'`
+			DS_MAX=`grep -w physical-size $CITRIX_DATASTORE_DATASTORE_DETAILS | cut -d':' -f2 | awk '{ print $1 }'`
+			DS_USED=`grep -w physical-utilisation $CITRIX_DATASTORE_DATASTORE_DETAILS | cut -d':' -f2 | awk '{ print $1 }'`
+			DS_FREE=$(( $DS_MAX - $DS_USED ))
+			echo "$DS_NAME""@""$UUID""@""$DS_FS""@""$DS_MAX""@""$DS_USED""@""$DS_FREE" >> $CITRIX_STATS_TMP
+			unset DS_NAME
+			unset DS_LOCATION
+			unset DS_FS
+			unset DS_MAX
+			unset DS_FREE
+			unset DS_USED
+			rm -f $CITRIX_DATASTORE_DATASTORE_DETAILS
+		done
+
+		# lvmoiscsi
+		for UUID in `$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-list type=lvmoiscsi | grep ^uuid | cut -d':' -f2 | awk '{ print $1 }'`; do
+			$CITRIX_XE_BINARY -s $CITRIX_SERVER_IP -pwf $CITRIX_SERVER_PASSWD_FILE sr-param-list type=lvmoiscsi uuid=$UUID > $CITRIX_DATASTORE_DATASTORE_DETAILS
+			DS_NAME=`grep -w name-label $CITRIX_DATASTORE_DATASTORE_DETAILS | cut -d':' -f2 | awk '{ print $1 }'`
+			DS_FS=`grep -w " type" $CITRIX_DATASTORE_DATASTORE_DETAILS | cut -d':' -f2 | awk '{ print $1 }'`
+			DS_MAX=`grep -w physical-size $CITRIX_DATASTORE_DATASTORE_DETAILS | cut -d':' -f2 | awk '{ print $1 }'`
+			DS_USED=`grep -w physical-utilisation $CITRIX_DATASTORE_DATASTORE_DETAILS | cut -d':' -f2 | awk '{ print $1 }'`
+			DS_FREE=$(( $DS_MAX - $DS_USED ))
+			echo "$DS_NAME""@""$UUID""@""$DS_FS""@""$DS_MAX""@""$DS_USED""@""$DS_FREE" >> $CITRIX_STATS_TMP
+			unset DS_NAME
+			unset DS_LOCATION
+			unset DS_FS
+			unset DS_MAX
+			unset DS_FREE
+			unset DS_USED
+			rm -f $CITRIX_DATASTORE_DATASTORE_DETAILS
+		done
+
+		/bin/mv $CITRIX_STATS_TMP $CITRIX_STATS
+		chmod 777 $CITRIX_STATS
+		rm -f $CITRIX_DATASTORE_DATASTORE_DETAILS
+		;;
+
+
+
+	*)
+		citrix_usage
+		;;
+
+
+esac
+
