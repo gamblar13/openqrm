@@ -1,0 +1,97 @@
+img {
+	border:none;
+}
+
+.htmlobject_td.storage_id {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.storage_icon {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.storage_state {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.storage_name {
+	text-align:left;
+	width:110px;
+	vertical-align:top;
+}
+.htmlobject_td.storage_type {
+	text-align:left;
+	width:310px;
+	vertical-align:top;
+}
+.htmlobject_td.storage_resource_id {
+	text-align:left;
+	width:110px;
+	vertical-align:top;
+}
+.htmlobject_td.storage_comment {
+	text-align:left;
+	width:110px;
+	vertical-align:top;
+}
+.htmlobject_th.storage_edit,
+.htmlobject_td.storage_edit {
+	text-align:center;
+	width:30px;
+	vertical-align:top;
+}
+.htmlobject_th.storage_mgmt,
+.htmlobject_td.storage_mgmt {
+	text-align:center;
+	width:30px;
+	vertical-align:top;
+}
+.htmlobject_td.storage_data {
+	text-align:left;
+	width:300px;
+	vertical-align:top;
+	white-space:nowrap;
+}
+
+.htmlobject_td.resource_state {
+	text-align:center;
+	vertical-align:top;
+	width:20px;
+}
+.htmlobject_td.resource_id {
+	text-align:center;
+	vertical-align:top;
+	width:20px;
+}
+.htmlobject_td.resource_icon {
+	text-align:center;
+	vertical-align:top;
+	width:25px;
+}
+.htmlobject_td.id,
+.htmlobject_td.delident {
+	text-align:center;
+	vertical-align:top;
+	width:20px;
+}
+
+.htmlobject_td.head {
+	border: 0px none;
+}
+
+.htmlobject_box textarea {
+	width: 600px;
+	height: 50px;
+}
+
+fieldset {
+	border: 1px solid #91A7B4;
+	padding: 5px 10px;
+}
+fieldset legend {
+	padding: 5px;
+	font-weight: bold;
+}
