@@ -1,0 +1,293 @@
+#!/bin/bash
+# openQRM postgres-specfic functions
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+if [ "$OPENQRM_SERVER_BASE_DIR" == "" ]; then
+	echo "ERROR: Please export OPENQRM_SERVER_BASE_DIR before sourcing $0"
+	exit 1
+fi
+
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+OPENQRM_DATABASE_INIT="$OPENQRM_SERVER_BASE_DIR/openqrm/etc/db/postgres/openqrm-postgres-init.sql"
+OPENQRM_DATABASE_INIT_TMP=/tmp/openqrm-postgres-init.sql
+OPENQRM_DATABASE_MAINTENANCE="$OPENQRM_SERVER_BASE_DIR/openqrm/etc/db/postgres/openqrm-postgres-maintenance"
+OPENQRM_DATABASE_MAINTENANCE_FNAME=`basename $OPENQRM_DATABASE_MAINTENANCE`
+
+
+if ! which psql 1>/dev/null 2>&1; then
+	echo "ERROR: Postgres client 'psql' not installed/found on this system"
+	exit 1
+else
+	POSTGRES_CLIENT=`which psql`
+fi
+if ! which pg_dump 1>/dev/null 2>&1; then
+	echo "ERROR: Postgres 'pg_dump' not installed/found on this system"
+	exit 1
+else
+	POSTGRES_DUMP=`which pg_dump`
+fi
+
+
+function initialize_database() {
+	echo "Initializing the openQRM-database"
+	cat $OPENQRM_DATABASE_INIT |	\
+		sed -e "s/OPENQRM_SERVER_IP_ADDRESS/$OPENQRM_SERVER_IP_ADDRESS/g"	\
+		> $OPENQRM_DATABASE_INIT_TMP
+	chmod 777 $OPENQRM_DATABASE_INIT_TMP
+	su - postgres -c "dropdb $OPENQRM_DATABASE_NAME" 1>/dev/null 2>&1
+	su - postgres -c "createdb $OPENQRM_DATABASE_NAME"
+	su - postgres -c "$POSTGRES_CLIENT -d $OPENQRM_DATABASE_NAME --set openqrmdbuser=$OPENQRM_DATABASE_USER -f $OPENQRM_DATABASE_INIT_TMP"
+	RET=$?
+	rm -f $OPENQRM_DATABASE_INIT_TMP
+	# add the db maintenance to cron
+	cat $OPENQRM_DATABASE_MAINTENANCE | sed -e "s#@@OPENQRM_SERVER_BASE_DIR@@#$OPENQRM_SERVER_BASE_DIR#g" > /etc/cron.daily/$OPENQRM_DATABASE_MAINTENANCE_FNAME
+	chmod +x /etc/cron.daily/$OPENQRM_DATABASE_MAINTENANCE_FNAME
+	if [ -x "/etc/init.d/cron" ]; then
+	    if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
+		invoke-rc.d cron reload
+	    else
+		/etc/init.d/cron reload
+	    fi
+	    elif [ -x "/etc/init.d/crond" ]; then
+	    if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
+		invoke-rc.d crond reload
+	    else
+		/etc/init.d/crond reload
+	    fi
+	else
+	    echo "Could not find cron init script in /etc/init.d/. Please reload cron manually!"
+	fi
+	return $RET
+}
+
+
+
+function backup_database() {
+	local SQL=$1
+	local PG_BACKUP_DIR=`dirname $SQL`
+	chown -R postgres $PG_BACKUP_DIR
+	echo "Creating backup of the openQRM-database at $SQL"
+	su - postgres -c "$POSTGRES_DUMP -w $OPENQRM_DATABASE_NAME > $SQL"
+	return $RET
+
+}
+
+function restore_database() {
+	local SQL=$1
+	echo "Restoring the openQRM-database from $SQL"
+	su - postgres -c "$POSTGRES_CLIENT -d $OPENQRM_DATABASE_NAME --set openqrmdbuser=$OPENQRM_DATABASE_USER -f $SQL"
+	return $RET
+}
+
+function drop_database() {
+	echo "Dropping the openQRM-database"
+	su - postgres -c "dropdb $OPENQRM_DATABASE_NAME" 1>/dev/null 2>&1
+	RET=$?
+	# remove maintenance cron job
+	rm -f /etc/cron.daily/$OPENQRM_DATABASE_MAINTENANCE_FNAME
+	if [ -x "/etc/init.d/cron" ]; then
+	    if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
+		invoke-rc.d cron reload
+	    else
+		/etc/init.d/cron reload
+	    fi
+	    elif [ -x "/etc/init.d/crond" ]; then
+	    if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
+		invoke-rc.d crond reload
+	    else
+		/etc/init.d/crond reload
+	    fi
+	else
+	    echo "Could not find cron init script in /etc/init.d/. Please reload cron manually!"
+	fi
+	return $RET
+}
+
+
+
+########################### functions to update the db shema ###########################
+
+function check_table_exists(){
+    local DB_TABLE=$1
+    local SQL="select * from $DB_TABLE"
+    su - postgres -c "$POSTGRES_CLIENT -d $OPENQRM_DATABASE_NAME --set openqrmdbuser=$OPENQRM_DATABASE_USER --command $SQL" 1>/dev/null 2>&1
+    return $RET
+}
+
+
+function check_column_in_table_exists(){
+    local DB_TABLE=$1
+    local DB_COLUMN=$2
+    local SQL="select $DB_COLUMN from $DB_TABLE"
+    su - postgres -c "$POSTGRES_CLIENT -d $OPENQRM_DATABASE_NAME --set openqrmdbuser=$OPENQRM_DATABASE_USER --command $SQL" 1>/dev/null 2>&1
+    return $RET
+}
+
+
+function check_if_data_in_column_of_table_exists(){
+    local DB_TABLE=$1
+    local DB_COLUMN=$2
+    local DB_DATA=$3
+    local DB_OUTPUT_LOG="/tmp/dboutput.log"
+    local SQL="select * from $DB_TABLE where $DB_COLUMN=$DB_DATA"
+    su - postgres -c "$POSTGRES_CLIENT -d $OPENQRM_DATABASE_NAME --set openqrmdbuser=$OPENQRM_DATABASE_USER --command $SQL" > $DB_OUTPUT_LOG
+    RET=$?
+    DB_OUTPUT=`cat $DB_OUTPUT_LOG`
+    if [ "$RET" == 0 ]; then
+        if [ "$DB_OUTPUT" == "" ]; then
+            return 1
+        else
+            return 0
+        fi
+    else
+        return $RET
+    fi
+}
+
+
+
+function run_sql(){
+    local DB_SQL=$@
+    su - postgres -c "$POSTGRES_CLIENT -d $OPENQRM_DATABASE_NAME --set openqrmdbuser=$OPENQRM_DATABASE_USER --command $SQL"
+    return $RET
+}
+
+
+
+
+function db_update()  {
+
+    # this function applies needed updates to the db-shema if needed in an idempotent way
+	if [ -f "$OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/etc/openqrm-server.conf" ]; then
+		# for update we have to source the old configuration
+		. $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/etc/openqrm-server.conf
+	else
+		. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	fi
+
+
+    #---------------------------------------------------------------------------
+    # from 4.9 to 5.0 the following db changes are needed
+    #---------------------------------------------------------------------------
+	# 1  > ALTER TABLE cloud_users ADD cu_lang varchar(4);
+	# 2  > UPDATE user_info set user_lang = 'en';
+	# 3  > ALTER TABLE user_info ADD user_wizard_name varchar(255);
+	# 4  > ALTER TABLE user_info ADD user_wizard_step int8;
+	# 5  > ALTER TABLE user_info ADD user_wizard_id int8;
+	# 6  > ALTER TABLE appliance_info ADD appliance_wizard varchar(255);
+	# 7  > ALTER TABLE appliance_info ALTER appliance_cpumodel type varchar(255);
+	# 8  > ALTER TABLE resource_info ALTER resource_cpumodel type varchar(255);
+	# 9  > ALTER TABLE cloud_config ALTER cc_value type varchar(255);
+	# 10 > ALTER TABLE event_info ALTER event_id BIGINT;
+	# 11 > insert into cloud_config(cc_id, cc_key, cc_value) values (38, 'deprovision_warning', '100');
+	# 12 > insert into cloud_config(cc_id, cc_key, cc_value) values (39, 'deprovision_pause', '50')
+
+    echo "- Checking database shema ..."
+
+    # if cloud enabled .....
+    if [ -e "$OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/cloud" ]; then
+
+		# 1  > ALTER TABLE cloud_users ADD cu_lang varchar(4);
+		if ! check_column_in_table_exists cloud_users cu_lang; then
+			echo " -- db change : ALTER TABLE cloud_users ADD cu_lang varchar(4)"
+			run_sql "ALTER TABLE cloud_users ADD cu_lang varchar(4);"
+		fi
+		# 9  > ALTER TABLE cloud_config ALTER cc_value type varchar(255);
+		echo " -- db change : ALTER TABLE cloud_config ALTER cc_value type varchar(255)"
+		run_sql "ALTER TABLE cloud_config ALTER cc_value type varchar(255);"
+
+		# 11  > insert into cloud_config(cc_id, cc_key, cc_value) values (38, 'deprovision_warning', '100');
+        if check_table_exists cloud_config; then
+            if ! check_if_data_in_column_of_table_exists cloud_config cc_id 38; then
+                echo " -- db change : insert into cloud_config(cc_id, cc_key, cc_value) values (38, 'deprovision_warning', '100')"
+                run_sql "insert into cloud_config(cc_id, cc_key, cc_value) values (38, 'deprovision_warning', '100');"
+            fi
+        fi
+
+		# 12  > insert into cloud_config(cc_id, cc_key, cc_value) values (39, 'deprovision_pause', '50')
+        if check_table_exists cloud_config; then
+            if ! check_if_data_in_column_of_table_exists cloud_config cc_id 39; then
+                echo " -- db change : insert into cloud_config(cc_id, cc_key, cc_value) values (39, 'deprovision_pause', '50')"
+                run_sql "insert into cloud_config(cc_id, cc_key, cc_value) values (39, 'deprovision_pause', '50');"
+            fi
+        fi
+	fi
+
+	# 2  > UPDATE user_info set user_lang = 'en';
+	echo " -- db change : UPDATE user_info set user_lang = 'en'"
+	run_sql "UPDATE user_info set user_lang = 'en';"
+
+	# 3  > ALTER TABLE user_info ADD user_wizard_name varchar(255);
+	if ! check_column_in_table_exists user_info user_wizard_name; then
+		echo " -- db change : ALTER TABLE user_info ADD user_wizard_name varchar(255)"
+		run_sql "ALTER TABLE user_info ADD user_wizard_name varchar(255);"
+	fi
+
+	# 4  > ALTER TABLE user_info ADD user_wizard_step int8;
+	if ! check_column_in_table_exists user_info user_wizard_step; then
+		echo " -- db change : ALTER TABLE user_info ADD user_wizard_step int8"
+		run_sql "ALTER TABLE user_info ADD user_wizard_step int8;"
+	fi
+
+	# 5  > ALTER TABLE user_info ADD user_wizard_id int8;
+	if ! check_column_in_table_exists user_info user_wizard_id; then
+		echo " -- db change : ALTER TABLE user_info ADD user_wizard_id int8"
+		run_sql "ALTER TABLE user_info ADD user_wizard_id int8;"
+	fi
+
+	# 6  > ALTER TABLE appliance_info ADD appliance_wizard varchar(255);
+	if ! check_column_in_table_exists appliance_info appliance_wizard; then
+		echo " -- db change : ALTER TABLE appliance_info ADD appliance_wizard varchar(255)"
+		run_sql "ALTER TABLE appliance_info ADD appliance_wizard varchar(255);"
+	fi
+
+	# 7  > ALTER TABLE appliance_info ALTER appliance_cpumodel type varchar(255);
+	echo " -- db change : ALTER TABLE appliance_info ALTER appliance_cpumodel type varchar(255)"
+	run_sql "ALTER TABLE appliance_info ALTER appliance_cpumodel type varchar(255);"
+
+	# 8  > ALTER TABLE resource_info ALTER resource_cpumodel type varchar(255);
+	echo " -- db change : ALTER TABLE resource_info ALTER resource_cpumodel type varchar(255)"
+	run_sql "ALTER TABLE resource_info ALTER resource_cpumodel type varchar(255);"
+
+	# 10 > ALTER TABLE event_info ALTER event_id BIGINT;
+	echo " -- db change : ALTER TABLE event_info ALTER event_id BIGINT"
+	run_sql "ALTER TABLE event_info ALTER event_id BIGINT;"
+
+
+   echo "- Database sanity check for version 4.9 to 5.0 finished"
+
+}
+
+
+
+
+case "$1" in
+	init)
+		initialize_database
+		;;
+	backup)
+		backup_database $2
+		;;
+	restore)
+		restore_database $2
+		;;
+	drop)
+		drop_database
+		;;
+	update)
+		db_update
+		;;
+esac
