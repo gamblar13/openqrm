@@ -1,0 +1,64 @@
+#!/usr/bin/expect -f
+# this is an expect script to automatically run commands on a Citrix XenServer Host
+#
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+if {[llength $argv]<1} {
+		send_user "usage: $argv0 <citrix-ip> <command>\n"
+		exit
+}
+
+set CITRIX_IP [lindex $argv 0]
+set CITRIX_CMD [lindex $argv 1]
+set CITRIX_PASSWORD NULL
+set OPENQRM_SERVER_BASE_DIR /usr/share
+
+send_user "Running command $CITRIX_CMD on $CITRIX_IP\n"
+
+set force_conservative 0  ;# set to 1 to force conservative mode even if
+			  ;# script wasn't run conservatively originally
+if {$force_conservative} {
+	set send_slow {1 .1}
+	proc send {ignore arg} {
+		sleep .1
+		exp_send -s -- $arg
+	}
+}
+set timeout -1
+# read pass from file
+set fp [open $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/conf/host/$CITRIX_IP.pwd r]
+while { [gets $fp data] >= 0 } {
+      set CITRIX_PASSWORD $data
+}
+close $fp
+# run command
+spawn /bin/bash
+match_max 100000
+expect "*# "
+send -- "dbclient -y root@$CITRIX_IP\r"
+
+expect "*?assword:*" {
+	send -- "$CITRIX_PASSWORD\r"
+	send -- "\r"
+	expect "*# "
+	send -- "$CITRIX_CMD\r"
+	send -- "\r"
+	expect "*# "
+}
+
+
+exit
+

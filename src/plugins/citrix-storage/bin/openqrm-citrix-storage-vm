@@ -1,0 +1,1079 @@
+#!/bin/bash
+# this script automatically manages citrix-storage
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/etc/openqrm-plugin-citrix-storage.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/include/openqrm-plugin-citrix-storage-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export LANG=C
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+OPENQRM_CITRIX_STORAGE_VM_CONF_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/conf/vm"
+OPENQRM_CITRIX_STORAGE_HOST_CONF_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/conf/host"
+OPENQRM_CITRIX_STORAGE_STAT_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat/"
+
+# define wget to use with https
+if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate --random-file=/dev/random"
+fi
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+if [ ! -d "$OPENQRM_CITRIX_STORAGE_HOST_CONF_DIR" ]; then
+	mkdir -p $OPENQRM_CITRIX_STORAGE_HOST_CONF_DIR
+fi
+if [ ! -d "$OPENQRM_CITRIX_STORAGE_VM_CONF_DIR" ]; then
+	mkdir -p $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR
+fi
+if [ ! -d "$OPENQRM_CITRIX_STORAGE_STAT_DIR" ]; then
+	mkdir -p $OPENQRM_CITRIX_STORAGE_STAT_DIR
+	chmod 777 $OPENQRM_CITRIX_STORAGE_STAT_DIR
+fi
+
+function citrix-storage_usage() {
+	echo "Usage : $0 start/stop/remove/reboot/list <-i citrix-storage-server-ip> <-n vm-name>"
+	echo "        $0 restart_by_mac/start_by_mac/stop_by_mac <-m vm-mac> <-d root-disk>"
+	echo "        $0 create <-i citrix-storage-server-ip> <-n vm-name> <-r memory> <-m mac-address> <-t vm-template-uuid> [-l sr-uuid] [-c cpus ]"
+	echo "        $0 update <-i citrix-storage-server-ip> <-n vm-name> <-r memory> <-m mac-address> [-c cpus ]"
+	echo "        $0 clone <-i citrix-storage-server-ip> <-n vm-name> <-w clone-name>"
+	echo "        $0 start_vnc <-i citrix-storage-server-ip> <-n vm-name> <-x vm-domid>"
+	echo "        $0 stop_vnc <-i citrix-storage-server-ip> <-n vm-name> <-x vm-domid>"
+	echo "        $0 post_vm_list <-i citrix-storage-server-ip>"
+	echo "        $0 post_vm_config <-i citrix-storage-server-ip> <-n vm-name>"
+	echo "        $0 post_template_list <-i citrix-storage-server-ip>"
+	#	echo "        $0 vm-mem-set <-i citrix-storage-server-ip> <-n vm-name> <-m ram>"
+	echo "        $0 fence <-i citrix-storage-server-ip> <-m mac-address>"
+	echo "        $0 statistics <-i citrix-storage-server-ip>"
+	exit 1
+}
+
+
+function get_citrix_vm_uuid_by_mac() {
+	local vm_mac=$1
+	$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-list params | grep -B5 -i $vm_mac | grep vm-uuid | cut -d':' -f2 | awk '{ print $1 }'
+}
+
+
+
+CITRIX_STORAGE_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			CITRIX_STORAGE_VM_NAME=$2
+			shift
+			;;
+		-c)
+			CITRIX_STORAGE_VM_CPU=$2
+			shift
+			;;
+		-m)
+			CITRIX_STORAGE_VM_MAC=$2
+			shift
+			;;
+		-m1)
+			CITRIX_STORAGE_VM_MAC1=$2
+			shift
+			;;
+		-m2)
+			CITRIX_STORAGE_VM_MAC2=$2
+			shift
+			;;
+		-m3)
+			CITRIX_STORAGE_VM_MAC3=$2
+			shift
+			;;
+		-m4)
+			CITRIX_STORAGE_VM_MAC4=$2
+			shift
+			;;
+		-r)
+			CITRIX_STORAGE_VM_RAM=$2
+			shift
+			;;
+		-d)
+			CITRIX_STORAGE_VM_DISK=$2
+			shift
+			;;
+		-s)
+			CITRIX_STORAGE_VM_SWAP=$2
+			shift
+			;;
+		-b)
+			CITRIX_STORAGE_VM_BOOT=$2
+			shift
+			;;
+		-l)
+			CITRIX_STORAGE_VM_SR=$2
+			shift
+			;;
+		-i)
+			CITRIX_STORAGE_SERVER_IP=$2
+			shift
+			;;
+		-t)
+			CITRIX_STORAGE_VM_TEMPLATE=$2
+			shift
+			;;
+		-x)
+			CITRIX_STORAGE_VM_COMPONENT_NUMBER=$2
+			shift
+			;;
+		-w)
+			CITRIX_STORAGE_VM_CLONE_NAME=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			citrix-storage_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+# main
+if [ "$CITRIX_STORAGE_COMMAND" == "" ]; then
+	citrix-storage_usage
+fi
+
+if [ "$CITRIX_STORAGE_COMMAND" != "list" ] && [ "$CITRIX_STORAGE_COMMAND" != "post_template_list" ] && [ "$CITRIX_STORAGE_COMMAND" != "post_vm_list" ]  && [ "$CITRIX_STORAGE_COMMAND" != "setboot" ] && [ "$CITRIX_STORAGE_COMMAND" != "fence" ] && [ "$CITRIX_STORAGE_COMMAND" != "start_by_mac" ] && [ "$CITRIX_STORAGE_COMMAND" != "stop_by_mac" ] && [ "$CITRIX_STORAGE_COMMAND" != "restart_by_mac" ] && [ "$CITRIX_STORAGE_COMMAND" != "statistics" ]; then
+	if [ "$CITRIX_STORAGE_VM_NAME" == "" ]; then
+		citrix-storage_usage
+	fi
+fi
+if [ "$CITRIX_STORAGE_SERVER_IP" == "" ]; then
+	citrix-storage_usage
+fi
+
+CITRIX_STORAGE_SERVER_PASSWD_FILE=$OPENQRM_CITRIX_STORAGE_HOST_CONF_DIR/$CITRIX_STORAGE_SERVER_IP.pwd
+CITRIX_STORAGE_VM_LIST_TMP=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat/$CITRIX_STORAGE_SERVER_IP.vm_list
+CITRIX_STORAGE_TEMPLATE_LIST_TMP=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat/$CITRIX_STORAGE_SERVER_IP.template_list
+mkdir -p `dirname $CITRIX_STORAGE_VM_LIST_TMP`
+chmod 777 `dirname $CITRIX_STORAGE_VM_LIST_TMP`
+
+if [ ! -f $CITRIX_STORAGE_SERVER_PASSWD_FILE ]; then
+	openqrm_post_event 0 "$CITRIX_STORAGE_COMMAND" 3 "openqrm-citrix-storage" "No password file ($CITRIX_STORAGE_SERVER_PASSWD_FILE) existing for Citrix-storage host $CITRIX_STORAGE_SERVER_IP"
+	exit 1
+fi
+
+FULL_COMMANDLINE="$0 $@"
+case "$CITRIX_STORAGE_COMMAND" in
+
+	create)
+		if [ "$CITRIX_STORAGE_VM_NAME" == "" ]; then
+			citrix-storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_VM_RAM" == "" ]; then
+			citrix-storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_VM_MAC" == "" ]; then
+			citrix-storage_usage
+		fi
+		# defaults
+		if [ "$CITRIX_STORAGE_VM_TEMPLATE" == "" ]; then
+			CITRIX_STORAGE_VM_TEMPLATE=$CITRIX_STORAGE_DEFAULT_VM_TEMPLATE
+		fi
+		if [ "$CITRIX_STORAGE_VM_CPU" == "" ]; then
+			CITRIX_STORAGE_VM_CPU=1
+		fi
+		CITRIX_STORAGE_VM_BOOT_PARAMETER="cnd"
+		case "$CITRIX_STORAGE_VM_BOOT" in
+			net)
+				CITRIX_STORAGE_VM_BOOT_PARAMETER="ncd"
+				;;
+			local)
+				CITRIX_STORAGE_VM_BOOT_PARAMETER="cnd"
+				;;
+		esac
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Creating Citrix-storage VM $CITRIX_STORAGE_VM_NAME from template $CITRIX_STORAGE_VM_TEMPLATE"
+		if [ "$CITRIX_STORAGE_VM_SR" == "" ]; then
+			# in case of cloud deployment the default SR uuid needs to be set in the plugin config file
+			CITRIX_STORAGE_VM_SR=$CITRIX_STORAGE_DEFAULT_SR_UUID
+		fi
+		SR_PARAMATER="sr-uuid=$CITRIX_STORAGE_VM_SR"
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-install template="$CITRIX_STORAGE_VM_TEMPLATE" new-name-label="$CITRIX_STORAGE_VM_NAME" $SR_PARAMATER; then
+			citrix_storage_log openqrm-citrix-storage "Failed to install the VM template for creating the new VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to install the VM template for creating the new VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# Find the network associated with the management interface. We'll assume that
+		# this is the network on which we want a network interface._{color}
+		NETWORK=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE network-list bridge=$CITRIX_STORAGE_MANAGEMENT_INTERFACE --minimal`
+		if [ "$NETWORK" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the default network bridge to create the vif device for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the default network bridge to create the vif device for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# Add a VIF linking the VM to the network
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-create vm-uuid=$CITRIX_STORAGE_VM_UUID network-uuid=$NETWORK device=0 mac=$CITRIX_STORAGE_VM_MAC; then
+			citrix_storage_log openqrm-citrix-storage "Failed to create the vif device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to create the vif device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		#change boot order
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-param-set uuid=$CITRIX_STORAGE_VM_UUID HVM-boot-params:order=$CITRIX_STORAGE_VM_BOOT_PARAMETER; then
+			citrix_storage_log openqrm-citrix-storage "Failed to set the boot-order for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to set the boot-order for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# set memory
+		CITRIX_STORAGE_VM_RAM_PARAMETER="$CITRIX_STORAGE_VM_RAM""MiB"
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-param-set uuid=$CITRIX_STORAGE_VM_UUID memory-static-max=$CITRIX_STORAGE_VM_RAM_PARAMETER; then
+			citrix_storage_log openqrm-citrix-storage "Setting memory failed for VM $CITRIX_STORAGE_VM_NAME! Eventually its template needs more RAM."
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Setting memory failed for VM $CITRIX_STORAGE_VM_NAME! Eventually its template needs more RAM."
+			citrix_storage_lock release
+			exit 1
+		fi
+		# set cpus
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-param-set uuid=$CITRIX_STORAGE_VM_UUID VCPUs-at-startup=$CITRIX_STORAGE_VM_CPU; then
+			citrix_storage_log openqrm-citrix-storage "Failed to set VCPUs-at-startup for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to set VCPUs-at-startup for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-param-set uuid=$CITRIX_STORAGE_VM_UUID VCPUs-max=$CITRIX_STORAGE_VM_CPU; then
+			citrix_storage_log openqrm-citrix-storage "Failed to set VCPUs-max for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to set VCPUs-max for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+
+		# additional nics
+		# Find the network associated with the management interface. We'll assume that
+		# this is the network on which we want a network interface._{color}
+		EXTERNAL_NETWORK=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE network-list bridge=$CITRIX_STORAGE_EXTERNAL_INTERFACE --minimal`
+		if [ "$EXTERNAL_NETWORK" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the external network bridge to create the additional vif device for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the external network bridge to create the additional vif device for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# addtional nics -> nic2
+		if [ "$CITRIX_STORAGE_VM_MAC1" != "" ]; then
+			citrix_storage_log openqrm-citrix-storage " Creating nic2"
+			# Add a VIF linking the VM to the external network
+			if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-create vm-uuid=$CITRIX_STORAGE_VM_UUID network-uuid=$EXTERNAL_NETWORK device=1 mac=$CITRIX_STORAGE_VM_MAC1; then
+				citrix_storage_log openqrm-citrix-storage "Failed to create the nic2 device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC1!"
+				openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to create the nic2 device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC1!"
+				citrix_storage_lock release
+				exit 1
+			fi
+		fi
+		# addtional nics -> nic3
+		if [ "$CITRIX_STORAGE_VM_MAC2" != "" ]; then
+			citrix_storage_log openqrm-citrix-storage " Creating nic3"
+			# Add a VIF linking the VM to the external network
+			if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-create vm-uuid=$CITRIX_STORAGE_VM_UUID network-uuid=$EXTERNAL_NETWORK device=2 mac=$CITRIX_STORAGE_VM_MAC2; then
+				citrix_storage_log openqrm-citrix-storage "Failed to create the nic3 device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC2!"
+				openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to create the nic3 device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC2!"
+				citrix_storage_lock release
+				exit 1
+			fi
+		fi
+		# addtional nics -> nic4
+		if [ "$CITRIX_STORAGE_VM_MAC3" != "" ]; then
+			citrix_storage_log openqrm-citrix-storage " Creating nic4"
+			# Add a VIF linking the VM to the external network
+			if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-create vm-uuid=$CITRIX_STORAGE_VM_UUID network-uuid=$EXTERNAL_NETWORK device=3 mac=$CITRIX_STORAGE_VM_MAC3; then
+				citrix_storage_log openqrm-citrix-storage "Failed to create the nic4 device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC3!"
+				openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to create the nic4 device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC3!"
+				citrix_storage_lock release
+				exit 1
+			fi
+		fi
+		# addtional nics -> nic5
+		if [ "$CITRIX_STORAGE_VM_MAC4" != "" ]; then
+			citrix_storage_log openqrm-citrix-storage " Creating nic5"
+			# Add a VIF linking the VM to the external network
+			if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-create vm-uuid=$CITRIX_STORAGE_VM_UUID network-uuid=$EXTERNAL_NETWORK device=4 mac=$CITRIX_STORAGE_VM_MAC4; then
+				citrix_storage_log openqrm-citrix-storage "Failed to create the nic5 device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC4!"
+				openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to create the nic5 device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC4!"
+				citrix_storage_lock release
+				exit 1
+			fi
+		fi
+
+		# remove eventual created disk from template
+		# get the vbd of the vm
+		VMS_VBD_UUID=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vbd-list | grep -B1 $CITRIX_STORAGE_VM_UUID | grep ^uuid | cut -d':' -f2 | awk '{ print $1 }'`
+		if [ "$VMS_VBD_UUID" != "" ]; then
+			citrix_storage_log openqrm-citrix-storage " Removing disk from idle VM"
+			$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vbd-destroy uuid=$VMS_VBD_UUID
+			# also remove its vdi
+			VMS_VDI_UUID=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vdi-list | grep -A1 ^uuid | grep -B1 "name-label ( RW): 0" | grep ^uuid | cut -d':' -f2 | awk '{ print $1 }'`
+			if [ "$VMS_VDI_UUID" != "" ]; then
+				$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vdi-destroy uuid=$VMS_VDI_UUID
+			fi
+		fi
+		# store vm details
+		echo "CITRIX_STORAGE_VM_RAM=\"$CITRIX_STORAGE_VM_RAM\"" > $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_NAME.conf
+		echo "CITRIX_STORAGE_VM_CPU=\"$CITRIX_STORAGE_VM_CPU\"" >> $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_NAME.conf
+		echo "CITRIX_STORAGE_VM_TEMPLATE=\"$CITRIX_STORAGE_VM_TEMPLATE\"" >> $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_NAME.conf
+		echo "CITRIX_STORAGE_VM_BOOT=\"$CITRIX_STORAGE_VM_BOOT\"" >> $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_NAME.conf
+
+		if ! $CITRIX_STORAGE_XE_BINARY vm-start -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID; then
+			citrix_storage_log openqrm-citrix-storage "Failed to start VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to start VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# post the updated list to the openQRM-server
+		$0 post_vm_list -i $CITRIX_STORAGE_SERVER_IP
+		citrix_storage_lock release
+		;;
+
+	start)
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Starting Citrix-storage VM $CITRIX_STORAGE_VM_NAME"
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		$CITRIX_STORAGE_XE_BINARY vm-start -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID
+		# post the updated list to the openQRM-server
+		$0 post_vm_list -i $CITRIX_STORAGE_SERVER_IP
+		citrix_storage_lock release
+		;;
+
+
+	start_by_mac)
+		if [ "$CITRIX_STORAGE_VM_MAC" == "" ]; then
+			citrix-storage_usage
+		fi
+		# noop
+		citrix_storage_log openqrm-citrix-storage "Start-by-Mac Citrix-storage VM $CITRIX_STORAGE_VM_MAC"
+		;;
+
+	stop)
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Stopping Citrix-storage VM $CITRIX_STORAGE_VM_NAME"
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		$CITRIX_STORAGE_XE_BINARY vm-shutdown -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID force=true
+		# post the updated list to the openQRM-server
+		$0 post_vm_list -i $CITRIX_STORAGE_SERVER_IP
+		citrix_storage_lock release
+		;;
+
+	stop_by_mac)
+		if [ "$CITRIX_STORAGE_VM_MAC" == "" ]; then
+			citrix-storage_usage
+		fi
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Stop-by-Mac Citrix-storage VM $CITRIX_STORAGE_VM_MAC"
+		CITRIX_STORAGE_VM_UUID=`get_citrix_vm_uuid_by_mac $CITRIX_STORAGE_VM_MAC`
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "stop_by_mac" 3 "openqrm-citrix-storage" "Failed to get the uuid for the VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		if ! $CITRIX_STORAGE_XE_BINARY vm-shutdown -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID force=true; then
+			citrix_storage_log openqrm-citrix-storage "Failed to stop_by_mac VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "stop_by_mac" 3 "openqrm-citrix-storage" "Failed to stop_by_mac VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		citrix_storage_lock release
+		;;
+
+	restart_by_mac)
+		if [ "$CITRIX_STORAGE_VM_MAC" == "" ]; then
+			citrix-storage_usage
+		fi
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Restart-by-Mac Citrix-storage VM $CITRIX_STORAGE_VM_MAC"
+		CITRIX_STORAGE_VM_UUID=`get_citrix_vm_uuid_by_mac $CITRIX_STORAGE_VM_MAC`
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "restart_by_mac" 3 "openqrm-citrix-storage" "Failed to get the uuid for the VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# stop the vm
+		if ! $CITRIX_STORAGE_XE_BINARY vm-shutdown -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID force=true; then
+			citrix_storage_log openqrm-citrix-storage "Failed to stop_by_mac VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "restart_by_mac" 3 "openqrm-citrix-storage" "Failed to stop_by_mac VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			citrix_storage_lock release
+			exit 1
+		fi
+
+		# add disk disk parameter if disk param is not set to noop or empty
+		if [ "$CITRIX_STORAGE_VM_DISK" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "(empty) restart-by-mac VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "restart_by_mac" 5 "openqrm-citrix-storage" "(empty) restart-by-mac VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			# we meed to detach the disk here
+			CITRIX_STORAGE_VM_DISK_UUID=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vbd-list | grep -B1 $CITRIX_STORAGE_VM_UUID | grep ^uuid | cut -d':' -f2 | awk '{ print $1 }'`
+			if [ "$CITRIX_STORAGE_VM_DISK_UUID" == "" ]; then
+				citrix_storage_log openqrm-citrix-storage "Failed to get the VDI UUID for VM with mac address $CITRIX_STORAGE_VM_MAC!"
+				openqrm_post_event 0 "restart_by_mac" 3 "openqrm-citrix-storage" "Failed to get the VDI UUID for VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			else
+				if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vbd-destroy uuid=$CITRIX_STORAGE_VM_DISK_UUID; then
+					citrix_storage_log openqrm-citrix-storage "Failed to deattach VDI $CITRIX_STORAGE_VM_DISK_UUID to VM with mac address $CITRIX_STORAGE_VM_MAC!"
+					openqrm_post_event 0 "restart_by_mac" 3 "openqrm-citrix-storage" "Failed to deattach VDI $CITRIX_STORAGE_VM_DISK_UUID to VM with mac address $CITRIX_STORAGE_VM_MAC!"
+				fi
+			fi
+		elif [ "$CITRIX_STORAGE_VM_DISK" == "noop" ]; then
+			citrix_storage_log openqrm-citrix-storage "(noop) restart-by-mac VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "restart_by_mac" 5 "openqrm-citrix-storage" "(noop) restart-by-mac VM with mac address $CITRIX_STORAGE_VM_MAC!"
+		else
+			# attach vdi as vbd to vm
+			citrix_storage_log openqrm-citrix-storage "($CITRIX_STORAGE_VM_DISK) restart-by-mac VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "restart_by_mac" 5 "openqrm-citrix-storage" "($CITRIX_STORAGE_VM_DISK) restart-by-mac VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vbd-create vm-uuid=$CITRIX_STORAGE_VM_UUID device=0 vdi-uuid=$CITRIX_STORAGE_VM_DISK; then
+				citrix_storage_log openqrm-citrix-storage "Failed to attach VDI $CITRIX_STORAGE_VM_DISK to VM with mac address $CITRIX_STORAGE_VM_MAC!"
+				openqrm_post_event 0 "restart_by_mac" 3 "openqrm-citrix-storage" "Failed to attach VDI $CITRIX_STORAGE_VM_DISK to VM with mac address $CITRIX_STORAGE_VM_MAC!"
+			fi
+		fi
+		# restart vm
+		if ! $CITRIX_STORAGE_XE_BINARY vm-start -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID; then
+				citrix_storage_log openqrm-citrix-storage "Failed to restart VM with mac address $CITRIX_STORAGE_VM_MAC!"
+				openqrm_post_event 0 "restart_by_mac" 3 "openqrm-citrix-storage" "Failed to restart VM with mac address $CITRIX_STORAGE_VM_MAC!"
+				citrix_storage_lock release
+				exit 1
+		fi
+		citrix_storage_lock release
+		;;
+
+
+	reboot)
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "reboot Citrix-storage vms $CITRIX_STORAGE_VM_NAME"
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		$CITRIX_STORAGE_XE_BINARY vm-shutdown -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID force=true
+		$CITRIX_STORAGE_XE_BINARY vm-start -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID
+		# post the updated list to the openQRM-server
+		$0 post_vm_list -i $CITRIX_STORAGE_SERVER_IP
+		citrix_storage_lock release
+		;;
+	remove)
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Removing Citrix-storage vms $CITRIX_STORAGE_VM_NAME"
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# be sure it is off
+		$CITRIX_STORAGE_XE_BINARY vm-shutdown -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID force=true
+		$CITRIX_STORAGE_XE_BINARY vm-uninstall -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID force=true
+		rm -f $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_NAME.conf
+		# post the updated list to the openQRM-server
+		$0 post_vm_list -i $CITRIX_STORAGE_SERVER_IP
+		citrix_storage_lock release
+		;;
+
+
+	clone)
+		if [ "$CITRIX_STORAGE_VM_CLONE_NAME" == "" ]; then
+			citrix-storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_VM_MAC" == "" ]; then
+			citrix-storage_usage
+		fi
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Cloning Citrix-storage VM $CITRIX_STORAGE_VM_NAME to $CITRIX_STORAGE_VM_CLONE_NAME"
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "clone" 3 "openqrm-citrix-storage" "Failed to get the uuid for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		CITRIX_STORAGE_VM_CLONE_UUID=`$CITRIX_STORAGE_XE_BINARY vm-clone -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID vm=$CITRIX_STORAGE_VM_UUID new-name-label="$CITRIX_STORAGE_VM_CLONE_NAME" new-name-description="Clone from $CITRIX_STORAGE_VM_NAME"`
+		if [ "$CITRIX_STORAGE_VM_CLONE_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Error during cloning of $CITRIX_STORAGE_VM_NAME to $CITRIX_STORAGE_VM_CLONE_NAME!"
+			openqrm_post_event 0 "clone" 3 "openqrm-citrix-storage" "Failed to get the uuid for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# adapt first nic mac address
+		UUID_FIRST_NIC=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-list vm-uuid=$CITRIX_STORAGE_VM_CLONE_UUID | grep -B2 "device*.*: 0" | grep ^uuid | head -n1 | cut -d':' -f2 | awk '{ print $1 }'`
+		if [ "$UUID_FIRST_NIC" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to find the Management network interface of $CITRIX_STORAGE_VM_CLONE_NAME!"
+			openqrm_post_event 0 "clone" 3 "openqrm-citrix-storage" "Failed to find the Management network interface of $CITRIX_STORAGE_VM_CLONE_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# destroy 1. nic
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-destroy uuid=$UUID_FIRST_NIC; then
+			citrix_storage_log openqrm-citrix-storage "Failed to adapt the Management network MAC address of $CITRIX_STORAGE_VM_CLONE_NAME!"
+			openqrm_post_event 0 "clone" 3 "openqrm-citrix-storage" "Failed to adapt the Management network MAC address of $CITRIX_STORAGE_VM_CLONE_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# Find the network associated with the management interface. We'll assume that
+		# this is the network on which we want a network interface._{color}
+		NETWORK=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE network-list bridge=$CITRIX_STORAGE_MANAGEMENT_INTERFACE --minimal`
+		if [ "$NETWORK" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the default network bridge to create the vif device for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "clone" 3 "openqrm-citrix-storage" "Failed to get the default network bridge to create the vif device for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# Add a VIF linking the VM to the network
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-create vm-uuid=$CITRIX_STORAGE_VM_CLONE_UUID network-uuid=$NETWORK device=0 mac=$CITRIX_STORAGE_VM_MAC; then
+			citrix_storage_log openqrm-citrix-storage "Failed to create the vif device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "clone" 3 "openqrm-citrix-storage" "Failed to create the vif device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# store vm details
+		. $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_NAME.conf
+		# store vm details
+		echo "CITRIX_STORAGE_VM_RAM=\"$CITRIX_STORAGE_VM_RAM\"" > $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_CLONE_NAME.conf
+		echo "CITRIX_STORAGE_VM_CPU=\"$CITRIX_STORAGE_VM_CPU\"" >> $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_CLONE_NAME.conf
+		echo "CITRIX_STORAGE_VM_TEMPLATE=\"$CITRIX_STORAGE_VM_TEMPLATE\"" >> $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_CLONE_NAME.conf
+		echo "CITRIX_STORAGE_VM_BOOT=\"$CITRIX_STORAGE_VM_BOOT\"" >> $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_CLONE_NAME.conf
+
+		if ! $CITRIX_STORAGE_XE_BINARY vm-start -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_CLONE_UUID; then
+			citrix_storage_log openqrm-citrix-storage "Failed to start the cloned VM $CITRIX_STORAGE_VM_CLONE_NAME!"
+			openqrm_post_event 0 "clone" 3 "openqrm-citrix-storage" "Failed to start the cloned VM $CITRIX_STORAGE_VM_CLONE_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# post the updated list to the openQRM-server
+		$0 post_vm_list -i $CITRIX_STORAGE_SERVER_IP
+		citrix_storage_lock release
+		;;
+
+	update)
+		if [ "$CITRIX_STORAGE_VM_NAME" == "" ]; then
+			citrix-storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_VM_RAM" == "" ]; then
+			citrix-storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_VM_MAC" == "" ]; then
+			citrix-storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_VM_CPU" == "" ]; then
+			CITRIX_STORAGE_VM_CPU=1
+		fi
+		if [ "$CITRIX_STORAGE_VM_BOOT" == "" ]; then
+			CITRIX_STORAGE_VM_BOOT=net
+		else
+			CITRIX_STORAGE_VM_BOOT_PARAMETER=$CITRIX_STORAGE_VM_BOOT
+		fi
+
+		ADDITIONAL_NETWORK_PARAMATER=""
+		if [ "$CITRIX_STORAGE_VM_MAC1" != "" ]; then
+			ADDITIONAL_NETWORK_PARAMATER="$ADDITIONAL_NETWORK_PARAMATER -m1 $CITRIX_STORAGE_VM_MAC1"
+		fi
+		if [ "$CITRIX_STORAGE_VM_MAC2" != "" ]; then
+			ADDITIONAL_NETWORK_PARAMATER="$ADDITIONAL_NETWORK_PARAMATER -m2 $CITRIX_STORAGE_VM_MAC2"
+		fi
+		if [ "$CITRIX_STORAGE_VM_MAC3" != "" ]; then
+			ADDITIONAL_NETWORK_PARAMATER="$ADDITIONAL_NETWORK_PARAMATER -m3 $CITRIX_STORAGE_VM_MAC3"
+		fi
+		if [ "$CITRIX_STORAGE_VM_MAC4" != "" ]; then
+			ADDITIONAL_NETWORK_PARAMATER="$ADDITIONAL_NETWORK_PARAMATER -m4 $CITRIX_STORAGE_VM_MAC4"
+		fi
+		# addtional infos from config file
+		. $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_NAME.conf
+
+		citrix_storage_log openqrm-citrix-storage "Updating Citrix-storage VM $CITRIX_STORAGE_VM_NAME"
+		# remove
+ 		$0 remove -i $CITRIX_STORAGE_SERVER_IP -n $CITRIX_STORAGE_VM_NAME
+		# re-create
+		$0 create -i $CITRIX_STORAGE_SERVER_IP -n $CITRIX_STORAGE_VM_NAME -t $CITRIX_STORAGE_VM_TEMPLATE -l $CITRIX_STORAGE_VM_SR -m $CITRIX_STORAGE_VM_MAC -r $CITRIX_STORAGE_VM_RAM -c $CITRIX_STORAGE_VM_CPU -b $CITRIX_STORAGE_VM_BOOT_PARAMETER $ADDITIONAL_NETWORK_PARAMATER
+		;;
+
+
+	list)
+		citrix_storage_log openqrm-citrix-storage "Listing Citrix-storage vms"
+		$CITRIX_STORAGE_XE_BINARY vm-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE
+		;;
+	post_vm_list)
+		citrix_storage_log openqrm-citrix-storage "Posting VM list to the openQRM-server"
+		VM_VIF_LIST=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		# create list of vifs
+		$CITRIX_STORAGE_XE_BINARY vif-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE > $VM_VIF_LIST
+		# create list of vms
+		# skip dom0
+		$CITRIX_STORAGE_XE_BINARY vm-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE > $VM_TMPFILE1
+		for UUID in `cat $VM_TMPFILE1 | grep uuid | cut -d':' -f2 | awk {' print $1 '}`; do
+			CITRIX_STORAGE_VM_NAME=`grep -A 1 $UUID $VM_TMPFILE1 | grep name-label | cut -d':' -f2 | awk {' print $1 '}`
+			if [ "$CITRIX_STORAGE_VM_NAME" != "Control" ]; then
+				. $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_NAME.conf
+				VM_VMDETAILS_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+				$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-param-list uuid=$UUID > $VM_VMDETAILS_TMPFILE
+				CITRIX_STORAGE_VM_CPUS=`grep VCPUs-max $VM_VMDETAILS_TMPFILE | cut -d':' -f2 | awk '{ print $1 }'`
+				CITRIX_STORAGE_VM_MEM=$CITRIX_STORAGE_VM_RAM
+				CITRIX_STORAGE_VM_STATE=`grep power-state $VM_VMDETAILS_TMPFILE | cut -d':' -f2 | awk '{ print $1 }'`
+				CITRIX_STORAGE_VM_BOOT=`grep HVM-boot-params $VM_VMDETAILS_TMPFILE | cut -d':' -f3 | awk '{ print $1 }'`
+				CITRIX_STORAGE_VM_DOM_ID=`grep dom-id $VM_VMDETAILS_TMPFILE | cut -d':' -f2 | awk '{ print $1 }'`
+				CITRIX_STORAGE_VM_DATASTORE_UUID=`grep suspend-SR-uuid $VM_VMDETAILS_TMPFILE | cut -d':' -f2 | awk '{ print $1 }'`
+				CITRIX_STORAGE_VM_DATASTORE_NAME=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE sr-list uuid=$CITRIX_STORAGE_VM_DATASTORE_UUID | grep name-label | cut -d':' -f2 | awk '{ print $1 }'`
+
+				# gather the mac address
+				CITRIX_STORAGE_VM_VIF_UUID=`grep -B 2 "device.*: 0" $VM_VIF_LIST | grep -B 1 $UUID | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+				VM_NIC_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+				$CITRIX_STORAGE_XE_BINARY vif-param-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_VIF_UUID > $VM_VMDETAILS_TMPFILE
+				CITRIX_STORAGE_VM_MAC=`grep " MAC " $VM_VMDETAILS_TMPFILE | cut -d':' -f2- | awk {' print $1 '}`
+				rm -f $VM_VMDETAILS_TMPFILE
+				echo "$UUID""@""$CITRIX_STORAGE_VM_NAME""@""$CITRIX_STORAGE_VM_STATE""@""$CITRIX_STORAGE_VM_MAC""@""$CITRIX_STORAGE_VM_CPUS""@""$CITRIX_STORAGE_VM_MEM""@""$CITRIX_STORAGE_VM_BOOT""@""$CITRIX_STORAGE_VM_DOM_ID""@""$CITRIX_STORAGE_VM_DATASTORE_NAME""@" >> $VM_TMPFILE2
+			fi
+		done
+		chmod 777 $VM_TMPFILE2
+		/bin/cp -af $VM_TMPFILE2 $CITRIX_STORAGE_VM_LIST_TMP
+		chmod 777 $CITRIX_STORAGE_VM_LIST_TMP
+		rm -f $VM_TMPFILE1 $VM_TMPFILE2
+		;;
+
+
+	post_vm_config)
+		citrix_storage_log openqrm-citrix-storage "Posting VM config of $CITRIX_STORAGE_VM_NAME to the openQRM-server"
+		CITRIX_STORAGE_VM_CONFIG_TMP="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat/$CITRIX_STORAGE_SERVER_IP.$CITRIX_STORAGE_VM_NAME.vm_config"
+
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for  VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the uuid for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		> $VM_TMPFILE
+		VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY vm-param-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID > $VM_TMPFILE1
+		CITRIX_STORAGE_VM_CPUS=`grep VCPUs-max $VM_TMPFILE1 | cut -d':' -f2 | awk {' print $1 '}`
+		CITRIX_STORAGE_VM_SR_UUID=`grep suspend-SR-uuid $VM_TMPFILE1 | grep RW | cut -d':' -f2 | awk {' print $1 '}`
+		CITRIX_STORAGE_VM_SR_NAME=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE sr-param-list uuid=$CITRIX_STORAGE_VM_SR_UUID | grep name-label | cut -d':' -f2 | awk '{ print $1 }'`
+		# gather all nics belonging to the vm
+		VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY vif-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE > $VM_TMPFILE2
+		for CITRIX_STORAGE_VM_VIF_UUID in `grep -B1 $CITRIX_STORAGE_VM_UUID $VM_TMPFILE2 | grep ^uuid | cut -d':' -f2 | awk {' print $1 '}`; do
+			CITRIX_STORAGE_DEV_NUMBER=`grep -A2 $CITRIX_STORAGE_VM_VIF_UUID $VM_TMPFILE2 | grep -A1 $CITRIX_STORAGE_VM_UUID | grep device | cut -d':' -f2 | awk {' print $1 '}`
+			CITRIX_STORAGE_VM_ADD_MAC=`$CITRIX_STORAGE_XE_BINARY vif-param-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_VIF_UUID | grep " MAC " | cut -d':' -f2- | awk {' print $1 '}`
+			echo "OPENQRM_CITRIX_STORAGE_VM_MAC_$CITRIX_STORAGE_DEV_NUMBER=\"$CITRIX_STORAGE_VM_ADD_MAC\"" >> $VM_TMPFILE
+		done
+		# addtional infos from config file
+		. $OPENQRM_CITRIX_STORAGE_VM_CONF_DIR/$CITRIX_STORAGE_VM_NAME.conf
+		echo "OPENQRM_CITRIX_STORAGE_VM_CPUS=\"$CITRIX_STORAGE_VM_CPUS\"" >> $VM_TMPFILE
+		echo "OPENQRM_CITRIX_STORAGE_VM_RAM=\"$CITRIX_STORAGE_VM_RAM\"" >> $VM_TMPFILE
+		echo "OPENQRM_CITRIX_STORAGE_VM_SR_UUID=\"$CITRIX_STORAGE_VM_SR_UUID\"" >> $VM_TMPFILE
+		echo "OPENQRM_CITRIX_STORAGE_VM_SR_NAME=\"$CITRIX_STORAGE_VM_SR_NAME\"" >> $VM_TMPFILE
+		echo "OPENQRM_CITRIX_STORAGE_VM_TEMPLATE=\"$CITRIX_STORAGE_VM_TEMPLATE\"" >> $VM_TMPFILE
+		echo "OPENQRM_CITRIX_STORAGE_VM_BOOT=\"$CITRIX_STORAGE_VM_BOOT\"" >> $VM_TMPFILE
+
+		/bin/cp -f $VM_TMPFILE $CITRIX_STORAGE_VM_CONFIG_TMP
+		chmod 777 $CITRIX_STORAGE_VM_CONFIG_TMP
+		rm -f $VM_TMPFILE $VM_TMPFILE1
+		;;
+
+
+	post_template_list)
+		citrix_storage_log openqrm-citrix-storage "Posting template list to the openQRM-server"
+		VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		> $VM_TMPFILE2
+		for CITRIX_TEMPLATE_UUID in `$CITRIX_STORAGE_XE_BINARY template-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE params=uuid | grep ^uuid | cut -d':' -f2 | awk {' print $1 '}`; do
+			> $VM_TMPFILE1
+			$CITRIX_STORAGE_XE_BINARY template-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_TEMPLATE_UUID params=name-label,VCPUs-max,memory-static-min,memory-static-max > $VM_TMPFILE1
+			CITRIX_TEMPLATE_NAME=`grep name-label $VM_TMPFILE1 | cut -d':' -f2 | sed -e "s/ \{1,\}/@/g"`
+			CITRIX_STORAGE_VM_CPU_MAX=`grep -w VCPUs-max $VM_TMPFILE1 | cut -d':' -f2 | awk {' print $1 '}`
+			CITRIX_STORAGE_VM_MEMORY_MIN=`grep -w memory-static-min $VM_TMPFILE1 | cut -d':' -f2 | awk {' print $1 '}`
+			CITRIX_STORAGE_VM_MEMORY_MAX=`grep -w memory-static-max $VM_TMPFILE1 | cut -d':' -f2 | awk {' print $1 '}`
+			echo "$CITRIX_TEMPLATE_UUID:$CITRIX_TEMPLATE_NAME:$CITRIX_STORAGE_VM_CPU_MAX:$CITRIX_STORAGE_VM_MEMORY_MIN:$CITRIX_STORAGE_VM_MEMORY_MAX" >> $VM_TMPFILE2
+		done
+		/bin/cp -f $VM_TMPFILE2 $CITRIX_STORAGE_TEMPLATE_LIST_TMP
+		chmod 777 $CITRIX_STORAGE_TEMPLATE_LIST_TMP
+		rm -f $VM_TMPFILE1 $VM_TMPFILE2
+		;;
+
+
+	setboot)
+		if [ "$CITRIX_STORAGE_VM_MAC" == "" ]; then
+			citrix-storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_VM_BOOT" == "" ]; then
+			citrix-storage_usage
+		fi
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Setting Citrix-storage XenServer VM with mac $CITRIX_STORAGE_VM_MAC to $CITRIX_STORAGE_VM_BOOT"
+		VM_VIF_LIST=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		# create list of vifs
+		$CITRIX_STORAGE_XE_BINARY vif-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE > $VM_VIF_LIST
+		# create list of vms
+		# skip dom0
+		FOUND_VM=1
+		$CITRIX_STORAGE_XE_BINARY vm-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE > $VM_TMPFILE1
+		for UUID in `cat $VM_TMPFILE1 | grep uuid | cut -d':' -f2 | awk {' print $1 '}`; do
+			CITRIX_STORAGE_VM_NAME=`grep -A 1 $UUID $VM_TMPFILE1 | grep name-label | cut -d':' -f2 | awk {' print $1 '}`
+			if [ "$CITRIX_STORAGE_VM_NAME" != "Control" ]; then
+				CITRIX_STORAGE_VM_STATE=`grep -A 2 $UUID $VM_TMPFILE1 | grep power-state | cut -d':' -f2 | awk {' print $1 '}`
+				# gather the mac address
+				CITRIX_STORAGE_VM_VIF_UUID=`grep -B 1 $UUID $VM_VIF_LIST | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+				VM_NIC_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+				$CITRIX_STORAGE_XE_BINARY vif-param-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_VIF_UUID > $VM_NIC_TMPFILE
+				CITRIX_STORAGE_GATHER_VM_MAC=`grep " MAC " $VM_NIC_TMPFILE | cut -d':' -f2- | awk {' print $1 '}`
+				rm -f $VM_NIC_TMPFILE
+				if [ "$CITRIX_STORAGE_VM_MAC" == "$CITRIX_STORAGE_GATHER_VM_MAC" ]; then
+					citrix_storage_log openqrm-citrix-storage "Found Citrix-storage XenServer VM with name $CITRIX_STORAGE_VM_NAME, mac $CITRIX_STORAGE_VM_MAC and VM uuid $UUID"
+					FOUND_VM=1
+					CITRIX_STORAGE_VM_UUID=$UUID
+					break
+				fi
+			fi
+		done
+		rm -f $VM_TMPFILE1 $VM_TMPFILE2
+		if [ "$FOUND_VM" == 0 ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to find the Citrix-storage XenServer VM with mac $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to find the Citrix-storage XenServer VM with mac $CITRIX_STORAGE_VM_MAC!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		#change boot order to netbooting
+		case "$CITRIX_STORAGE_VM_BOOT" in
+			local)
+				VM_BOOT_ORDER="cnd"
+				;;
+			net)
+				VM_BOOT_ORDER="ncd"
+				;;
+		esac
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-param-set uuid=$CITRIX_STORAGE_VM_UUID HVM-boot-params:order=$VM_BOOT_ORDER; then
+			citrix_storage_log openqrm-citrix-storage "Failed to set the boot-order $VM_BOOT_ORDER for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to set the boot-order $VM_BOOT_ORDER for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# restart hard
+		$CITRIX_STORAGE_XE_BINARY vm-shutdown -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID force=true
+		$CITRIX_STORAGE_XE_BINARY vm-start -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID
+		citrix_storage_lock release
+		;;
+
+
+	update_vm_ram)
+		if [ "$CITRIX_STORAGE_VM_RAM" == "" ]; then
+			citrix-storage_usage
+		fi
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Editing RAM of Citrix-storage vms $CITRIX_STORAGE_VM_NAME to $CITRIX_STORAGE_VM_RAM"
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-param-set uuid=$CITRIX_STORAGE_VM_UUID memory-static-max=$CITRIX_STORAGE_VM_RAM
+		# post the updated list to the openQRM-server
+		$0 post_vm_config -i $CITRIX_STORAGE_SERVER_IP -n $CITRIX_STORAGE_VM_NAME
+		citrix_storage_lock release
+		;;
+
+	update_vm_cpus)
+		if [ "$CITRIX_STORAGE_VM_CPU" == "" ]; then
+			citrix-storage_usage
+		fi
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Updating CPUs of Citrix-storage vms $CITRIX_STORAGE_VM_NAME to $CITRIX_STORAGE_VM_CPU"
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# set cpus
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-param-set uuid=$CITRIX_STORAGE_VM_UUID VCPUs-at-startup=$CITRIX_STORAGE_VM_CPU; then
+			citrix_storage_log openqrm-citrix-storage "Failed to set VCPUs-at-startup for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to set VCPUs-at-startup for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-param-set uuid=$CITRIX_STORAGE_VM_UUID VCPUs-max=$CITRIX_STORAGE_VM_CPU; then
+			citrix_storage_log openqrm-citrix-storage "Failed to set VCPUs-max for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to set VCPUs-max for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# post the updated list to the openQRM-server
+		$0 post_vm_config -i $CITRIX_STORAGE_SERVER_IP -n $CITRIX_STORAGE_VM_NAME
+		citrix_storage_lock release
+		;;
+
+
+	add_vm_nic)
+		if [ "$CITRIX_STORAGE_VM_MAC" == "" ]; then
+			citrix-storage_usage
+		fi
+		if [ "$CITRIX_STORAGE_VM_COMPONENT_NUMBER" == "" ]; then
+			citrix-storage_usage
+		fi
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Adding nic $CITRIX_STORAGE_VM_COMPONENT_NUMBER to Citrix-storage vms $CITRIX_STORAGE_VM_NAME with $CITRIX_STORAGE_VM_MAC"
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+
+		# additional nics
+		# Find the network associated with the management interface. We'll assume that
+		# this is the network on which we want a network interface._{color}
+		EXTERNAL_NETWORK=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE network-list bridge=$CITRIX_STORAGE_EXTERNAL_INTERFACE --minimal`
+		if [ "$EXTERNAL_NETWORK" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the external network bridge to create the additional vif device for VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the external network bridge to create the additional vif device for VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		citrix_storage_log openqrm-citrix-storage " Creating nic2"
+		# Add a VIF linking the VM to the external network
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-create vm-uuid=$CITRIX_STORAGE_VM_UUID network-uuid=$EXTERNAL_NETWORK device=$CITRIX_STORAGE_VM_COMPONENT_NUMBER mac=$CITRIX_STORAGE_VM_MAC; then
+			citrix_storage_log openqrm-citrix-storage "Failed to create the nic $CITRIX_STORAGE_VM_COMPONENT_NUMBER device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to create the nic $CITRIX_STORAGE_VM_COMPONENT_NUMBER device for VM $CITRIX_STORAGE_VM_NAME with mac address $CITRIX_STORAGE_VM_MAC!"
+			citrix_storage_lock release
+			exit 1
+		fi
+
+		# post the updated list to the openQRM-server
+		$0 post_vm_config -i $CITRIX_STORAGE_SERVER_IP -n $CITRIX_STORAGE_VM_NAME
+		citrix_storage_lock release
+		;;
+
+
+	remove_vm_nic)
+		if [ "$CITRIX_STORAGE_VM_COMPONENT_NUMBER" == "" ]; then
+			citrix-storage_usage
+		fi
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Removing nic $CITRIX_STORAGE_VM_COMPONENT_NUMBER from Citrix-storage vms $CITRIX_STORAGE_VM_NAME"
+		# get its uuid
+		VM_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list > $VM_TMPFILE
+		CITRIX_STORAGE_VM_UUID=`grep -B 1 $CITRIX_STORAGE_VM_NAME $VM_TMPFILE | grep -B 1 name-label | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+		rm -f $VM_TMPFILE
+		if [ "$CITRIX_STORAGE_VM_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the uuid for the new created VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		VIF_UUID=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-list | grep -B3 "device.*: $CITRIX_STORAGE_VM_COMPONENT_NUMBER" | grep -B1 $CITRIX_STORAGE_VM_UUID | grep ^uuid | cut -d':' -f2 | awk {' print $1 '}`
+		if [ "$VIF_UUID" == "" ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to get the vif-uuid for the $CITRIX_STORAGE_VM_COMPONENT_NUMBER. nic of VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to get the vif-uuid for the $CITRIX_STORAGE_VM_COMPONENT_NUMBER. nic of VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		if ! $CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-destroy uuid=$VIF_UUID; then
+			citrix_storage_log openqrm-citrix-storage "Failed to remove the $CITRIX_STORAGE_VM_COMPONENT_NUMBER. vif ($VIF_UUID) on VM $CITRIX_STORAGE_VM_NAME!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to remove the $CITRIX_STORAGE_VM_COMPONENT_NUMBER. vif ($VIF_UUID) on VM $CITRIX_STORAGE_VM_NAME!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# post the updated list to the openQRM-server
+		$0 post_vm_config -i $CITRIX_STORAGE_SERVER_IP -n $CITRIX_STORAGE_VM_NAME
+		citrix_storage_lock release
+		;;
+
+
+	fence)
+		if [ "$CITRIX_STORAGE_VM_MAC" == "" ]; then
+			citrix-storage_usage
+		fi
+		citrix_storage_lock aquire
+		citrix_storage_log openqrm-citrix-storage "Fencing Citrix-storage XenServer VM with mac $CITRIX_STORAGE_VM_MAC"
+		VM_VIF_LIST=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		VM_TMPFILE2=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+		# create list of vifs
+		$CITRIX_STORAGE_XE_BINARY vif-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE > $VM_VIF_LIST
+		# create list of vms
+		# skip dom0
+		FOUND_VM=1
+		$CITRIX_STORAGE_XE_BINARY vm-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE > $VM_TMPFILE1
+		for UUID in `cat $VM_TMPFILE1 | grep uuid | cut -d':' -f2 | awk {' print $1 '}`; do
+			CITRIX_STORAGE_VM_NAME=`grep -A 1 $UUID $VM_TMPFILE1 | grep name-label | cut -d':' -f2 | awk {' print $1 '}`
+			if [ "$CITRIX_STORAGE_VM_NAME" != "Control" ]; then
+				CITRIX_STORAGE_VM_STATE=`grep -A 2 $UUID $VM_TMPFILE1 | grep power-state | cut -d':' -f2 | awk {' print $1 '}`
+				# gather the mac address
+				CITRIX_STORAGE_VM_VIF_UUID=`grep -B 1 $UUID $VM_VIF_LIST | grep uuid | cut -d':' -f2 | awk {' print $1 '}`
+				VM_NIC_TMPFILE=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+				$CITRIX_STORAGE_XE_BINARY vif-param-list -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_VIF_UUID > $VM_NIC_TMPFILE
+				CITRIX_STORAGE_GATHER_VM_MAC=`grep " MAC " $VM_NIC_TMPFILE | cut -d':' -f2- | awk {' print $1 '}`
+				rm -f $VM_NIC_TMPFILE
+				if [ "$CITRIX_STORAGE_VM_MAC" == "$CITRIX_STORAGE_GATHER_VM_MAC" ]; then
+					citrix_storage_log openqrm-citrix-storage "Found Citrix-storage XenServer VM with name $CITRIX_STORAGE_VM_NAME, mac $CITRIX_STORAGE_VM_MAC and VM uuid $UUID"
+					FOUND_VM=1
+					CITRIX_STORAGE_VM_UUID=$UUID
+					break
+				fi
+			fi
+		done
+		rm -f $VM_TMPFILE1 $VM_TMPFILE2
+		if [ "$FOUND_VM" == 0 ]; then
+			citrix_storage_log openqrm-citrix-storage "Failed to find the Citrix-storage XenServer VM with mac $CITRIX_STORAGE_VM_MAC!"
+			openqrm_post_event 0 "vm-install" 3 "openqrm-citrix-storage" "Failed to find the Citrix-storage XenServer VM with mac $CITRIX_STORAGE_VM_MAC!"
+			citrix_storage_lock release
+			exit 1
+		fi
+		# stop hard
+		$CITRIX_STORAGE_XE_BINARY vm-shutdown -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE uuid=$CITRIX_STORAGE_VM_UUID force=true
+		citrix_storage_lock release
+		;;
+
+
+	start_vnc)
+		CITRIX_STORAGE_VM_VNC_CONFIG=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat/$CITRIX_STORAGE_SERVER_IP"".""$CITRIX_STORAGE_VM_NAME"".vm_console
+		CITRIX_STORAGE_VM_VNC_CONFIG_TMP=$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat/$CITRIX_STORAGE_SERVER_IP"".""$CITRIX_STORAGE_VM_NAME"".vm_console.tmp
+		CITRIX_STORAGE_VM_VNC_PORT=`$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/bin/openqrm-citrix-cmd $CITRIX_STORAGE_SERVER_IP "xenstore-read /local/domain/$CITRIX_STORAGE_VM_COMPONENT_NUMBER/console/vnc-port" | grep -A1 xenstore-read | tail -n1`
+		CITRIX_STORAGE_VM_VNC_PORT=`echo $CITRIX_STORAGE_VM_VNC_PORT | tr -d '\r'`
+		if [ "$CITRIX_STORAGE_VM_VNC_PORT" == "" ]; then
+			echo "ERROR: Please enable remote SSH login in the Citrix XenServer at $CITRIX_STORAGE_SERVER_IP" > $CITRIX_STORAGE_VM_VNC_CONFIG_TMP
+			chmod 777 $CITRIX_STORAGE_VM_VNC_CONFIG_TMP
+			cp -af $CITRIX_STORAGE_VM_VNC_CONFIG_TMP $CITRIX_STORAGE_VM_VNC_CONFIG
+			chmod 777 $CITRIX_STORAGE_VM_VNC_CONFIG
+			rm -f $CITRIX_STORAGE_VM_VNC_CONFIG_TMP
+			openqrm_post_event 0 "start_vnc" 3 "openqrm-citrix-storage" "Please enable remote SSH login in the Citrix XenServer at $CITRIX_STORAGE_SERVER_IP!"
+			exit 1
+		fi
+		echo $CITRIX_STORAGE_VM_VNC_PORT > $CITRIX_STORAGE_VM_VNC_CONFIG_TMP
+		# local = vnc port + 3000
+		CITRIX_STORAGE_VM_LOCAL_PORT=8902
+		chmod 777 $CITRIX_STORAGE_VM_VNC_CONFIG_TMP
+		cp -af $CITRIX_STORAGE_VM_VNC_CONFIG_TMP $CITRIX_STORAGE_VM_VNC_CONFIG
+		chmod 777 $CITRIX_STORAGE_VM_VNC_CONFIG
+		rm -f $CITRIX_STORAGE_VM_VNC_CONFIG_TMP
+		# create the ssh tunnel
+		#  $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/bin/openqrm-citrix-tunnel $CITRIX_STORAGE_SERVER_IP $CITRIX_STORAGE_VM_LOCAL_PORT $CITRIX_STORAGE_VM_VNC_PORT
+		;;
+
+
+
+	statistics)
+		if [ "$CITRIX_STORAGE_VM_COMPONENT_NUMBER" == "" ]; then
+			citrix-storage_usage
+		fi
+		OPENQRM_EVENT="statistics"
+		OPENQRM_ACTIVE_STATE="active"
+		HOST_CONTROL_DOMAIN_UUID=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-list params=uuid,name-label | grep -B1 "Control domain" | grep ^uuid | head -n1 | cut -d':' -f2 | awk '{ print $1 }'`
+
+		if [ "$HOST_CONTROL_DOMAIN_UUID" != "" ]; then
+			VM_TMPFILE1=`mktemp /tmp/oq-vm.XXXXXX` || exit 1
+			$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vm-param-list uuid=$HOST_CONTROL_DOMAIN_UUID > $VM_TMPFILE1
+			VCPUS=`cat $VM_TMPFILE1 | grep VCPUs-number | cut -d':' -f2 | awk '{ print $1 }'`
+			VCPU_UTILIZATION=`cat $VM_TMPFILE1 | grep VCPUs-utilisation | cut -d':' -f2-  | sed -e 's#[0-9][0-9]:##g' | sed -e 's#[0-9]:##g' | sed -e 's#;#\n#g' | sort -r | head -n1 | awk '{ print $1 }'`
+			MEMORY_ACTUAL=`cat $VM_TMPFILE1 | grep memory-actual | cut -d':' -f2 | awk '{ print $1 }'`
+			MEMORY_ACTUAL=$(( $MEMORY_ACTUAL / 102400 ))
+			NETWORK_CARDS=`$CITRIX_STORAGE_XE_BINARY -s $CITRIX_STORAGE_SERVER_IP -pwf $CITRIX_STORAGE_SERVER_PASSWD_FILE vif-list | grep ^uuid | wc -l`
+			rm -f $VM_TMPFILE1
+			# send stats
+			citrix_storage_log openqrm-citrix-storage "Sending stats on behalf of Citrix-storage Host $CITRIX_STORAGE_SERVER_IP!"
+			current_uptime=`cat /proc/uptime | cut -d'.' -f 1`
+			MESSAGEDATA="resource_id=$CITRIX_STORAGE_VM_COMPONENT_NUMBER&resource_uptime=$current_uptime&resource_cpunumber=$VCPUS&resource_cpuspeed=$current_cpu_speed&resource_cpumodel=$current_cpu_model&resource_memtotal=$MEMORY_ACTUAL&resource_memused=$MEMORY_ACTUAL&resource_swaptotal=$current_swap_total&resource_swapused=$current_swap_used&resource_hostname=$CITRIX_STORAGE_VM_NAME&resource_load=$VCPU_UTILIZATION&resource_nics=$NETWORK_CARDS&resource_state=$OPENQRM_ACTIVE_STATE&resource_event=$OPENQRM_EVENT";
+			OPENQRM_RESOURCE_INFO_URL="$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/action/resource-monitor.php?resource_command=update_info&$MESSAGEDATA"
+			wget $WGET_NO_CERT_CHECK -q -O /dev/null "$OPENQRM_RESOURCE_INFO_URL"
+		fi
+		;;
+
+
+
+	*)
+		citrix-storage_usage
+		;;
+
+
+esac
+

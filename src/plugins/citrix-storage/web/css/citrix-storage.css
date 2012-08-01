@@ -1,0 +1,128 @@
+a {
+	text-decoration: none;
+}
+.password-button {
+	width: 150px;
+	font-size: 11px;
+	padding: 0px !important;
+	margin: 0 0 5px 0;
+	text-align: center;
+}
+#left_column {
+	border: 1px solid #BABABA;
+    height: 420px;
+    left: 5px;
+    margin: 0;
+    padding: 10px;
+    position: relative;
+    top: 0px;
+    width: 240px;
+	float: left;
+}
+#center_column {
+	border: 1px solid #BABABA;
+    height: 420px;
+    left: 10px;
+    margin: 0;
+    padding: 10px;
+    position: relative;
+    top: 0px;
+    width: 240px;
+	float: left;
+}
+#right_column {
+	border: 1px solid #BABABA;
+    height: 420px;
+    left: 15px;
+    margin: 0;
+    padding: 10px;
+    position: relative;
+    top: 0px;
+    width: 240px;
+	float: left;
+}
+#buttons {
+    margin: 10px 0 0 0;
+}
+
+.htmlobject_box .left {
+	width: 200px;
+}
+.htmlobject_td.appliance_action {
+    width: 30px;
+}
+.htmlobject_td.appliance_action a {
+    background: url("../../../img/edit.png") no-repeat scroll center top transparent;
+    border: 0 none;
+    color: transparent;
+    display: block;
+    line-height: 0;
+    overflow: hidden;
+    padding: 0 0 0;
+    text-align: center;
+    text-decoration: none;
+    width: 30px;
+    height: 30px;
+}
+
+
+/* Documentation */
+
+#documentation_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 750px;
+}
+
+#plugin_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 255px;
+}
+
+
+
+#introduction_content {
+    padding: 0px 5px !important;
+}
+#provides_content {
+    padding: 0px 10px !important;
+}
+#requirements_content {
+    padding: 0px 10px !important;
+}
+#migration_content {
+    padding: 0px 5px !important;
+}
+
+#storage_mgmt_content {
+    padding: 0px 10px !important;
+}
+
+#vm_mgmt_content {
+    padding: 0px 10px !important;
+}
+
+#plugin_type {
+	width: 240px;
+	height: 40px;
+    top: 0px;
+}
+
+#deployment_type {
+	width: 240px;
+	height: 40px;
+    top: 0px;
+
+}
+
+#tested_with {
+	width: 240px;
+	height: 100px;
+    top: 0px;
+
+}

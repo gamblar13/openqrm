@@ -1,0 +1,146 @@
+#!/bin/bash
+# init script for the openQRM citrix-storage-plugin
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/include/openqrm-plugin-citrix-storage-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/etc/openqrm-plugin-citrix-storage.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export LANG=C
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+# define wget to use with https
+if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+
+function openqrm_plugin_citrix-storage_check_for_xe() {
+	if [ ! -x "$CITRIX_STORAGE_XE_BINARY" ]; then
+		echo "openqrm-plugin-citrix-storage" "Xe binary ($CITRIX_STORAGE_XE_BINARY) missing! Could not enable the Citrix-storage plugin"
+		echo "Please install the Xe binary (xen-server-tools package) !"
+		openqrm_post_event 0 "citrix-storage" 3 "openqrm-plugin-citrix-storage" "XenServer xe tool ($CITRIX_STORAGE_XE_BINARY) missing! Could not enable the Citrix-storage plugin"
+		openqrm_post_event 0 "citrix-storage" 3 "openqrm-plugin-citrix-storage" "Please copy the Xe binary from a XenServer to $CITRIX_STORAGE_XE_BINARY on your openQRM Server !"
+		exit 1
+	fi
+
+}
+
+
+function openqrm_plugin_citrix-storage_start() {
+	echo "Starting the openQRM citrix-storage-plugin"
+	openqrm_plugin_citrix-storage_check_for_xe
+	touch $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/citrix-storage/.running
+}
+
+
+function openqrm_plugin_citrix-storage_stop() {
+	echo "Stopping the openQRM citrix-storage-plugin"
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/citrix-storage/.running
+}
+
+function openqrm_plugin_citrix-storage_uninstall() {
+	local USERNAME=$1
+	local PASSWORD=$2
+	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
+		echo -n "citrix-storage: Please give a username to uninstall the plugin : "
+		read USERNAME
+		echo
+		echo -n "citrix-storage: Please give the password for user $USERNAME : "
+		read PASSWORD
+		echo
+	fi
+	echo "Uninstalling the openQRM citrix-storage-plugin"
+	openqrm_plugin_citrix-storage_stop
+	# removing the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/citrix-storage/citrix-storage-action.php?citrix_storage_command=uninstall"; then
+		citrix_storage_log uninstall "ERROR: Could not drop the citrix-storage plugin tables in the database!"
+	fi
+	openqrm_server_remove_deployment_type $USERNAME $PASSWORD citrix-deployment
+	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD citrix-storage
+	openqrm_server_remove_virtualization_type $USERNAME $PASSWORD citrix-storage-vm
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/citrix-storage
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.citrix-deployment.php
+	rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat
+
+}
+
+function openqrm_plugin_citrix-storage_init() {
+	local USERNAME=$1
+	local PASSWORD=$2
+	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
+		echo -n "citrix-storage: Please give a username to init the plugin : "
+		read USERNAME
+		echo
+		echo -n "citrix-storage: Please give the password for user $USERNAME : "
+		read PASSWORD
+		echo
+	fi
+	echo "Initializing the openQRM citrix-storage-plugin"
+	openqrm_plugin_citrix-storage_check_for_xe
+	# add deployment type
+	openqrm_server_add_deployment_type $USERNAME $PASSWORD citrix-deployment citrix-deployment "Local Deployment Citrix" citrix-storage "Citrix Storage"
+	# adding virtualization type
+	openqrm_server_add_virtualization_type $USERNAME $PASSWORD citrix-storage "Citrix-storage Host"
+	openqrm_server_add_virtualization_type $USERNAME $PASSWORD citrix-storage-vm "Citrix-storage VM"
+	# linking the web dir
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/citrix-storage
+	# creating the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/citrix-storage/citrix-storage-action.php?citrix_storage_command=init"; then
+		citrix_storage_log init "ERROR: Could not create the citrix-storage plugin tables in the database!"
+		return 1
+	fi
+	# create dir for stat files
+	mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat
+	chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/citrix-storage-stat
+	# linking the rootdevice identifier hook
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/citrix-storage/web/image.citrix-deployment.php $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/image.citrix-deployment.php
+
+}
+
+USER=$2
+PASS=$3
+
+case "$1" in
+	start)
+		openqrm_plugin_citrix-storage_start
+		;;
+	stop)
+		openqrm_plugin_citrix-storage_stop
+		;;
+	restart)
+		openqrm_plugin_citrix-storage_stop
+		sleep 1
+		openqrm_plugin_citrix-storage_start
+		;;
+	init)
+		openqrm_plugin_citrix-storage_init $USER $PASS
+		;;
+	uninstall)
+		openqrm_plugin_citrix-storage_uninstall $USER $PASS
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|init|uninstall}"
+		exit 1
+
+esac
+exit $?
+
+
+
+
