@@ -1,0 +1,459 @@
+#!/bin/bash
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+# this script automatically manages hybrid-cloud
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/hybrid-cloud/include/openqrm-plugin-hybrid-cloud-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/hybrid-cloud/etc/openqrm-plugin-hybrid-cloud.conf
+# get the ip config
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export LANG=C
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+# stat dir
+HYBRID_CLOUD_STAT_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/hybrid-cloud/web/stat/"
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+
+if ! which screen 1>/dev/null; then
+	echo "ERROR: The 'screen' utility is not installed! Please install and try again."
+	hybrid_cloud_log "ERROR: The 'screen' utility is not installed! Please install and try again."
+	exit 6
+fi
+
+# re-run in background via screen
+if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+	if [ -x /usr/bin/screen.real ]; then
+		RUNSCREEN="/usr/bin/screen.real"
+	else
+		RUNSCREEN=`which screen`
+	fi
+	export RUN_IN_BACKGROUND=true
+	SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+	$RUNSCREEN -dmS $SCREEN_NAME $0 $@
+	exit
+fi
+# create stat dir
+if [ ! -d "$HYBRID_CLOUD_STAT_DIR" ]; then
+	mkdir -p $HYBRID_CLOUD_STAT_DIR
+	chmod -R 777 $HYBRID_CLOUD_STAT_DIR
+fi
+
+
+function hybrid_cloud_usage() {
+	echo "Usage : $0 describe_instances -n <account-name> -i <account-id> -c <path-to-eucarc> -t <cloud-type>"
+	echo "        $0 import_instance -n <account-name> -i <account-id> -c <path-to-eucarc> -t <cloud-type> -x <instance-id> -k <ssh-key> -s <image-storage:/image-path/>"
+	echo "        $0 export_image -n <account-name> -i <account-id> -c <path-to-eucarc> -t <cloud-type> -s <image-storage:/image-path/> -m <ami-size(in MB)> -r <ami-architecture> -a <ami-name> [-l <aws-location>]"
+	echo "        $0 iso <-q path>"
+	exit 1
+}
+
+
+HYBRID_CLOUD_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-i)
+			PARAM_HYBRID_CLOUD_ACCOUNT_ID=$2
+			shift
+			;;
+		-n)
+			PARAM_HYBRID_CLOUD_ACCOUNT_NAME=$2
+			shift
+			;;
+		-t)
+			PARAM_HYBRID_CLOUD_ACCOUNT_TYPE=$2
+			shift
+			;;
+		-c)
+			PARAM_EUCA_CONF=$2
+			shift
+			;;
+		-s)
+			PARAM_IMAGE_STORE=$2
+			shift
+			;;
+		-x)
+			PARAM_INSTANCE_ID=$2
+			shift
+			;;
+		-k)
+			PARAM_SSH_KEY=$2
+			shift
+			;;
+		-l)
+			PARAM_EXPORT_LOCATION=$2
+			shift
+			;;
+		-m)
+			PARAM_AMI_SIZE=$2
+			shift
+			;;
+		-r)
+			PARAM_AMI_ARCH=$2
+			shift
+			;;
+		-a)
+			PARAM_AMI_NAME=$2
+			shift
+			;;
+		-q)
+			PARAM_HOST_PATH=$2
+			shift
+			;;
+
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			hybrid_cloud_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+# checks
+if [ "$HYBRID_CLOUD_COMMAND" == "" ]; then
+	hybrid_cloud_usage
+fi
+if [ "$HYBRID_CLOUD_COMMAND" != "iso" ]; then
+	if [ "$PARAM_HYBRID_CLOUD_ACCOUNT_ID" == "" ]; then
+		hybrid_cloud_usage
+	fi
+	if [ "$PARAM_HYBRID_CLOUD_ACCOUNT_TYPE" == "" ]; then
+		hybrid_cloud_usage
+	fi
+	if [ "$PARAM_EUCA_CONF" == "" ]; then
+		hybrid_cloud_usage
+	else
+		if [ ! -f $PARAM_EUCA_CONF ]; then
+			openqrm_post_event 0 "get" 3 "openqrm-hybrid-cloud" "Cloud configuration file $PARAM_EUCA_CONF not found"
+		else
+			. $PARAM_EUCA_CONF
+		fi
+	fi
+fi
+
+# map the cloud types to the utils names
+case "$PARAM_HYBRID_CLOUD_ACCOUNT_TYPE" in
+	uec)
+		DESCRIBE_INSTANCES="euca-describe-instances"
+		BUNDLE_IMAGE="euca-bundle-image"
+		UPLOAD_BUNDLE="euca-upload-bundle"
+		REGISTER="euca-register"
+		;;
+	aws)
+		DESCRIBE_INSTANCES="ec2-describe-instances"
+		BUNDLE_IMAGE="ec2-bundle-image"
+		UPLOAD_BUNDLE="ec2-upload-bundle"
+		REGISTER="ec2-register"
+		;;
+	euca)
+		DESCRIBE_INSTANCES="euca-describe-instances"
+		BUNDLE_IMAGE="euca-bundle-image"
+		UPLOAD_BUNDLE="euca-upload-bundle"
+		REGISTER="euca-register"
+		;;
+esac
+
+
+# main
+case "$HYBRID_CLOUD_COMMAND" in
+	describe_instances)
+		if [ "$PARAM_HYBRID_CLOUD_ACCOUNT_NAME" == "" ]; then
+			hybrid_cloud_usage
+		fi
+		$DESCRIBE_INSTANCES > $HYBRID_CLOUD_STAT_DIR/$PARAM_HYBRID_CLOUD_ACCOUNT_ID.describe_instances.log.tmp.1
+		HYBRID_CLOUD_RET=$?
+		if [ "$HYBRID_CLOUD_RET" != 0 ]; then
+			openqrm_post_event 0 "get" 3 "openqrm-hybrid-cloud" "Could not list cloud instances for account $PARAM_HYBRID_CLOUD_ACCOUNT_NAME!"
+		else
+			grep INSTANCE $HYBRID_CLOUD_STAT_DIR/$PARAM_HYBRID_CLOUD_ACCOUNT_ID.describe_instances.log.tmp.1 | grep running > $HYBRID_CLOUD_STAT_DIR/$PARAM_HYBRID_CLOUD_ACCOUNT_ID.describe_instances.log.tmp
+			sed -i -e "s/\x09/@/g" $HYBRID_CLOUD_STAT_DIR/$PARAM_HYBRID_CLOUD_ACCOUNT_ID.describe_instances.log.tmp
+			sed -i -e "s/\x20/@/g" $HYBRID_CLOUD_STAT_DIR/$PARAM_HYBRID_CLOUD_ACCOUNT_ID.describe_instances.log.tmp
+			chmod -R 777 $HYBRID_CLOUD_STAT_DIR/$PARAM_HYBRID_CLOUD_ACCOUNT_ID.describe_instances.log.tmp
+			mv -f $HYBRID_CLOUD_STAT_DIR/$PARAM_HYBRID_CLOUD_ACCOUNT_ID.describe_instances.log.tmp $HYBRID_CLOUD_STAT_DIR/$PARAM_HYBRID_CLOUD_ACCOUNT_ID.describe_instances.log
+			rm -f $HYBRID_CLOUD_STAT_DIR/$PARAM_HYBRID_CLOUD_ACCOUNT_ID.describe_instances.log.tmp.1 $HYBRID_CLOUD_STAT_DIR/$PARAM_HYBRID_CLOUD_ACCOUNT_ID.describe_instances.log.tmp
+		fi
+		;;
+
+	import_instance)
+		if [ "$PARAM_INSTANCE_ID" == "" ] || [ "$PARAM_HYBRID_CLOUD_ACCOUNT_NAME" == "" ] || [ "$PARAM_IMAGE_STORE" == "" ] || [ "$PARAM_SSH_KEY" == "" ]; then
+			hybrid_cloud_usage
+		fi
+		c_log "NOTICE: Importing $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE Instance $PARAM_INSTANCE_ID to Server Image at $PARAM_IMAGE_STORE"
+		hybrid_cloud_log "NOTICE: -> using ssh-key file $PARAM_SSH_KEY"
+		# active event
+		openqrm_post_event 0 "$PARAM_INSTANCE_ID" 9 "openqrm-hybrid-cloud" "Importing EC2 Instance $PARAM_INSTANCE_ID to $PARAM_IMAGE_STORE!"
+
+		MOUNTPOINT=`mktemp -d /tmp/$PARAM_INSTANCE_ID.XXXXXXXXXX` || exit 1
+		if ! mount -t nfs $PARAM_IMAGE_STORE $MOUNTPOINT; then
+			hybrid_cloud_log "ERROR: Could not mount $PARAM_IMAGE_STORE!"
+			openqrm_post_event 0 "$PARAM_INSTANCE_ID" 10 "openqrm-hybrid-cloud" "Importing EC2 Instance $PARAM_INSTANCE_ID to $PARAM_IMAGE_STORE!"
+			openqrm_post_event 0 "import_instance" 3 "openqrm-hybrid-cloud" "Could not mount $PARAM_IMAGE_STORE!"
+			exit 1
+		else
+			hybrid_cloud_log "NOTICE: Mounted $PARAM_IMAGE_STORE. Starting the import."
+			openqrm_post_event 0 "import_instance" 5 "openqrm-hybrid-cloud" "Mounted $PARAM_IMAGE_STORE. Starting the import."
+		fi
+
+		# starting import via rsync
+		INSTANCE_HOSTNAME=`$DESCRIBE_INSTANCES $PARAM_INSTANCE_ID | grep INSTANCE | awk {' print $4 '}`
+		if [ "$INSTANCE_HOSTNAME" == "" ]; then
+			umount $MOUNTPOINT
+			rmdir $MOUNTPOINT
+			hybrid_cloud_log "ERROR: Could not get hostname from $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE Instance $PARAM_INSTANCE_ID"
+			openqrm_post_event 0 "$PARAM_INSTANCE_ID" 10 "openqrm-hybrid-cloud" "Importing EC2 Instance $PARAM_INSTANCE_ID to $PARAM_IMAGE_STORE!"
+			openqrm_post_event 0 "import_instance" 3 "openqrm-hybrid-cloud" "Could not get hostname from $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE Instance $PARAM_INSTANCE_ID"
+			exit 1
+		else
+			hybrid_cloud_log "NOTICE: Got hostname $INSTANCE_HOSTNAME for $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE Instance $PARAM_INSTANCE_ID"
+			openqrm_post_event 0 "import_instance" 5 "openqrm-hybrid-cloud" "Got hostname $INSTANCE_HOSTNAME for $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE Instance $PARAM_INSTANCE_ID"
+		fi
+		# run one simple command per expetc + ssh so the machine key gets accpeted and added to known_hosts
+		hybrid_cloud_log "NOTICE: Checking ssh connection to $INSTANCE_HOSTNAME via key $PARAM_SSH_KEY"
+		$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/hybrid-cloud/bin/openqrm-hybrid-cloud-ssh $INSTANCE_HOSTNAME $PARAM_SSH_KEY ls
+
+		hybrid_cloud_log "NOTICE: Starting AMI import of $INSTANCE_HOSTNAME to $PARAM_IMAGE_STORE"
+		rsync -az -e "ssh -i $PARAM_SSH_KEY" --exclude /proc --exclude /sys $INSTANCE_HOSTNAME:/* $MOUNTPOINT/
+		RSYNC_RET=$?
+		# some more preparations ....
+		mkdir -p $MOUNTPOINT/proc $MOUNTPOINT/sys
+		# debian/ubuntu
+		if [ -f $MOUNTPOINT/etc/debian_version ]; then
+			# remove network, plymouth and cloud init
+			rm -f $MOUNTPOINT/etc/init/plymouth*
+			rm -f $MOUNTPOINT/etc/init/cloud-*
+			# remove possible uec services
+			chroot $MOUNTPOINT/ update-rc.d -f landscape-client remove
+			# remove possible ec2 services
+			chroot $MOUNTPOINT/ update-rc.d -f ec2-get-credentials remove
+			chroot $MOUNTPOINT/ update-rc.d -f ec2-run-user-data remove
+			chroot $MOUNTPOINT/ update-rc.d -f ifupdown remove
+			chroot $MOUNTPOINT/ update-rc.d -f ec2-ssh-host-key-gen remove
+			chroot $MOUNTPOINT/ update-rc.d -f ec2-killall-nash-hotplug remove
+			chroot $MOUNTPOINT/ update-rc.d -f ec2-mkdir-tmp remove
+
+		elif [ -f $MOUNTPOINT/etc/redhat-release ]; then
+		# redhat/centos
+			rm -f $MOUNTPOINT/etc/init/plymouth*
+			rm -f $MOUNTPOINT/etc/init/cloud-*
+
+		fi
+		# umount and finalize
+		umount $MOUNTPOINT
+		rmdir $MOUNTPOINT
+		if ! [ $RSYNC_RET == 24 -o $RSYNC_RET == 23 -o $RSYNC_RET == 0 ]; then
+			hybrid_cloud_log "ERROR: Error importing $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE Instance $PARAM_INSTANCE_ID"
+			openqrm_post_event 0 "$PARAM_INSTANCE_ID" 10 "openqrm-hybrid-cloud" "Importing EC2 Instance $PARAM_INSTANCE_ID to $PARAM_IMAGE_STORE!"
+			openqrm_post_event 0 "import_instance" 3 "openqrm-hybrid-cloud" "Error importing $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE Instance $PARAM_INSTANCE_ID"
+			exit 1
+		fi
+		hybrid_cloud_log "NOTICE: Successfully created Server-image from $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE Instance $PARAM_INSTANCE_ID"
+		openqrm_post_event 0 "$PARAM_INSTANCE_ID" 10 "openqrm-hybrid-cloud" "Importing EC2 Instance $PARAM_INSTANCE_ID to $PARAM_IMAGE_STORE!"
+		openqrm_post_event 0 "import_instance" 5 "openqrm-hybrid-cloud" "Successfully imported $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE Instance $PARAM_INSTANCE_ID to Server Image at $PARAM_IMAGE_STORE"
+
+		;;
+
+
+	export_image)
+		if [ "$PARAM_AMI_SIZE" == "" ] || [ "$PARAM_AMI_NAME" == "" ] || [ "$PARAM_AMI_ARCH" == "" ] || [ "$PARAM_IMAGE_STORE" == "" ]; then
+			hybrid_cloud_usage
+		fi
+		hybrid_cloud_log "NOTICE: Exporting Server Image at $PARAM_IMAGE_STORE to $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE as a new AMI $PARAM_AMI_NAME"
+		openqrm_post_event 0 "$PARAM_AMI_NAME" 9 "openqrm-hybrid-cloud" "Exporting $PARAM_IMAGE_STORE to AMI $PARAM_AMI_NAME!"
+
+		MOUNTPOINT=`mktemp -d /tmp/image-mnt.XXXXXXXXXX` || exit 1
+		if ! mount -t nfs $PARAM_IMAGE_STORE $MOUNTPOINT; then
+			hybrid_cloud_log "ERROR: Could not mount $PARAM_IMAGE_STORE!"
+			openqrm_post_event 0 "$PARAM_AMI_NAME" 10 "openqrm-hybrid-cloud" "Exporting $PARAM_IMAGE_STORE to AMI $PARAM_AMI_NAME!"
+			openqrm_post_event 0 "export_image" 3 "openqrm-hybrid-cloud" "Could not mount $PARAM_IMAGE_STORE!"
+			exit 1
+		else
+			hybrid_cloud_log "NOTICE: Mounted $PARAM_IMAGE_STORE."
+			openqrm_post_event 0 "export_image" 5 "openqrm-hybrid-cloud" "Mounted $PARAM_IMAGE_STORE."
+		fi
+		LOOP_IMAGE_FILE="/tmp/$PARAM_AMI_NAME.img"
+		LOOP_IMAGE_MNT=`mktemp -d /tmp/image-loop-mnt.XXXXXXXXXX` || exit 1
+	   dd if=/dev/zero of=$LOOP_IMAGE_FILE bs=1M seek=$PARAM_AMI_SIZE count=1
+		mkfs.ext3 -F $LOOP_IMAGE_FILE
+		if ! mount -o loop $LOOP_IMAGE_FILE $LOOP_IMAGE_MNT; then
+			hybrid_cloud_log "ERROR: Could not loop mount $LOOP_IMAGE_FILE!"
+			openqrm_post_event 0 "$PARAM_AMI_NAME" 10 "openqrm-hybrid-cloud" "Exporting $PARAM_IMAGE_STORE to AMI $PARAM_AMI_NAME!"
+			openqrm_post_event 0 "export_image" 3 "openqrm-hybrid-cloud" "Could not loop mount $LOOP_IMAGE_FILE!"
+			exit 1
+		else
+			hybrid_cloud_log "NOTICE: Loop mounted $LOOP_IMAGE_FILE."
+			openqrm_post_event 0 "export_image" 5 "openqrm-hybrid-cloud" "Mounted $PARAM_IMAGE_STORE."
+		fi
+		rsync -az $MOUNTPOINT/* $LOOP_IMAGE_MNT/
+		RSYNC_RET=$?
+		if ! [ $RSYNC_RET == 24 -o $RSYNC_RET == 23 -o $RSYNC_RET == 0 ]; then
+			umount $MOUNTPOINT
+			rmdir $MOUNTPOINT
+			hybrid_cloud_log "ERROR: Syncing the Image to loop-back file failed. Exiting"
+			openqrm_post_event 0 "$PARAM_AMI_NAME" 10 "openqrm-hybrid-cloud" "Exporting $PARAM_IMAGE_STORE to AMI $PARAM_AMI_NAME!"
+			openqrm_post_event 0 "export_image" 3 "openqrm-hybrid-cloud" "Syncing the Image to loop-back file failed. Exiting"
+			exit 1
+		fi
+
+		# modify it a bit to fit to ec2
+		rm -rf $LOOP_IMAGE_MNT/$OPENQRM_SERVER_BASE_DIR/openqrm
+		rm -f $LOOP_IMAGE_MNT/iauth*
+		cd $LOOP_IMAGE_MNT/etc
+		rm -f `find -name openqrm-client`
+		cd - 1>/dev/null
+		# create network config
+		if [ -f $LOOP_IMAGE_MNT/etc/debian_version ]; then
+			rm -f $LOOP_IMAGE_MNT/etc/network/interfaces
+			cat >> $LOOP_IMAGE_MNT/etc/network/interfaces << EOF
+auto lo
+iface lo inet loopback
+auto eth0
+iface eth0 inet dhcp
+EOF
+
+		elif [ -f $LOOP_IMAGE_MNT/etc/redhat-release ]; then
+			rm -f $LOOP_IMAGE_MNT/etc/sysconfig/network-scripts/ifcfg-eth0
+			cat >> $LOOP_IMAGE_MNT/etc/sysconfig/network-scripts/ifcfg-eth0 << EOF
+DEVICE=eth0
+BOOTPROTO=dhcp
+ONBOOT=yes
+TYPE=Ethernet
+USERCTL=yes
+PEERDNS=yes
+IPV6INIT=no
+EOF
+			echo "NETWORKING=yes" > $LOOP_IMAGE_MNT/etc/sysconfig/network.
+		fi
+		# re-create fstab / small instances only for now
+		rm -f $LOOP_IMAGE_MNT/etc/fstab
+		cat >> $LOOP_IMAGE_MNT/etc/fstab << EOF
+/dev/sda1  /         ext3    defaults        1 1
+none       /dev/pts  devpts  gid=5,mode=620  0 0
+none       /dev/shm  tmpfs   defaults        0 0
+none       /proc     proc    defaults        0 0
+none       /sys      sysfs   defaults        0 0
+EOF
+
+		# create required devices
+		mknod $LOOP_IMAGE_MNT/dev/zero c 1 5
+		mknod $LOOP_IMAGE_MNT/dev/null c 1 3
+		mknod $LOOP_IMAGE_MNT/dev/tty c 5 0
+		mknod $LOOP_IMAGE_MNT/dev/console c 5 1
+		mknod $LOOP_IMAGE_MNT/dev/ptmx c 5 2
+		mknod $LOOP_IMAGE_MNT/dev/tty0 c 4 0
+		mknod $LOOP_IMAGE_MNT/dev/tty1 c 4 1
+		mknod $LOOP_IMAGE_MNT/dev/sda b 8 0
+		mknod $LOOP_IMAGE_MNT/dev/sda1 b 8 1
+		mknod $LOOP_IMAGE_MNT/dev/sda2 b 8 2
+		mknod $LOOP_IMAGE_MNT/dev/sda3 b 8 3
+
+		# umounting
+		umount $MOUNTPOINT
+		rmdir $MOUNTPOINT
+		umount $LOOP_IMAGE_MNT
+		rmdir $LOOP_IMAGE_MNT
+
+		# define a separated log for each ami
+		CLOUD_TOOLS_DEBUG_LOG="/tmp/$PARAM_AMI_NAME.export.debug.log"
+		CLOUD_TOOLS_ERROR_LOG="/tmp/$PARAM_AMI_NAME.export.error.log"
+
+
+		# bundle
+		hybrid_cloud_log "BUNDLING: $BUNDLE_IMAGE -i $LOOP_IMAGE_FILE -c $EC2_CERT -k $EC2_PRIVATE_KEY -u $PARAM_HYBRID_CLOUD_ACCOUNT -r $PARAM_AMI_ARCH"
+		if ! $BUNDLE_IMAGE -i $LOOP_IMAGE_FILE -c $EC2_CERT -k $EC2_PRIVATE_KEY -u $EC2_USER_ID -r $PARAM_AMI_ARCH 1>$CLOUD_TOOLS_DEBUG_LOG 2>$CLOUD_TOOLS_ERROR_LOG; then
+			hybrid_cloud_log "ERROR: Bundling AMI $LOOP_IMAGE_FILE! failed"
+			openqrm_post_event 0 "$PARAM_AMI_NAME" 10 "openqrm-hybrid-cloud" "Exporting $PARAM_IMAGE_STORE to AMI $PARAM_AMI_NAME!"
+			openqrm_post_event 0 "export_image" 3 "openqrm-hybrid-cloud" "Bundling AMI $LOOP_IMAGE_FILE! failed"
+			exit 1
+		else
+			hybrid_cloud_log "NOTICE: Successfully bundled $LOOP_IMAGE_FILE."
+			openqrm_post_event 0 "export_image" 5 "openqrm-hybrid-cloud" "Successfully bundled $LOOP_IMAGE_FILE."
+		fi
+		# for aws we need to set the location for the upload
+		if [ "$PARAM_HYBRID_CLOUD_ACCOUNT_TYPE" == "aws" ]; then
+			if [ "$PARAM_EXPORT_LOCATION" == "" ]; then
+				PARAM_EXPORT_LOCATION="$EC2_DEFAULT_LOCATION"
+			fi
+			EC2_UPLOAD_BUNDLE_PARAMETER=" --location $PARAM_EXPORT_LOCATION"
+		fi
+		# upload
+		hybrid_cloud_log "UPLOADING: $UPLOAD_BUNDLE -b $PARAM_AMI_NAME -m /tmp/$PARAM_AMI_NAME.img.manifest.xml -a $EC2_ACCESS_KEY -s $EC2_SECRET_KEY $EC2_UPLOAD_BUNDLE_PARAMETER"
+		if ! $UPLOAD_BUNDLE -b $PARAM_AMI_NAME -m /tmp/$PARAM_AMI_NAME.img.manifest.xml -a $EC2_ACCESS_KEY -s $EC2_SECRET_KEY $EC2_UPLOAD_BUNDLE_PARAMETER 1>>$CLOUD_TOOLS_DEBUG_LOG 2>>$CLOUD_TOOLS_ERROR_LOG; then
+			hybrid_cloud_log "ERROR: Uploading bundled AMI $LOOP_IMAGE_FILE! failed"
+			openqrm_post_event 0 "$PARAM_AMI_NAME" 10 "openqrm-hybrid-cloud" "Exporting $PARAM_IMAGE_STORE to AMI $PARAM_AMI_NAME!"
+			openqrm_post_event 0 "export_image" 3 "openqrm-hybrid-cloud" "Uploading bundled AMI $LOOP_IMAGE_FILE! failed"
+			exit 1
+		else
+			hybrid_cloud_log "NOTICE: Successfully uploaded bundled AMI $LOOP_IMAGE_FILE."
+			openqrm_post_event 0 "export_image" 5 "openqrm-hybrid-cloud" "Successfully uploaded bundled AMI $LOOP_IMAGE_FILE."
+		fi
+		# register
+		hybrid_cloud_log "REGISTER: $REGISTER -U $EC2_URL $PARAM_AMI_NAME/$PARAM_AMI_NAME.img.manifest.xml"
+		HYBRID_CLOUD_AMI_NAME=`$REGISTER -U $EC2_URL $PARAM_AMI_NAME/$PARAM_AMI_NAME.img.manifest.xml | awk {' print $2 '}`
+		echo "# output of $REGISTER -U $EC2_URL $PARAM_AMI_NAME/$PARAM_AMI_NAME.img.manifest.xml"  1>>$CLOUD_TOOLS_DEBUG_LOG
+		echo "# $HYBRID_CLOUD_AMI_NAME"  1>>$CLOUD_TOOLS_DEBUG_LOG
+
+		hybrid_cloud_log "NOTICE: Successfully exported Server-image from $PARAM_IMAGE_STORE to $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE AMI $PARAM_AMI_NAME"
+		openqrm_post_event 0 "$PARAM_AMI_NAME" 10 "openqrm-hybrid-cloud" "Exporting $PARAM_IMAGE_STORE to AMI $PARAM_AMI_NAME!"
+		openqrm_post_event 0 "import_instance" 5 "openqrm-hybrid-cloud" "Successfully exported Server-image from $PARAM_IMAGE_STORE to $PARAM_HYBRID_CLOUD_ACCOUNT_TYPE AMI $PARAM_AMI_NAME"
+		;;
+
+	iso)
+		if [ "$PARAM_HOST_PATH" == "" ]; then
+			hybrid_cloud_usage
+		fi
+		# validate path
+		PARAM_HOST_PATH=`echo "$PARAM_HOST_PATH" | cut -d';' -f1`
+		PARAM_HOST_PATH=`echo "$PARAM_HOST_PATH" | cut -d'&' -f1`
+		PARAM_HOST_PATH=`echo "$PARAM_HOST_PATH" | cut -d' ' -f1`
+		PARAM_HOST_PATH=`echo "$PARAM_HOST_PATH" | cut -d'$' -f1`
+		if [ ! -d "$PARAM_HOST_PATH" ]; then
+			openqrm_post_event 0 "iso" 2 "openqrm-hybrid-cloud" "No such directory $PARAM_HOST_PATH !"
+			exit 1
+		fi
+		# post dir list
+		PICK_ISO_CONFIG_TMP=$HYBRID_CLOUD_STAT_DIR/0.pick_iso_config.tmp
+		PICK_ISO_CONFIG=$HYBRID_CLOUD_STAT_DIR/0.pick_iso_config
+		echo "P@$PARAM_HOST_PATH" > $PICK_ISO_CONFIG_TMP
+		for DIR_CONTENT in `ls -f $PARAM_HOST_PATH`; do
+		    if [ -d "$PARAM_HOST_PATH"/"$DIR_CONTENT" ]; then
+				echo "D@$DIR_CONTENT" >> $PICK_ISO_CONFIG_TMP
+		    elif [ -f "$PARAM_HOST_PATH"/"$DIR_CONTENT" ]; then
+				echo "F@$DIR_CONTENT" >> $PICK_ISO_CONFIG_TMP
+		    fi
+		done
+		chmod 777 $PICK_ISO_CONFIG_TMP
+		mv -f $PICK_ISO_CONFIG_TMP $PICK_ISO_CONFIG
+		;;
+
+
+	*)
+		hybrid_cloud_usage
+		;;
+
+
+esac
+

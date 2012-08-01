@@ -1,0 +1,142 @@
+.htmlobject_th.edit,
+.htmlobject_td.edit {
+	width: 30px;
+	text-align: center;
+	vertical-align: top;
+}
+.htmlobject_th.hybrid_cloud_id,
+.htmlobject_td.hybrid_cloud_id {
+	width: 30px;
+	vertical-align: top;
+}
+a.import,
+a.export {
+	padding: 0;
+	border: 0px none;
+	width: 32px;
+	height: 32px;
+	display:block;
+	text-align: center;
+	text-decoration: none;
+	line-height: 0px;
+	overflow: hidden;
+	color: transparent;
+}
+a.export {
+	background: url('../../../img/export.png') no-repeat center top;
+}
+a.import {
+	background: url('../../../img/import.png') no-repeat center top;
+}
+
+.browse-button {
+	font-size: 11px;
+	padding: 0px 5px 0px 5px !important;
+	margin: 0 0 0 5px;
+}
+
+.password-button {
+	width: 150px;
+	font-size: 11px;
+	padding: 0px !important;
+	margin: 0 0 5px 0;
+	text-align: center;
+}
+
+
+#form.account .htmlobject_box .left {
+	float: left;
+	width: 180px;
+	margin: 0;
+	padding: 0;
+}
+
+/* FUNCTIONBOX */
+.functionbox-capation-box {
+	text-align: right;
+	padding: 5px;
+	background: #333399;
+}
+.functionbox-capation {
+	text-align: left;
+	color: white;
+	cursor: crosshair;
+	font-weight: bold;
+	font-size: 12px;
+	line-height: 20px;
+	padding: 5px !important;
+}
+/* filepicker */
+#filepicker {
+	z-index: 10;
+	position: absolute;
+	left: 0;
+	top: 0;
+	width:280px;
+	background: white;
+	border: 0px none;
+	border-left: 1px solid #ddd;
+	border-bottom: 1px solid #ddd;
+	box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.30);
+	-moz-box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.30);
+	-webkit-box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.30);
+}
+#filepicker .functionbox-capation input {
+	position: absolute;
+	right: 5px;
+	top: 5px;
+	width:18px;
+	height:18px;
+	font-size: 10px;
+	border: 1px solid;
+	background: #fff;
+	text-align: center;
+	line-height: 18px;
+	padding: 0;
+}
+#filepicker #canvas {
+	vertical-align:middle;
+	text-align:center;
+	height:340px;
+	overflow: auto;
+}
+#filepicker table {
+	width: 100%;
+	border: 0px none;
+	margin: 0;
+}
+#filepicker table td {
+	border-bottom: 1px solid #ccc;
+}
+#filepicker table a {
+	display: block;
+	line-height: 20px;
+	padding: 0 0 0 25px;
+	text-decoration: none;
+	font-size: 11px;
+}
+#filepicker table a.folder {
+	background: url("../img/icons.gif") no-repeat scroll 0 -20px transparent;
+}
+#filepicker table a.file {
+    background: url("../img/icons.gif") no-repeat scroll 0 0 transparent;
+	color: black;
+}
+/* About */
+
+#documentation_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 750px;
+}
+
+#plugin_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 255px;
+}
+

@@ -1,0 +1,234 @@
+<?php
+/**
+ * Hybrid-cloud import target
+ *
+    openQRM Enterprise developed by openQRM Enterprise GmbH.
+
+    All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+
+    This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+    The latest version of this license can be found here: src/doc/LICENSE.txt
+
+    By using this software, you acknowledge having read this license and agree to be bound thereby.
+
+                http://openqrm-enterprise.com
+
+    Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+ */
+
+class hybrid_cloud_import_target
+{
+/**
+* name of action buttons
+* @access public
+* @var string
+*/
+var $actions_name = 'hybrid_cloud_import_action';
+/**
+* identifier name
+* @access public
+* @var string
+*/
+var $identifier_name = 'hybrid_cloud_import_identifier';
+/**
+* message param
+* @access public
+* @var string
+*/
+var $message_param = "hybrid_cloud_import_msg";
+/**
+* path to templates
+* @access public
+* @var string
+*/
+var $tpldir;
+/**
+* translation
+* @access public
+* @var array
+*/
+var $lang = array();
+
+	//--------------------------------------------
+	/**
+	 * Constructor
+	 *
+	 * @access public
+	 * @param openqrm $openqrm
+	 * @param htmlobject_response $response
+	 */
+	//--------------------------------------------
+	function __construct($openqrm, $response, $controller) {
+		$this->response = $response;
+		$this->file     = $openqrm->file();
+		$this->openqrm  = $openqrm;
+		$this->controller = $controller;
+		$this->id = $this->response->html->request()->get('hybrid_cloud_id');
+	}
+
+	//--------------------------------------------
+	/**
+	 * Action
+	 *
+	 * @access public
+	 * @return htmlobject_template
+	 */
+	//--------------------------------------------
+	function action() {
+		$data = $this->target();
+		$t = $this->response->html->template($this->tpldir.'/hybrid-cloud-import-target.tpl.php');
+		$t->add($this->response->html->thisfile, "thisfile");
+		$t->add($data);
+		$t->add($this->response->get_array());
+		$t->add(sprintf($this->lang['label_target'], $this->response->html->request()->get('instance_id'), $data['name']), 'label');
+		$t->add($this->controller->prefix_tab, 'prefix_tab');
+		$t->add($this->openqrm->get('baseurl'), 'baseurl');
+		$t->add($this->lang['canceled'], 'canceled');
+		$t->add($this->lang['please_wait'], 'please_wait');
+		$t->group_elements(array('param_' => 'form'));
+		return $t;
+	}
+
+	//--------------------------------------------
+	/**
+	 * Target
+	 *
+	 * @access public
+	 * @return array
+	 */
+	//--------------------------------------------
+	function target() {
+		$image_id = $this->response->html->request()->get('image_id'); 
+		if($image_id !== '') {
+
+			require_once($this->openqrm->get('basedir').'/plugins/hybrid-cloud/web/class/hybrid-cloud.class.php');
+			$hc = new hybrid_cloud();
+			$hc->get_instance_by_id($this->id);
+
+			$image = new image();
+			$image->get_instance_by_id($image_id);
+			$storage = new storage();
+			$storage->get_instance_by_id($image->storageid);
+			$resource = new resource();
+			$resource->get_instance_by_id($storage->resource_id);
+
+			$command  = $this->openqrm->get('basedir').'/plugins/hybrid-cloud/bin/openqrm-hybrid-cloud import_instance';
+			$command .= ' -i '.$hc->id;
+			$command .= ' -n '.$hc->account_name;
+			$command .= ' -c '.$hc->rc_config;
+			$command .= ' -k '.$hc->ssh_key;
+			$command .= ' -t '.$hc->account_type;
+			$command .= ' -x '.$this->response->html->request()->get('instance_id');
+			$command .= ' -s '.$resource->ip.":".$image->rootdevice;
+
+			$server = new openqrm_server();
+			$server->send_command($command);
+
+			$msg = sprintf($this->lang['msg_imported'], $this->response->html->request()->get('instance_id'), $hc->account_name, $image->name );
+			$this->response->redirect(
+				$this->response->get_url($this->controller->actions_name, 'select', $this->message_param, $msg)
+			);
+
+		} else {
+			$h = array();
+			$h['image_icon']['title'] ='&#160;';
+			$h['image_icon']['sortable'] = false;
+			$h['image_id']['title'] = $this->lang['table_id'];
+			$h['image_name']['title'] = $this->lang['table_name'];
+			$h['image_version']['title'] = $this->lang['table_version'];
+			$h['image_type']['title'] = $this->lang['table_deployment'];
+			$h['image_isactive']['title'] = $this->lang['table_isactive'];
+			$h['image_comment']['title'] = $this->lang['table_comment'];
+			$h['image_comment']['sortable'] = false;
+			$h['edit']['title'] = '&#160;';
+			$h['edit']['sortable'] = false;
+
+			$image = new image();
+			$params = $this->response->get_array($this->actions_name, 'target');
+			$b      = array();
+
+			$table = $this->response->html->tablebuilder('source', $params);
+			$table->offset = 0;
+			$table->sort = 'image_id';
+			$table->limit = 10;
+			$table->order = 'ASC';
+			$table->max = $image->get_count();
+
+			$table->init();
+
+			$image_arr = $image->display_overview(0, 10000, $table->sort, $table->order);
+			$image_icon = "/openqrm/base/img/image.png";
+			foreach ($image_arr as $index => $image_db) {
+				// prepare the values for the array
+				$image = new image();
+				$image->get_instance_by_id($image_db["image_id"]);
+
+				if($image->type === 'lvm-nfs-deployment' || $image->type === 'nfs-deployment') {
+					$image_comment = $image_db["image_comment"];
+					if (!strlen($image_comment)) {
+						$image_comment = "-";
+					}
+					$image_version = $image_db["image_version"];
+					if (!strlen($image_version)) {
+						$image_version = "&#160;";
+					}
+					// edit
+					$a = $this->response->html->a();
+					$a->title   = $this->lang['action_import'];
+					$a->handler = 'onclick="wait();"';
+					$a->css     = 'import';
+					$a->href    = $this->response->get_url($this->actions_name, 'target').'&image_id='.$image->id;
+					$image_edit = $a->get_string();
+
+					// set the active icon
+					$isactive_icon = "/openqrm/base/img/enable.png";
+					if ($image_db["image_isactive"] == 1) {
+						$isactive_icon = "/openqrm/base/img/disable.png";
+					}
+					$image_isactive_icon = "<img src=".$isactive_icon." width='24' height='24' alt='State'>";
+
+					$b[] = array(
+						'image_icon' => "<img width='24' height='24' src='".$image_icon."'>",
+						'image_id' => $image_db["image_id"],
+						'image_name' => $image_db["image_name"],
+						'image_version' => $image_version,
+						'image_type' => $image_db["image_type"],
+						'image_isactive' => $image_isactive_icon,
+						'image_comment' => $image_comment,
+						'edit' => $image_edit,
+					);
+				}
+			}
+
+			$table->id = 'Tabelle';
+			$table->css = 'htmlobject_table';
+			$table->border = 1;
+			$table->cellspacing = 0;
+			$table->cellpadding = 3;
+			$table->autosort = false;
+			$table->sort_link = false;
+			$table->max = count($b);
+			$table->head = $h;
+			$table->body = $b;
+			$table->limit_select = array(
+				array("value" => 10, "text" => 10),
+				array("value" => 20, "text" => 20),
+				array("value" => 30, "text" => 30),
+				array("value" => 50, "text" => 50),
+				array("value" => 100, "text" => 100),
+			);
+
+			require_once($this->openqrm->get('basedir').'/plugins/hybrid-cloud/web/class/hybrid-cloud.class.php');
+			$hc = new hybrid_cloud();
+			$hc->get_instance_by_id($this->id);
+
+			$d['name']  = $hc->account_name;
+			$d['form']  = $this->response->get_form($this->actions_name, 'target', false)->get_elements();
+			$d['table'] = $table;
+
+			return $d;
+		}
+	}
+
+}
+?>
