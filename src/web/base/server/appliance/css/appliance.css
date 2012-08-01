@@ -1,0 +1,129 @@
+img {
+	border:none;
+}
+
+hr {
+	color: #EBEBEB;
+	background-color: #EBEBEB;
+}
+
+.htmlobject_td {
+	padding:5px !important;
+}
+.htmlobject_td.appliance_icon {
+	text-align:left;
+	vertical-align:top;
+	width:30px;
+}
+.htmlobject_td.appliance_state {
+	text-align:left;
+	vertical-align:top;
+	width:30px;
+}
+.htmlobject_td.appliance_id {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.appliance_name {
+	text-align:left;
+	width:120px;
+	vertical-align:top;
+}
+.htmlobject_td.appliance_values {
+	text-align:left;
+	width:310px;
+	vertical-align:top;
+	white-space:nowrap;
+	line-height: 18px;
+}
+.htmlobject_td.appliance_values a {
+	text-decoration: none;
+}
+.htmlobject_td.appliance_comment {
+	text-align:left;
+	vertical-align:top;
+}
+.htmlobject_td.appliance_comment img{
+	margin: 0 6px 0 0;
+}
+.htmlobject_td.appliance_comment hr{
+	margin: 6px 0;
+	color: #ccc;
+	background-color: #ccc;
+	border: 0 none;
+	height: 1px;
+}
+.htmlobject_td.appliance_edit {
+	text-align:center;
+	width:40px;
+	vertical-align:top;
+}
+
+.htmlobject_td.identifier {
+	text-align:center;
+	vertical-align:top;
+}
+.htmlobject_box textarea {
+	width: 350px;
+	height: 50px;
+}
+.htmlobject_box .right a {
+	text-decoration: none;
+}
+.htmlobject_tab_box .dirbox h3 {
+	cursor: pointer;
+	margin: 0 0 5px 0;
+	padding: 2px;
+	font-size: 12px;
+	line-height: 20px;
+	border-left: 1px solid #999999;
+	border-right: 1px solid #999999;
+}
+
+div.dirlist {
+	margin: 0 0 10px 0;
+	border-bottom: 0 none #999;
+	padding: 0 0 0 5px;
+}
+div.dirlist a {
+	display: block;
+	text-decoration: none;
+	color: #000;
+	margin: 3px 0 0 0;
+}
+
+a.dirlist {
+	display: block;
+	text-decoration: none;
+	padding: 5px 5px 5px 15px;
+	border-bottom: 1px solid  #999999;
+	border-left: 1px solid #999999;
+	border-right: 1px solid #999999;
+	line-height: 18px;
+	color: black;
+}
+a.dirlist img {
+	margin: 0 5px 0 0;
+	width: 16px;
+	height: 16px;
+}
+#form.form {
+	float: left;
+	margin: 8px 0 0 0;
+}
+#form.form #buttons {
+	text-align: center;
+	margin: 15px 0 0 0;
+}
+#add.add {
+	float: left;
+}
+#add.add div,
+#add.add a {
+	float: left;
+}
+#add.add div {
+	line-height: 32px;
+	margin: 0 12px 0 15px;
+}
