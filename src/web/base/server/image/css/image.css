@@ -1,0 +1,40 @@
+.htmlobject_td.image_icon {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.image_id {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.image_name {
+	text-align:left;
+	width:200px;
+	vertical-align:top;
+}
+.htmlobject_td.image_edit,
+.htmlobject_td.image_isactive {
+	text-align:center;
+	width:40px;
+	vertical-align:top;
+}
+.htmlobject_box textarea {
+	width: 600px;
+	height: 50px;
+}
+
+.htmlobject_td.image_data {
+	width: 230px;
+}
+.htmlobject_td.image_data a{
+	text-decoration: none;
+}
+
+.password-button {
+	width: 150px;
+	font-size: 11px;
+	padding: 0px !important;
+	margin: 0 0 5px 0;
+	text-align: center;
+}
