@@ -1,0 +1,98 @@
+body {
+	margin:0;
+	padding: 0;
+	font-family: verdana, arial, sans-serif;
+	font-size: 12px;
+	background: #dbdbdb;
+}
+
+.spacerBlock {
+	display: block;
+	height: 47px;
+	margin: 0 0 27px -20px;
+	background: url(../img/header_dropShadow.png) repeat-x #d8d8d8; 
+}
+
+
+h3 {
+	font-size: 14px;
+	font-weight: normal;
+	color: #000000;
+	background: #FFFFFF url(../img/menu/menuSectionBgr.png) repeat-x scroll left 1px;
+	border-top: 1px solid #999;
+	border-bottom: 1px solid #c7c7c7;
+	padding: 5px 10px;
+	margin: 0;
+}
+
+table {
+	margin-left: 10px;
+}
+
+.menuSection {
+	padding: 10px 0 20px 0;
+	background: #ffffff;
+}
+
+
+.treemenudiv	{
+	display: block;
+	white-space: nowrap;
+}
+
+.phplmnormal	{
+	text-decoration: none;
+}
+
+a.phplmnormal:hover	{
+	cursor:pointer;
+	padding:0 0 0 0;
+	text-decoration: none;
+}
+
+a.phplm:link	{
+	color: #003300;
+	text-decoration: none;
+}
+
+a.phplm:visited	{
+	color: #726461;
+	text-decoration: none;
+}
+
+a.phplm:hover	{
+	color: #841212;
+	background-color: #fff0c0;
+	text-decoration: none;
+}
+
+a.phplm:active	{
+	color: #ff0000;
+	text-decoration: none;
+}
+
+a.phplmselected:link	{
+	color: #dd0000;
+	background-color: #ffdd76;
+	text-decoration: none;
+}
+
+a.phplmselected:visited	{
+	color: #dd0000;
+	background-color: #ffdd76;
+	text-decoration: none;
+}
+
+a.phplmselected:hover	{
+	color: #841212;
+	background-color: #fff0c0;
+	text-decoration: none;
+}
+
+a.phplmselected:active	{
+	color: #ff0000;
+	text-decoration: none;
+}
+.imgs	{
+	border: 0px;
+}
