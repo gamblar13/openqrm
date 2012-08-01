@@ -1,0 +1,33 @@
+.htmlobject_th.edit,
+.htmlobject_td.edit {
+	width: 30px;
+	text-align: center;
+	vertical-align: top;
+}
+
+/* Documentation */
+
+fieldset {
+	border: 1px solid #91A7B4;
+	padding: 5px 20px;
+}
+fieldset legend {
+	padding: 5px;
+	font-weight: bold;
+}
+
+#documentation_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 750px;
+}
+
+#plugin_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 255px;
+}
