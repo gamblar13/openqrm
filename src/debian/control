@@ -1,0 +1,15 @@
+Source: openqrm
+Section: admin
+Priority: extra
+Maintainer: openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+Build-Depends: debhelper (>= 6.0.7~), portmap, rsync, zlib1g-dev, wget, bzip2, cdbs, unzip, module-init-tools, udev, quilt, netbase, sudo, lvm2, ethtool
+Standards-Version: 3.8.2
+Homepage: http://www.openqrm.org
+
+Package: openqrm
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, apache2, php5, php5-mysql, libphp-adodb, mysql-server, mysql-client, syslinux, python, tftpd-hpa, dhcp3-server, screen, nagios-images, nagios-plugins, nmap, default-mta | mail-transport-agent, libxml-simple-perl, open-iscsi, aoetools, openssl, rsync, expect, puppetmaster, subversion, bind9, collectd, stunnel, expect, sudo
+Description: Cloud Computing Platform
+ openQRM is a fully automated, rapid deployment system including
+ VM-Management, Monitoring, High-Availability and Storage-Management.
+ It provides a plug-able open-source Cloud Computing platform.
