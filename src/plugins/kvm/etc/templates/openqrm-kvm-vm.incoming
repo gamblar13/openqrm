@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+KVM_MIGRATION_PORT=$1
+if [ "$KVM_MIGRATION_PORT" == "" ]; then
+	echo "Usage : $0 <migration-port>"
+	exit 1
+fi
+
+KVM=`which kvm`
+if [ "$KVM" == "" ]; then
+	KVM=`which qemu-kvm`
+	if [ "$KVM" == "" ]; then
+		# maybe it is centos and not in the path
+		if [ -x /usr/libexec/qemu-kvm ]; then
+			KVM=/usr/libexec/qemu-kvm
+		else
+			echo "ERROR: kvm ist not installed on this system !" | logger
+			exit 1
+		fi
+	fi
+fi
+# which screen binary to use
+if [ -x /usr/bin/screen.real ]; then
+	RUNSCREEN="/usr/bin/screen.real"
+else
+	RUNSCREEN=`which screen`
+fi
+mkdir -p /var/run/openqrm/kvm
+
+# source the component config files
+VM_CONF_DIR=`dirname $0`
+VM_CONF_DIR=`cd $VM_CONF_DIR && pwd && cd - 1>/dev/null`
+VM_NAME=`basename $VM_CONF_DIR`
+. $VM_CONF_DIR/cpus
+. $VM_CONF_DIR/ram
+. $VM_CONF_DIR/disk1
+. $VM_CONF_DIR/disk2
+. $VM_CONF_DIR/disk3
+. $VM_CONF_DIR/disk4
+. $VM_CONF_DIR/net1
+. $VM_CONF_DIR/net2
+. $VM_CONF_DIR/net3
+. $VM_CONF_DIR/net4
+. $VM_CONF_DIR/net5
+. $VM_CONF_DIR/vnc
+. $VM_CONF_DIR/boot
+if [ -f "$VM_CONF_DIR/vncpassword" ]; then
+	. $VM_CONF_DIR/vncpassword
+fi
+
+
+
+
+KVM_VM_DISK="$KVM_VM_DISK_1 $KVM_VM_DISK_2 $KVM_VM_DISK_3 $KVM_VM_DISK_4"
+KVM_VM_NET="$KVM_VM_NET_1 $KVM_VM_NET_2 $KVM_VM_NET_3 $KVM_VM_NET_4 $KVM_VM_NET_5"
+
+echo "KVM vm $VM_NAME starting up ..." | logger
+$RUNSCREEN -dmS $KVM_VM_MAC_1 $KVM $KVM_VM_DISK -m $KVM_VM_RAM -smp $KVM_VM_CPUS $KVM_VM_BOOT $KVM_VM_NET -vnc $KVM_VM_VNC -balloon virtio -monitor unix:/var/run/openqrm/kvm/kvm.$VM_NAME.mon,server,nowait -incoming tcp:0:$KVM_MIGRATION_PORT
+# set vnc password
+if [ "$KVM_VM_VNCPASSWORD" ]; then
+	while ! echo "change vnc password $KVM_VM_VNCPASSWORD" | socat stdio unix:/var/run/openqrm/kvm/kvm.$VM_NAME.mon; do
+		sleep 1
+		LOOP=$(( LOOP + 1 ))
+		if [ "$LOOP" == 10 ]; then
+			break
+		fi
+	done
+fi
+
