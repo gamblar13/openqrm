@@ -1,0 +1,28 @@
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+#	Title
+#	Href
+#	Alt
+#	IMG
+#	Target
+..|KVM-storage
+...|Help|
+....|About|index.php?plugin=kvm-storage&controller=kvm-storage-about|How to use|kvm-storage/plugin.png
+....|Config|index.php?plugin=kvm-storage&controller=kvm-storage-about&kvm_storage_about_action=bootservice|KVM-Storage Host Boot-Service|kvm-storage/../../help.png
+....|VMs|index.php?plugin=kvm-storage&controller=kvm-storage-about&kvm_storage_about_action=vms|Virtual Machine Management|kvm-storage/../../help.png
+....|Storage|index.php?plugin=kvm-storage&controller=kvm-storage-about&kvm_storage_about_action=storage|Storage Management|kvm-storage/../../help.png
+....|Usage|index.php?plugin=kvm-storage&controller=kvm-storage-about&kvm_storage_about_action=usage|Use-cases|kvm-storage/../../help.png
+...|KVM Volumes|index.php?plugin=kvm-storage|KVM LVM Storage Manager|kvm-storage/../../edit.png
+...|KVM VMs|index.php?plugin=kvm-storage&controller=kvm-storage-vm|KVM Storage VM Manager|kvm-storage/../../edit.png
