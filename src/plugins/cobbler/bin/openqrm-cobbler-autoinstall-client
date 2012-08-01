@@ -1,0 +1,135 @@
+#!/bin/bash
+# this script manages the to automatically install the openQRM client
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+# some defines
+OPENQRM_RESOURCE_PARAMETER_FILE="/var/openqrm/openqrm-resource.conf"
+# be sure cmd output is english
+export LANGUAGE=C
+export LANG=C
+export LC_ALL=C
+# cmdline params
+OPENQRM_SERVER_IP=$1
+RESOURCE_MAC=$2
+
+function try_to_get_resource_parameters() {
+	local RES_MAC=$1
+	# gather resource parameters, try http first
+	mkdir -p `dirname $OPENQRM_RESOURCE_PARAMETER_FILE`
+	rm -f $OPENQRM_RESOURCE_PARAMETER_FILE
+	if ! wget -O $OPENQRM_RESOURCE_PARAMETER_FILE "http://$OPENQRM_SERVER_IP/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$RES_MAC"; then
+		if ! wget --no-check-certificate -O $OPENQRM_RESOURCE_PARAMETER_FILE "https://$OPENQRM_SERVER_IP/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_mac=$RES_MAC"; then
+			echo "ERROR: Could not get the resource parameters from openQRM Server at $OPENQRM_SERVER_IP!"
+			return 1
+		else
+			# wget returned ok but are the parameters valid ?
+			unset resource_id
+			. $OPENQRM_RESOURCE_PARAMETER_FILE
+			if [ "$resource_id" != "" ]; then
+				return 0
+			else
+				return 1
+			fi
+		fi
+	else
+		# wget returned ok but are the parameters valid ?
+		unset resource_id
+		. $OPENQRM_RESOURCE_PARAMETER_FILE
+		if [ "$resource_id" != "" ]; then
+			return 0
+		else
+			return 1
+		fi
+	fi
+}
+
+
+# checks
+if [ "$OPENQRM_SERVER_IP" == "" ]; then
+	echo "This tool automatically install the openQRM Client on a Linux system"
+	echo "Usage: $0 <OPENQRM_SERVER_IP> [RESOURCE_MAC]"
+	exit 1
+fi
+# are we running from kickstart post ?
+if [ "$RESOURCE_MAC" != "" ]; then
+	if ! ifconfig -a | grep -i $RESOURCE_MAC &>/dev/null; then
+		echo "ERROR: Mac address $RESOURCE_MAC not found on this system!"
+		exit 1
+	fi
+else
+	# we build a list of all available mac addresses
+	for MAC in `ifconfig -a | grep ^eth | awk '{ print $5 }'`; do
+		RESOURCE_MAC="$RESOURCE_MAC $MAC"
+	done
+fi
+# try to find the right nic
+FOUND_OPENQRM_NIC=false
+for AVAILABLE_MAC in `echo $RESOURCE_MAC`; do
+	if try_to_get_resource_parameters $AVAILABLE_MAC; then
+		FOUND_OPENQRM_NIC=true
+		break
+	fi
+done
+if [ "$FOUND_OPENQRM_NIC" == "false" ]; then
+	echo "ERROR: Could not find out which Network card to use!"
+	exit 1
+fi
+# here we have valid resource-parameter config file
+. $OPENQRM_RESOURCE_PARAMETER_FILE
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+echo "Getting openqrm-client package"
+# run default openqrm-client boot-service
+KERNEL_ARCH=`uname -m`
+if echo $KERNEL_ARCH | grep i.*86 1>/dev/null; then
+	# i386
+	OPENQRM_CLIENT_ARCH=i386
+else
+	OPENQRM_CLIENT_ARCH=$KERNEL_ARCH
+fi
+# find out the short distri name
+if [ -f /etc/debian_version ]; then
+	# debian or ubuntu, try to find out without lsb-release which may not be installed
+	if grep -i ubuntu /etc/apt/sources.list 1>/dev/null; then
+		OPENQRM_SHORT_DISTRI_NAME="ubuntu"
+	else
+		OPENQRM_SHORT_DISTRI_NAME="debian"
+	fi
+elif [ -f /etc/redhat-release ]; then
+	OPENQRM_SHORT_DISTRI_NAME="centos"
+fi
+
+cd /
+echo "Getting openqrm-client package"
+if ! wget $WGET_NO_CERT_CHECK -O openqrm-client.tgz "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/boot-service/openqrm-client.tgz"; then
+	rm -f openqrm-client.tgz
+	echo "ERROR: Could not download the openqrm-client package from openQRM Server $OPENQRM_SERVER_IP!"
+	exit 1
+fi
+
+tar -xzf openqrm-client.tgz
+rm -f openqrm-client.tgz
+ln -sf $resource_basedir/openqrm/etc/init.d/openqrm-client /etc/init.d/openqrm-client
+export OPENQRM_SERVER_BASE_DIR=$resource_basedir
+. $resource_basedir/openqrm/include/openqrm-functions
+openqrm_chkconfig add openqrm-client
+
+
+
+
+
+

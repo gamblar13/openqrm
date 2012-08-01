@@ -1,0 +1,25 @@
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+# This is a Cobbler kickstart Snippet for the %post section to
+# automatic install openQRM client after the installation
+# -> 1) Adapt @@@YOUR_OPENQRM_SERVER_IP@@@ with your openQRM Servers ip-address.
+# -> 2) Add this as "openqrm_client_auto_install" to your Cobbler Snippets
+# -> 3) Add $SNIPPET('openqrm_client_auto_install') to your kickstart-templates post section
+
+wget http://@@@YOUR_OPENQRM_SERVER_IP@@@/openqrm/boot-service/openqrm-cobbler-autoinstall-client
+chmod +x ./openqrm-cobbler-autoinstall-client
+mount -t proc proc /proc
+./openqrm-cobbler-autoinstall-client @@@YOUR_OPENQRM_SERVER_IP@@@
+umount /proc

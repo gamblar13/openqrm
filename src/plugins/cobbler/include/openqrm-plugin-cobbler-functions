@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+COBBLER_LOCK_FILE=/var/run/cobbler/cobbler-plugin.lock
+COBBLER_LOCK_DELAY=5
+COBBLER_LOCK_RETRY=100
+COBBLER_LOCK_TIMEOUT=500
+################ common cobbler functions
+
+# logs for cobbler
+function cobbler_log() {
+	local COMPONENT=$1
+	shift
+	local MESSAGE=$@
+	logger -i -t "cobbler plug-in" "$COMPONENT : $MESSAGE"
+}
+
+
+# locking function
+function cobbler_lock() {
+	local COMMAND=$1
+	local RET=1
+
+	if [ ! -d `dirname $COBBLER_LOCK_FILE` ]; then
+		mkdir -p `dirname $COBBLER_LOCK_FILE`
+	fi
+	case "$COMMAND" in
+		aquire)
+				lockfile -s $COBBLER_LOCK_DELAY -r $COBBLER_LOCK_RETRY -l $COBBLER_LOCK_TIMEOUT $COBBLER_LOCK_FILE
+				RET=$?
+				cobbler_log cobbler_lock "Aquired the lock"
+				return $RET
+				;;
+		release)
+				/bin/rm -f $COBBLER_LOCK_FILE
+				RET=$?
+				cobbler_log cobbler_lock "Released the lock"
+				return $RET
+				;;
+		*)
+			cobbler_log cobbler_lock "No such command. Try 'aquire' or 'release'"
+			return 1
+			;;
+	esac
+}
+
+
+
+################ cobbler functions
+
+

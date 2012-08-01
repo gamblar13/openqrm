@@ -1,0 +1,195 @@
+#!/bin/bash
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+# this script automatically manages cobbler
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cobbler/include/openqrm-plugin-cobbler-functions
+OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	OPENQRM_SERVER_IP=$resource_openqrmserver
+else
+	echo "ERROR: This script runs on an integrated Cobbler-Server only!"
+	exit 6
+fi
+
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+# this script runs on the integrated cobbler-server only
+if [ -f "$OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf" ]; then
+	echo "ERROR: This script runs on an integrated Cobbler-Server only!"
+	exit 6
+fi
+# run only on cobbler-servers
+if ! which cobbler &>/dev/null; then
+	exit 0
+fi
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+# functions running on the cobbler-server
+function cobbler_usage() {
+	echo "Usage : $0 add_cobbler_client -i <resource-ip> -x <resource-ip> -m <resource-mac> -n <cobbler-resource-name>"
+	echo "        $0 remove_cobbler_client -n <cobbler-resource-name>"
+	echo "        $0 post_profiles -u <openqrm-user-name> -p <openqrm-password>"
+	exit 1
+}
+
+
+COBBLER_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-i)
+			PARAM_RESOURCE_IP=$2
+			shift
+			;;
+		-x)
+			PARAM_RESOURCE_ID=$2
+			shift
+			;;
+		-m)
+			PARAM_RESOURCE_MAC=$2
+			shift
+			;;
+		-n)
+			PARAM_RESOURCE_NAME=$2
+			shift
+			;;
+		-o)
+			PARAM_COBBLER_PRODUCTS=$2
+			shift
+			;;
+		-k)
+			PARAM_COBBLER_PRODUCT_KEY=$2
+			shift
+			;;
+		-u)
+			PARAM_OPENQRM_USER=$2
+			shift
+			;;
+		-p)
+			PARAM_OPENQRM_PASS=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			cobbler_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+# checks
+if [ "$COBBLER_COMMAND" == "" ]; then
+	cobbler_usage
+fi
+
+# main
+case "$COBBLER_COMMAND" in
+
+	add_cobbler_client)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			cobbler_usage
+		fi
+		if [ "$PARAM_RESOURCE_IP" == "" ]; then
+			cobbler_usage
+		fi
+		if [ "$PARAM_RESOURCE_ID" == "" ]; then
+			cobbler_usage
+		fi
+		if [ "$PARAM_RESOURCE_MAC" == "" ]; then
+			cobbler_usage
+		fi
+		if [ "$PARAM_COBBLER_PRODUCTS" == "" ]; then
+			cobbler_usage
+		fi
+		OPENQRM_DEFAULT_GATEWAY=`/sbin/ip route list | awk '/^default / { print $3 }'`
+		OPENQRM_SUBNET=`ifconfig | grep "$resource_ip " | cut -d':' -f4`
+		OPENQRM_DOMAIN=`cat /etc/resolv.conf | grep ^search | head -n1 | awk '{ print $2 }'`
+		OPENQRM_DNS=`cat /etc/resolv.conf | grep ^nameserver | head -n1 | awk '{ print $2 }'`
+#		openqrm_post_event 0 "cobbler" 5 "openqrm-cobbler" "Adding Cobbler-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		echo "NOTICE: Adding Cobbler-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		# make sure it is not existing yet
+		cobbler system remove --name="$PARAM_RESOURCE_NAME" &>/dev/null
+		if ! cobbler system add --name="$PARAM_RESOURCE_NAME" --owners="admin" --profile="$PARAM_COBBLER_PRODUCTS" --netboot-enabled="yes" --interface="eth0" --hostname="$PARAM_RESOURCE_NAME" --gateway="$OPENQRM_DEFAULT_GATEWAY" --name-servers="$OPENQRM_DNS" --name-servers-search="$OPENQRM_DOMAIN" --mac-address="$PARAM_RESOURCE_MAC" --ip-address="$PARAM_RESOURCE_IP" --static="yes" --subnet="$OPENQRM_SUBNET"; then
+			openqrm_post_event 0 "cobbler" 2 "openqrm-cobbler" "Could not add $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC to Cobbler-server $resource_id/$resource_ip."
+			exit 1
+		fi
+		sleep 10
+		# start cobbler-monitord to send transition to openQRM while the system is installing
+		if [ -x /usr/bin/screen.real ]; then
+			RUNSCREEN="/usr/bin/screen.real"
+		else
+			RUNSCREEN=`which screen`
+		fi
+		SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+		$RUNSCREEN -dmS $SCREEN_NAME $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/cobbler/sbin/openqrm-cobbler-monitord $PARAM_RESOURCE_ID $PARAM_RESOURCE_MAC
+		;;
+
+	remove_cobbler_client)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			cobbler_usage
+		fi
+#		openqrm_post_event 0 "cobbler" 5 "openqrm-cobbler" "Adding Cobbler-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		echo "NOTICE: Removing Cobbler-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		if ! cobbler system remove --name="$PARAM_RESOURCE_NAME"; then
+			openqrm_post_event 0 "cobbler" 2 "openqrm-cobbler" "Could not remove $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC from Cobbler-server $resource_id/$resource_ip."
+			exit 1
+		fi
+		;;
+
+
+
+	post_profiles)
+		if [ "$PARAM_OPENQRM_USER" == "" ]; then
+			cobbler_usage
+		fi
+		if [ "$PARAM_OPENQRM_PASS" == "" ]; then
+			cobbler_usage
+		fi
+		COBBLER_STATUS_TMP=$resource_id.cobbler-profiles.list
+		> $COBBLER_STATUS_TMP
+		for COBBLER_PROFILE in `cobbler profile list | awk '{ print $1 }'`; do
+				COBBLER_PROFILE=`echo $COBBLER_PROFILE | sed -e "s/,//g" | sed -e "s/\"//g"`
+				echo "$COBBLER_PROFILE,$COBBLER_PROFILE" >> $COBBLER_STATUS_TMP
+		done
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$PARAM_OPENQRM_USER --http-password=$PARAM_OPENQRM_PASS  --post-file=`$OPENQRM_POSTENCODE $COBBLER_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/cobbler/cobbler-action.php?cobbler_command=get_profiles; then
+			openqrm_post_event 0 "post_profiles" 3 "openqrm-cobbler" "Could not post list of profiles to the openQRM-server at $OPENQRM_SERVER_IP!"
+		fi
+		rm -f $COBBLER_STATUS_TMP
+		rm -f $COBBLER_STATUS_TMP.post
+		;;
+
+
+
+	*)
+		cobbler_usage
+		;;
+
+
+esac
+
