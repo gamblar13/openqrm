@@ -1,6 +1,0 @@
-default linux
-
-label linux
-kernel boot/clonezilla/vmlinuz
-append initrd=boot/clonezilla/initrd.img boot=live union=aufs config noswap noprompt vga=788 ip=frommedia fetch=tftp://@@@OPENQRM_SERVER_IP_ADDRESS@@@/boot/clonezilla/filesystem.squashfs ocs_prerun="busybox tftp -g -r boot/clonezilla/custom-@@@RESOURCE_MAC@@@ -l /tmp/custom-@@@RESOURCE_MAC@@@ @@@OPENQRM_SERVER_IP_ADDRESS@@@" ocs_live_run="bash /tmp/custom-@@@RESOURCE_MAC@@@" ocs_live_keymap="NONE" ocs_live_batch="no" ocs_lang="en_US.UTF-8" nolocales live-netdev="eth0"
-
