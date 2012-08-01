@@ -1,0 +1,136 @@
+
+body {
+    font-size: 62.5%;
+    font-family: "Trebuchet MS","Helvetica","Arial","Verdana","sans-serif";
+    font-size: 11px;
+    margin: 0;
+    padding: 0;
+}
+
+A:link {text-decoration: none; color: black;}
+A:visited {text-decoration: none; color: black;}
+A:active {text-decoration: none; color:	black;}
+A:hover {text-decoration: underline; color:	#78ab2c;}
+
+
+h1,h2,h3,h4 {
+	padding: 0 0 0 0!important;
+}
+
+h1 b, h2 b, h3 b, h4 b {
+	color:	#78ab2c;
+}
+
+
+#logo {
+    left: 485px;
+    position: absolute;
+    top: 95px;
+}
+
+#title {
+    left: 475px;
+    position: absolute;
+    top: 160px;
+}
+
+#login {
+    left: 480px;
+    position: absolute;
+    top: 220px;
+	width: 400px;
+}
+
+
+#register {
+    left: 522px;
+    position: absolute;
+    top: 310px;
+}
+
+#footer {
+	border-top: 1px solid #CECECE;
+    padding: 0 0 0 420px;
+	position: absolute;
+	width: 100%;
+    top: 600px;
+}
+
+
+#cloud_user_login {
+    left: 5px;
+    position: absolute;
+    top: 90px;
+}
+
+#cloud_user_login_submit {
+    left: 65px;
+    position: absolute;
+    top: 210px;
+}
+
+
+
+
+
+#cloud_user_left_column {
+    height: 280px;
+    left: 25px;
+    margin: 0;
+    padding: 10px;
+    position: absolute;
+    top: 70px;
+    width: 210px;
+}
+
+
+#cloud_user_right_column {
+    height: 280px;
+    left: 260px;
+    margin: 0;
+    padding: 10px;
+    position: absolute;
+    top: 70px;
+    width: 210px;
+}
+
+#cloud_user_create_submit {
+    left: 335px;
+    position: absolute;
+    top: 320px;
+}
+
+
+
+
+
+#cloud_user_input_token {
+    left: 5px;
+    position: absolute;
+    top: 90px;
+}
+
+#cloud_user_token_submit {
+    left: 65px;
+    position: absolute;
+    top: 160px;
+}
+
+
+
+
+#cloud_recovery_input {
+    left: 5px;
+    position: absolute;
+    top: 90px;
+}
+
+#cloud_user_recovery_submit {
+    left: 65px;
+    position: absolute;
+    top: 210px;
+}
+
+
+
+

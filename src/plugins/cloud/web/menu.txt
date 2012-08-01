@@ -1,0 +1,43 @@
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+#	Title
+#	Href
+#	Alt
+#	IMG
+#	Target
+..|Help|
+...|About|index.php?plugin=cloud&controller=cloud-documentation|How to use|cloud/plugin.png
+..|Portal|/cloud-portal|The openQRM Cloud|cloud/plugin.png|_BLANK
+..|User|index.php?plugin=cloud&controller=cloud-user|The User on the Cloud|cloud/../../user.png
+..|Groups|index.php?plugin=cloud&controller=cloud-usergroup|User Groups on the Cloud|cloud/../../user.png
+..|Mail|index.php?plugin=cloud&controller=cloud-mail|Send a mail to the Cloud Users|cloud/../../mail.png
+..|Requests|index.php?plugin=cloud&controller=cloud-request|The Requests from the Users|cloud/../../manage.png
+..|Configuration
+...|Main Config|index.php?plugin=cloud&controller=cloud-config|The Cloud Configuration|cloud/../../edit.png
+...|Products|index.php?plugin=cloud&controller=cloud-selector|Cloud Product Manager|cloud/../../manage.png
+...|Private Images|index.php?plugin=cloud&controller=cloud-private-image|Private Cloud Images|cloud/../../auth.png
+...|Resource Pools|index.php?plugin=cloud&controller=cloud-resource-pool|Resource Pool Manager|cloud/../../auth.png
+...|Resource Limits|index.php?plugin=cloud&controller=cloud-resource-limit|Host-Limit Manager|cloud/../../auth.png
+...|Power-Saver|index.php?plugin=cloud&controller=cloud-power-saver|Power Saver Manager|cloud/cloudpower.png
+...|Ip-Mgmt|index.php?plugin=cloud&controller=cloud-ip-mgmt|Setup IP-Adressing for the Cloud|cloud/cloudipgroups.png
+...|Cloud NAT|index.php?plugin=cloud&controller=cloud-nat|Configure NAT for the Cloud|cloud/cloudnat.png
+...|Transactions
+....|Done|index.php?plugin=cloud&controller=cloud-transaction|List of Cloud Transactions|cloud/../../active.png
+....|Failed|index.php?plugin=cloud&controller=cloud-transaction-failed|List of Failed Cloud Transactions|cloud/../../error.png
+..|WebService
+...|SOAP|index.php?plugin=cloud&controller=cloud-documentation&cloud_documentation=soap|Documenation for the Cloud SOAP WebService|cloud/../../edit.png
+...|Admin Demo|plugins/cloud/soap/cloudadmin-soap-example-client.php|Demo for the Cloud Admin SOAP WebService|cloud/../../loading.gif|_BLANK
+...|User Demo|/cloud-portal/user/soap/clouduser-soap-example-client.php|Demo for the Cloud User SOAP WebService|cloud/../../loading.gif|_BLANK
+...|API|http://www.openqrm.com/drupal/userfiles/docs/openqrm-soap-api/classtrees_openQRM-Cloud%20SOAP%20API.html|The API for the Cloud SOAP WebService|cloud/../../help.png|_BLANK

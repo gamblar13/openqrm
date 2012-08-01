@@ -1,0 +1,409 @@
+.htmlobject_td.cu_status,
+.htmlobject_td.cu_id,
+.htmlobject_td.cg_id,
+.htmlobject_td.id,
+.htmlobject_td.image_icon,
+.htmlobject_td.image_id,
+.htmlobject_td.appliance_icon,
+.htmlobject_td.appliance_id,
+.htmlobject_td.ip_mgmt_icon
+ {
+	text-align:center;
+	width:30px;
+	vertical-align:top;
+}
+.htmlobject_td.cu_actions,
+.htmlobject_td.cg_actions,
+.htmlobject_td.cr_details,
+.htmlobject_td.action_up,
+.htmlobject_td.action_down,
+.htmlobject_td.image_actions,
+.htmlobject_td.appliance_actions,
+.htmlobject_td.ip_mgmt_actions {
+	text-align:center;
+	width:40px;
+	vertical-align:top;
+}
+
+/* Specials */
+#buttons {
+	margin: 20px 0 0 0;
+}
+.useredit .htmlobject_box .left {
+	width: 170px;
+}
+.natconfig .htmlobject_box .left {
+	width: 300px;
+}
+.password-button {
+	width: 150px;
+	font-size: 11px;
+	padding: 0px !important;
+	margin: 0 0 5px 0;
+	text-align: center;
+}
+
+/*
+general styles
+*/
+
+.htmlobject_td.image_id {
+	text-align:center;
+	width:25px;
+	vertical-align:top;
+}
+.htmlobject_td.image_version {
+	text-align:center;
+	width:110px;
+	vertical-align:top;
+}
+.htmlobject_td.image_application {
+	text-align:center;
+	width:110px;
+	vertical-align:top;
+}
+.htmlobject_td.image_filename {
+	text-align:center;
+	width:210px;
+	vertical-align:top;
+	font-size: 10px !important;
+}
+.htmlobject_td.image_size {
+	text-align:center;
+	width:60px;
+	vertical-align:top;
+}
+.htmlobject_td.image_root_password {
+	text-align:center;
+	width:80px;
+	vertical-align:top;
+}
+.htmlobject_td.image_maintainer {
+	text-align:center;
+	vertical-align:top;
+	width:120px;
+	font-size: 10px !important;
+}
+
+fieldset {
+	border: 1px solid #91A7B4;
+	padding: 5px 10px;
+}
+fieldset legend {
+	padding: 5px;
+	font-weight: bold;
+}
+
+
+
+a.enable,
+a.disable,
+a.up,
+a.down {
+	padding: 0;
+	border: 0px none;
+	width: 32px;
+	height: 32px;
+	display:block;
+	text-align: center;
+	text-decoration: none;
+	line-height: 0px;
+	overflow: hidden;
+	color: transparent;
+}
+a.enable {
+	background: url('/openqrm/base/img/enable.png') no-repeat center top;
+}
+a.disable {
+	background: url('/openqrm/base/img/disable.png') no-repeat center top;
+}
+a.up {
+	background: url('/openqrm/base/img/up.png') no-repeat center top;
+}
+a.down {
+	background: url('/openqrm/base/img/down.png') no-repeat center top;
+}
+
+
+
+/*
+cloud tables width
+*/
+
+#cloud_request_details {
+	width:400px;
+}
+/*
+insert cloud styles
+*/
+
+#cloud_insert_left_column {
+	border: 1px solid #BABABA;
+	position: relative;
+	left: 25px;
+	top: 130px;
+	width: 350px;
+	height: 270px;
+	margin: 0;
+	padding: 10px 10px;
+}
+
+#cloud_insert_right_column {
+	border: 1px solid #BABABA;
+	position: relative;
+	left: 395px;
+	top: 130px;
+	width: 350px;
+	height: 270px;
+	margin: 0;
+	padding: 10px 10px;
+}
+
+#cloud_insert_bottom {
+	position: relative;
+	left: 25px;
+	top: 425px;
+	width: 720px;
+	height: 30px;
+	margin: 0;
+	padding: 10px 10px;
+}
+
+#cloud_insert_submit {
+	position: relative;
+	left: 295px;
+	top: 5px;
+	width: 180px;
+	height: 20px;
+	margin: 0;
+}
+
+#cloud_comment {
+	width: 180px;
+}
+
+
+/*
+insert cloud-usergroup styles
+*/
+
+#cloud_usergroup_left_column {
+	position: absolute;
+	left: 265px;
+	top: 240px;
+	width: 450px;
+	height: 145px;
+	margin: 0;
+	padding: 10px 10px;
+}
+
+
+/*
+insert cloud-user styles
+*/
+
+
+#cloud_user_base {
+    width: 840px;
+}
+
+#cloud_user_left {
+    float: left;
+    width: 400px;
+    margin: 0;
+    padding: 10px;
+}
+#cloud_user_left .htmlobject_box .left {
+    float: left;
+    margin: 0;
+    padding: 0;
+    width: 150px;
+}
+
+#cloud_user_right {
+    float: left;
+    width: 400px;
+    margin: 0;
+    padding: 10px;
+}
+
+#cloud_user_bottom {
+    margin: 0;
+    padding: 10px 10px;
+}
+
+
+
+/*
+insert cloud-user styles
+*/
+
+#cloud_soap_top {
+    float: left;
+    width: 820px;
+    margin: 0;
+    padding: 10px;
+}
+
+#cloud_soap_base {
+    width: 840px;
+}
+
+#cloud_soap_left {
+    float: left;
+    width: 400px;
+    margin: 0;
+    padding: 10px;
+}
+
+#cloud_soap_right {
+    float: right;
+    width: 400px;
+    margin: 0;
+    padding: 10px;
+}
+
+
+
+
+
+
+/*
+insert cloud-user config styles
+*/
+
+#cloud_config_update_left {
+	float: left;
+	border: 1px solid #BABABA;
+	width: 450px;
+	margin: 0;
+	padding: 10px 10px;
+}
+#cloud_config_update_right {
+	float: left;
+	border: 1px solid #BABABA;
+	width: 450px;
+	margin: 0 0 0 10px;
+	padding: 10px 10px;
+}
+
+#cloud_config_update_left .htmlobject_box .left,
+#cloud_config_update_right .htmlobject_box .left {
+    float: left;
+    margin: 0;
+    padding: 0;
+    width: 250px;
+}
+#cloud_config_update_bottom {
+    height: 30px;
+    margin: 0;
+    padding: 10px;
+    width: 380px;
+}
+
+#cloud_config_update_submit {
+    height: 20px;
+    margin: 0;
+    width: 180px;
+}
+
+
+
+
+/* request details */
+#cloudinfoScrollArea {
+	position:relative;
+	border:1px solid #cecece;
+	overflow: auto;
+	height:360px;
+}
+
+#cloudinfoArea {
+	margin: 5px 0 5px 5px;
+	padding: 0 0 0 5px;
+}
+
+#cloudbackgroundPopup{
+	display:none;
+	position:fixed;
+	_position:absolute;
+	height:100%;
+	width:100%;
+	top:0;
+	left:0;
+	background:#000000;
+	border:1px solid #cecece;
+	z-index:1;
+}
+#cloudpopupInfo{
+	display:none;
+	position:fixed;
+	_position:absolute;
+	height:400px;
+	width:450px;
+	background:#FFFFFF;
+	border:2px solid #cecece;
+	z-index:2;
+	padding:12px;
+	font-size:13px;
+}
+#cloudpopupInfo h1{
+	text-align:left;
+	color:#000000;
+	font-size:22px;
+	font-weight:700;
+	border-bottom:1px dotted #D3D3D3;
+	padding-bottom:2px;
+	margin-bottom:20px;
+}
+#cloudpopupInfoClose{
+	font-size:14px;
+	line-height:14px;
+	right:6px;
+	top:4px;
+	position:absolute;
+	color:#000000;
+	font-weight:700;
+	display:block;
+}
+
+
+
+/* Documentation */
+
+#documentation_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 750px;
+}
+#plugin_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 255px;
+}
+#introduction_content {
+    padding: 0px 5px !important;
+}
+#provides_content {
+    padding: 0px 10px !important;
+}
+#requirements_content {
+    padding: 0px 10px !important;
+}
+#plugin_type {
+	width: 240px;
+	height: 40px;
+    top: 0px;
+}
+#tested_with {
+	width: 240px;
+	height: 100px;
+    top: 0px;
+
+}
+
+

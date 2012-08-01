@@ -1,0 +1,727 @@
+#cloud_logo {
+	position: absolute;
+	left:30px;
+	top:5px;
+	width: 200px;
+	height: 1px;
+	margin: 0;
+	z-index: 5;
+}
+
+
+#cloud_title {
+	position: absolute;
+    left: 190px;
+    top: 40px;
+	width: 170px;
+	height: 1px;
+	margin: 0;
+	z-index: 6;
+}
+
+
+
+#cloud_top_menu {
+	position: absolute;
+	top:0px;
+	right:10px;
+	width: 270px;
+	height: 60px;
+	margin: 0;
+	z-index: 6;
+}
+
+#cloud_select {
+	float: left;
+	height: 20px;
+	margin: 0;
+	z-index: 6;
+}
+
+
+#cloud_logout {
+	position: absolute;
+	left: 0px;
+	top: 45px;
+	width: 150px;
+	height: 1px;
+	margin: 0;
+	z-index: 6;
+}
+
+
+
+#cloud_language_select {
+	position: absolute;
+	left: 0px;
+	top: 23px;
+	height: 1px;
+	margin: 0;
+	z-index: 6;
+}
+
+#cloud_lang {
+	width: 80px;
+	height: 20px;
+}
+
+#cloud {
+	height: 20px;
+}
+
+
+
+#cloud_no_available {
+	position: absolute;
+	left: 50px;
+	top: 50px;
+	width: 650px;
+	height: 20px;
+	margin: 0;
+	z-index: 6;
+}
+
+
+
+#table_home_zone {
+	position: absolute;
+	width: 350px;
+	top: 20px;
+}
+
+
+
+/*
+ create tab
+*/
+
+option.imagebacked {
+	padding: 10px 0 0px 20px;
+	background-repeat: no-repeat;
+	background-position: 0px 0px;
+	vertical-align: middle;
+}
+
+
+#cloud_request_left_column {
+	border: 1px solid #BABABA;
+	position: absolute;
+	left: 0px;
+	top: 40px;
+	width: 450px;
+	height: 350px;
+	margin: 0;
+	padding: 5px 10px;
+}
+
+#cloud_request_left_column_left_column {
+    background-color: white;
+    height: 200px;
+    left: 5px;
+    margin: 0;
+    padding: 5px 10px;
+    position: absolute;
+    top: 110px;
+    width: 220px;
+}
+
+#cloud_request_left_column_right_column {
+    background-color: white;
+    height: 200px;
+    left: 245px;
+    margin: 0;
+    padding: 5px 10px;
+    position: absolute;
+    top: 110px;
+    width: 200px;
+}
+
+
+
+
+
+#cloud_request_right_column {
+	border: 1px solid #BABABA;
+	position: absolute;
+	left: 470px;
+	top: 40px;
+	width: 450px;
+	height: 360px;
+	margin: 0;
+}
+
+
+#cloud_request_right_column_left_column {
+	border: 1px solid #BABABA;
+	position: absolute;
+	left: 5px;
+	top: 5px;
+	width: 310px;
+	height: 275px;
+	margin: 0;
+	padding: 5px 10px;
+}
+
+#cloud_request_right_column_right_column {
+	border: 1px solid #BABABA;
+	position: absolute;
+	left: 335px;
+	top: 5px;
+	width: 88px;
+	height: 275px;
+	margin: 0;
+	padding: 5px 10px;
+}
+
+#cloud_request_right_column_bottom_column {
+	border: 1px solid #BABABA;
+	position: absolute;
+	background-color: white;
+	left: 5px;
+	top: -40px;
+	width: 418px;
+	height: 20px;
+	margin: 0;
+	padding: 5px 10px;
+}
+
+
+
+#cloud_request_system_profile_space {
+	position: absolute;
+	left: 640px;
+	top: 150px;
+	width: 150px;
+	height: 150px;
+	margin: 0;
+}
+
+
+#cloud_submit {
+    height: 20px;
+    left: 10px;
+    margin: 0;
+    position: absolute;
+    top: 332px;
+    width: 450px;
+}
+
+
+#cloud_scrollable_application_checkboxes {
+    border: 1px solid #CCCCCC;
+    height: 135px;
+    left: 10px;
+    overflow: auto;
+    padding: 5px;
+    position: absolute;
+    top: 55px;
+    width: 210px;
+}
+
+
+
+#cloud_ip_selects {
+    border: 1px solid #CCCCCC;
+    height: 135px;
+    left: 10px;
+    overflow: auto;
+    padding: 5px;
+    position: absolute;
+    top: 55px;
+    width: 190px;
+}
+
+
+#cloud_hostname_input_box {
+	position: absolute;
+	bottom: -6px;
+}
+
+
+/*
+ account tab
+*/
+
+#cloud_account_left_column {
+	border: 1px solid #BABABA;
+	position: absolute;
+	left: 25px;
+	top: 40px;
+	width: 400px;
+	height: 300px;
+	margin: 0;
+	padding: 5px 10px;
+}
+
+#cloud_account_right_column {
+	border: 1px solid #BABABA;
+	position: absolute;
+	left: 445px;
+	top: 40px;
+	width: 400px;
+	height: 310px;
+	margin: 0;
+}
+
+#cloud_account_user_space {
+	position: absolute;
+	left: 580px;
+	top: 150px;
+	width: 150px;
+	height: 150px;
+	margin: 0;
+}
+
+#cloud-account-submit {
+	position: absolute;
+	left: 230px;
+	top: 280px;
+	width: 180px;
+	height: 20px;
+	margin: 0;
+}
+
+
+
+/*
+ for the cost calculator
+*/
+
+#cost_resource_type_req_val {
+	position: absolute;
+	background-color: white;
+	border: 1px solid #BABABA;
+	top: 80px;
+	left: 30px;
+	width: 30px;
+	height: 15px;
+}
+#cost_kernel_val {
+	position: absolute;
+	background-color: white;
+	border: 1px solid #BABABA;
+	top: 105px;
+	left: 30px;
+	width: 30px;
+	height: 15px;
+}
+#cost_memory_val {
+	position: absolute;
+	background-color: white;
+	border: 1px solid #BABABA;
+	top: 130px;
+	left: 30px;
+	width: 30px;
+	height: 15px;
+}
+#cost_cpu_val {
+	position: absolute;
+	background-color: white;
+	border: 1px solid #BABABA;
+	top: 155px;
+	left: 30px;
+	width: 30px;
+	height: 15px;
+}
+#cost_disk_val {
+	position: absolute;
+	background-color: white;
+	border: 1px solid #BABABA;
+	top: 180px;
+	left: 30px;
+	width: 30px;
+	height: 15px;
+}
+#cost_network_val {
+	position: absolute;
+	background-color: white;
+	border: 1px solid #BABABA;
+	top: 205px;
+	left: 30px;
+	width: 30px;
+	height: 15px;
+}
+#cost_ha_val {
+	position: absolute;
+	background-color: white;
+	border: 1px solid #BABABA;
+	top: 230px;
+	left: 30px;
+	width: 30px;
+	height: 15px;
+}
+#cost_apps_val {
+	position: absolute;
+	background-color: white;
+	border: 1px solid #BABABA;
+	top: 255px;
+	left: 30px;
+	width: 30px;
+	height: 15px;
+}
+
+
+/*
+ for the cost calculator / summary
+*/
+
+
+#cost_sum_per_hour {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	width: 50px;
+	height: 15px;
+}
+
+#cost_sum_per_hour_val {
+	position: absolute;
+	top: 10px;
+	left: 65px;
+	width: 20px;
+	height: 15px;
+}
+#cost_sum_per_hour_currency {
+	position: absolute;
+	top: 10px;
+	left: 90px;
+	width: 20px;
+	height: 15px;
+}
+
+
+#cost_sum_per_day {
+	position: absolute;
+	top: 10px;
+	left: 110px;
+	width: 50px;
+	height: 15px;
+}
+
+#cost_sum_per_day_val {
+	position: absolute;
+	top: 10px;
+	left: 160px;
+	width: 20px;
+	height: 15px;
+}
+#cost_sum_per_day_currency {
+	position: absolute;
+	top: 10px;
+	left: 185px;
+	width: 20px;
+	height: 15px;
+}
+
+
+#cost_sum_per_month {
+	position: absolute;
+	top: 10px;
+	left: 210px;
+	width: 50px;
+	height: 15px;
+}
+
+#cost_sum_per_month_val {
+	position: absolute;
+	top: 10px;
+	left: 265px;
+	width: 20px;
+	height: 15px;
+}
+#cost_sum_per_month_currency {
+	position: absolute;
+	top: 10px;
+	left: 295px;
+	width: 20px;
+	height: 15px;
+}
+
+
+
+#cost_sum_ccu_total {
+	position: absolute;
+	top: 10px;
+	left: 320px;
+	width: 35px;
+	height: 15px;
+}
+#cost_sum_ccu {
+	border: 1px solid #BABABA;
+	position: absolute;
+	top: 10px;
+	left: 360px;
+	width: 30px;
+	height: 15px;
+}
+
+#cost_sum_ccu_title {
+	position: absolute;
+	top: 10px;
+	left: 395px;
+	width: 35px;
+	height: 15px;
+}
+
+
+
+#cost_applications {
+	position: absolute;
+	top: 255px;
+	left: 25px;
+	width: 50px;
+	height: 15px;
+}
+
+
+
+
+
+
+/*-------- custom design
+-------------------------------------------------- */
+
+h1,h2,h3,h4 {
+	color:#3057a8;
+	padding: 0 0 0 0!important;
+}
+
+h1 b, h2 b, h3 b, h4 b {
+	color:#78ab2c;
+}
+
+#project_tab_ui {
+	height:67px;
+	width:100%;
+	font-weight:normal;
+ 	background:#f0f0f0;
+	border-bottom:1px solid #cecece;
+}
+
+
+
+
+div#content_container {
+    position: absolute;
+	width: 900px;
+    top: 145px;
+}
+
+
+div#openqrm_enterprise_footer {
+	position:absolute;
+	left:0px;
+	top:600px;
+	border-top:1px solid #cecece;
+	width:100%;
+	height:80px;
+}
+
+div#openqrm_enterprise_footer a {
+	padding: 0 0 0 30px;
+	color:#333;
+}
+
+div#carousel {
+	position:absolute;
+	top:80px;
+}
+
+
+
+
+/*-------- Navi
+-------------------------------------------------- */
+
+.htmlobject_tabs ul {
+	width:1000px;
+	height:40px;
+	position:absolute;
+	top:95px;
+	left:30px;
+	border:1px solid #cecece;
+	background:url(../img/bg-navi.png) repeat-x;
+	padding:0px;
+}
+
+.htmlobject_tabs ul li {
+	border:none;
+	border-color:none;
+	background:none!important;
+	font-family:Arial, Helvetica, sans-serif;
+	color:#4a4a4a;
+	}
+
+.htmlobject_tabs ul li:first-child {
+	background:url(../img/navi-plugin.png) no-repeat 5px 13px!important;
+	padding: 0 0 0 15px ;
+}
+
+.htmlobject_tabs li.current {
+	border-bottom:none!important;
+	}
+
+.htmlobject_tabs ul li a {
+	color:#4a4a4a;
+	background:url(../img/arrow.png) right no-repeat;
+	padding: 10px 20px 10px 15px;
+	}
+
+.htmlobject_tabs ul li a:hover,
+.htmlobject_tabs li.current a {
+	color:#78ab2c;
+	}
+
+
+/*-------- Form
+-------------------------------------------------- */
+
+div#cloud_select select,
+div#cloud_language_select select {
+	width:130px!important;
+	height:20px!important;
+	border:1px solid #cecece!important;
+
+}
+
+div#cloud_select label,
+div#cloud_language_select label {
+    display: block;
+    float: left;
+    width: 80px;
+}
+
+.msgBox {
+	position: absolute;
+	top: 60px;
+	left: 350px;
+	width: 600px!important;
+	padding: 0 5px 0 5px!important;
+	
+}
+
+
+/*-Icon classes ----- */
+a.edit,
+a.console,
+a.remove,
+a.restart,
+a.resize,
+a.private,
+a.pause,
+a.unpause,
+a.graphs,
+a.manage {
+	padding: 0;
+	border: 0px none;
+	width: 32px;
+	height: 32px;
+	display:block;
+	text-align: center;
+	text-decoration: none;
+	line-height: 0px;
+	overflow: hidden;
+	color: transparent;
+}
+a.edit {
+	background: url('/cloud-portal/user/img/edit.png') no-repeat center top;
+}
+a.console {
+	background: url('/cloud-portal/user/img/login.png') no-repeat center top;
+}
+a.manage {
+	background: url('/cloud-portal/user/img/manage.png') no-repeat center top;
+}
+a.remove {
+	background: url('/cloud-portal/user/img/remove.png') no-repeat center top;
+}
+a.restart {
+	background: url('/cloud-portal/user/img/restart.png') no-repeat center top;
+}
+a.pause {
+	background: url('/cloud-portal/user/img/pause.png') no-repeat center top;
+}
+a.unpause {
+	background: url('/cloud-portal/user/img/unpause.png') no-repeat center top;
+}
+a.graphs {
+	background: url('/cloud-portal/img/graphs.png') no-repeat center top;
+}
+a.resize {
+	background: url('/cloud-portal/user/img/resize.png') no-repeat center top;
+}
+a.private {
+	background: url('/cloud-portal/user/img/private.png') no-repeat center top;
+}
+
+
+
+/* request details */
+#cloudinfoScrollArea {
+	position:relative;
+	border:1px solid #cecece;
+	overflow: scroll;
+	height:255px;
+}
+
+#cloudinfoArea {
+	margin: 5px 0 5px 5px;
+	padding: 0 0 0 5px;
+}
+
+
+#cloudbackgroundPopup{
+	display:none;
+	position:fixed;
+	_position:absolute;
+	height:100%;
+	width:100%;
+	top:0;
+	left:0;
+	background:#000000;
+	border:1px solid #cecece;
+	z-index:1;
+}
+#cloudpopupInfo{
+	display:none;
+	position:fixed;
+	_position:absolute;
+	height:300px;
+	width:450px;
+	background:#FFFFFF;
+	border:2px solid #cecece;
+	z-index:2;
+	padding:12px;
+	font-size:13px;
+}
+#cloudpopupInfo h1{
+	text-align:left;
+	color:#000000;
+	font-size:22px;
+	font-weight:700;
+	border-bottom:1px dotted #D3D3D3;
+	padding-bottom:2px;
+	margin-bottom:20px;
+}
+#cloudpopupInfoClose{
+	font-size:14px;
+	line-height:14px;
+	right:6px;
+	top:4px;
+	position:absolute;
+	color:#000000;
+	font-weight:700;
+	display:block;
+}
+
+
+#appliance_cloud_action_column {
+	width: 320px!important;
+	height: 32px!important;
+}
+
+#appliance_cloud_action {
+	position: relative;
+	float: left;
+}
+
