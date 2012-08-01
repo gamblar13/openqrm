@@ -1,0 +1,423 @@
+#!/bin/bash
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+# this script automatically manages aoe
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/aoe-storage/include/openqrm-plugin-aoe-storage-functions
+OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	OPENQRM_SERVER_IP=$resource_openqrmserver
+	OPENQRM_EXEC_PORT=$resource_execdport
+elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+	openqrm_server_get_config
+	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+	resource_id=0
+	resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+    openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+fi
+export LANG=C
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+# using the resource_id as the shelf-id
+AOE_SHELF=$resource_id
+export AOE_SHELF
+# how long to wait for the volume authentication, each loop is 5 secs
+MAX_VOLUME_AUTHENTICATION_LOOP=30
+export MAX_VOLUME_AUTHENTICATION_LOOP
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+
+if [ ! -d "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY" ]; then
+	mkdir -p $AOE_STORAGE_SERVER_IMAGE_DIRECTORY
+fi
+
+if ! which screen 1>/dev/null; then
+	echo "ERROR: The 'screen' utility is not installed! Please install and try again."
+	aoe_storage_log "ERROR: The 'screen' utility is not installed! Please install and try again."
+	exit 6
+fi
+
+# re-run in background via screen
+if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+	if [ -x /usr/bin/screen.real ]; then
+		RUNSCREEN="/usr/bin/screen.real"
+	else
+		RUNSCREEN=`which screen`
+	fi
+	export RUN_IN_BACKGROUND=true
+	SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+	$RUNSCREEN -dmS $SCREEN_NAME $0 $@
+	exit
+fi
+
+
+function aoe_storage_usage() {
+	echo "Usage : $0 add/remove/clone|snap/list <-n image-name> "
+	echo "             [-m size in MB]"
+	echo "             [-s image-snapshot-name]"
+	echo "        $0 auth <-r image-rootdevice> <-i mac-address>"
+	echo "        $0 post_luns <-u username> <-p password>"
+	echo "        $0 post_identifier <-u username> <-p password>"
+	echo "        $0 post_sync_progress <-n image-name> <-s image-snapshot-name> <-u username> <-p password>"
+	echo "        $0 post_sync_finished <-n image-name> <-u username> <-p password>"
+	exit 1
+}
+
+
+
+AOE_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			AOE_IMAGE_NAME=$2
+			shift
+			;;
+		-s)
+			AOE_IMAGE_SNAPSHOT_NAME=$2
+			shift
+			;;
+		-m)
+			AOE_IMAGE_SIZE=$2
+			shift
+			;;
+		-i)
+			AOE_IMAGE_AUTH_MAC=$2
+			shift
+			;;
+		-r)
+			AOE_IMAGE_ROOTDEVICE=$2
+			shift
+			;;
+		-u)
+			AOE_OPENQRM_USERNAME=$2
+			shift
+			;;
+		-p)
+			AOE_OPENQRM_PASSWORD=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			aoe_storage_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+
+
+# main
+if [ "$AOE_COMMAND" == "" ]; then
+	aoe_storage_usage
+fi
+
+if [ "$AOE_COMMAND" == "post_luns" ] || [ "$AOE_COMMAND" == "post_identifier" ]; then
+	if [ "$AOE_OPENQRM_USERNAME" == "" ]; then
+		aoe_storage_usage
+	fi
+	if [ "$AOE_OPENQRM_PASSWORD" == "" ]; then
+		aoe_storage_usage
+	fi
+else
+	if [ "$AOE_COMMAND" != "list" ] && [ "$AOE_COMMAND" != "auth" ]; then
+		if [ "$AOE_IMAGE_NAME" == "" ]; then
+			aoe_storage_usage
+		fi
+	fi
+fi
+
+case "$AOE_COMMAND" in 
+
+	add)
+		# check if existing already
+		if [ -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME" ]; then
+			openqrm_post_event 0 "add" 3 "openqrm-aoe-storage" "AOE volume $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME already exists."
+			exit 1
+		fi
+		if [ "$AOE_IMAGE_SIZE" == "" ]; then
+			AOE_IMAGE_SIZE=$DEFAULT_IMAGE_SIZE
+		fi
+		export AOE_IMAGE_SIZE
+		echo "Creating AOE volume $AOE_IMAGE_NAME"
+		mkdir -p $AOE_STORAGE_SERVER_IMAGE_DIRECTORY
+		# add to exports
+		aoe_storage_lock aquire
+		manage_aoe add
+		aoe_storage_lock release
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$AOE_OPENQRM_USERNAME" != "" ] && [ "$AOE_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_luns -u $AOE_OPENQRM_USERNAME -p $AOE_OPENQRM_PASSWORD
+		fi
+		;;
+
+	remove)
+		# check that source fs-images exist
+		if [ ! -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME" ]; then
+			openqrm_post_event 0 "remove" 3 "aoe-storage" "Volume $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME does not exists!"
+			exit 1
+		fi
+		# check that it is not in use by a syncing action
+		if ls $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME.sync_in_progress.* 1>/dev/null 2>&1; then
+			openqrm_post_event 0 "remove" 3 "aoe-storage" "Volume $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME is currently in use by a sync action!"
+			exit 1
+		fi
+		if [ -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME.clone_in_progress" ]; then
+			openqrm_post_event 0 "remove" 3 "aoe-storage" "Volume $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME is currently in use by a clone action!"
+			exit 1
+		fi
+		echo "Removing AOE volume $AOE_IMAGE_NAME"
+		aoe_storage_lock aquire
+		manage_aoe remove
+		# physical remove
+		rm -rf $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME
+		aoe_storage_lock release
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$AOE_OPENQRM_USERNAME" != "" ] && [ "$AOE_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_luns -u $AOE_OPENQRM_USERNAME -p $AOE_OPENQRM_PASSWORD
+		fi
+		;;
+
+	clone|snap)
+		if [ "$AOE_IMAGE_SNAPSHOT_NAME" == "" ]; then
+			openqrm_post_event 0 "snap" 3 "aoe-storage" "No snapshot volume name given."
+			aoe_storage_usage
+		fi
+		# check that source fs-images exist
+		if [ ! -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME" ]; then
+			openqrm_post_event 0 "snap" 3 "aoe-storage" "Source image $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME does not exist."
+			exit 1
+		fi
+		if [ -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_SNAPSHOT_NAME.clone_in_progress" ]; then
+			openqrm_post_event 0 "clone" 3 "aoe-storage" "There is already an active cloning action running for Volume $AOE_IMAGE_SNAPSHOT_NAME!"
+			exit 1
+		fi
+		if [ -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_SNAPSHOT_NAME" ]; then
+			openqrm_post_event 0 "clone" 3 "aoe-storage" "Snapshot $AOE_IMAGE_SNAPSHOT_NAME already exists!"
+			exit 1
+		fi
+		AOE_ORIGINAL_IMAGE_SIZE=`cat $VBLADECONF | grep -v '^#' | grep $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME | cut -d '#' -f2 | cut -d'=' -f2 | awk {' print $1 '}`
+		if [ "$AOE_ORIGINAL_IMAGE_SIZE" == "" ]; then
+			openqrm_post_event 0 "snap" 3 "aoe-storage" "Could not find out original image size! Skipping snapshot."
+			exit 1
+		fi
+		echo "Creating snapshot from AOE volume $AOE_IMAGE_NAME -> $AOE_IMAGE_SNAPSHOT_NAME size $AOE_ORIGINAL_IMAGE_SIZE"
+		mkdir -p $AOE_STORAGE_SERVER_IMAGE_DIRECTORY
+		# create lock in the origin for clone so remove is not able to remove the origin while syncing
+		touch "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME.sync_in_progress.$AOE_IMAGE_SNAPSHOT_NAME"
+		# create long-term-action start event
+		openqrm_post_event 0 "$AOE_IMAGE_SNAPSHOT_NAME" 9 "aoe-storage" "Started to clone $AOE_IMAGE_SNAPSHOT_NAME from $AOE_IMAGE_NAME"
+		export ORG_IMAGE_NAME=$AOE_IMAGE_NAME
+		export AOE_IMAGE_NAME=$AOE_IMAGE_SNAPSHOT_NAME
+		export AOE_IMAGE_SIZE=$AOE_ORIGINAL_IMAGE_SIZE
+		aoe_storage_lock aquire
+		manage_aoe add snap
+		# create a lock in the new created dir for post_exports + identifier
+		touch "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_SNAPSHOT_NAME.clone_in_progress"
+		aoe_storage_lock release
+		# in case we have a username + password post the updated list to the openQRM-server
+		# if we have a user + password we start sync-progress monitor
+		if [ "$AOE_OPENQRM_USERNAME" != "" ] && [ "$AOE_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_sync_progress -n $ORG_IMAGE_NAME -s $AOE_IMAGE_SNAPSHOT_NAME -u $AOE_OPENQRM_USERNAME -p $AOE_OPENQRM_PASSWORD &
+		fi
+		sleep 10
+		# start to sync
+		cp -a $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$ORG_IMAGE_NAME $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_SNAPSHOT_NAME
+
+		# remove lock from the origin + snapshot
+		rm -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$ORG_IMAGE_NAME.sync_in_progress.$AOE_IMAGE_SNAPSHOT_NAME"
+		rm -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_SNAPSHOT_NAME.clone_in_progress"
+
+		# stop sync-progress monitor and send sync-finished to openQRM
+		$0 post_sync_finished -n $AOE_IMAGE_SNAPSHOT_NAME -u $AOE_OPENQRM_USERNAME -p $AOE_OPENQRM_PASSWORD
+		# create long-term-action finished event
+		openqrm_post_event 0 "$AOE_IMAGE_SNAPSHOT_NAME" 10 "aoe-storage" "Finished to clone $AOE_IMAGE_SNAPSHOT_NAME"
+		;;
+
+	auth)
+		if [ "$AOE_IMAGE_ROOTDEVICE" == "" ]; then
+			AOE_IMAGE_ROOTDEVICE="$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME"
+		fi
+		if [ "$AOE_IMAGE_NAME" == "" ]; then
+			AOE_IMAGE_NAME=`basename $AOE_IMAGE_ROOTDEVICE`
+		fi
+		echo "Authenticating AOE volume $AOE_IMAGE_ROOTDEVICE to $AOE_IMAGE_AUTH_MAC"
+		# this is just for starting auth, make sure the device is there, otherwise wait
+		if [ "$AOE_OPENQRM_USERNAME" != "" ] && [ "$AOE_OPENQRM_PASSWORD" != "" ] && [ "$AOE_IMAGE_NAME" != "" ]; then
+			MAX_AUTH_LOOP=0
+			while (true); do
+				if [ -f "$AOE_IMAGE_ROOTDEVICE" ] && [ ! -f "$AOE_IMAGE_ROOTDEVICE.clone_in_progress" ]; then
+					break
+				fi
+				sleep 5
+				if [ "$MAX_AUTH_LOOP" == "$MAX_VOLUME_AUTHENTICATION_LOOP" ]; then
+					openqrm_post_event 0 "auth" 3 "openqrm-aoe-storage" "Volume $AOE_IMAGE_ROOTDEVICE does not exist."
+					exit 1
+				fi
+				MAX_AUTH_LOOP=$(( MAX_AUTH_LOOP + 1 ))
+			done
+		fi
+		aoe_storage_lock aquire
+		manage_aoe auth $AOE_IMAGE_AUTH_MAC
+		aoe_storage_lock release
+		# if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+		if [ "$AOE_OPENQRM_USERNAME" != "" ] && [ "$AOE_OPENQRM_PASSWORD" != "" ] && [ "$AOE_IMAGE_NAME" != "" ]; then
+			if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$AOE_OPENQRM_USERNAME --http-password=$AOE_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/aoe-storage/aoe-storage-action.php?aoe_storage_command=auth_finished&aoe_image_name=$AOE_IMAGE_NAME"; then
+				aoe_storage_log auth "ERROR: Could not remove the storage-auth-blocker from the openQRM-server at $OPENQRM_SERVER_IP!"
+			fi
+			# post exports again
+			$0 post_luns -u $AOE_OPENQRM_USERNAME -p $AOE_OPENQRM_PASSWORD
+		fi
+		;;
+
+	list)
+		ls $AOE_STORAGE_SERVER_IMAGE_DIRECTORY
+		;;
+	post_luns)
+		echo "Posting current aoe-luns to the openQRM-server"
+		# get avail + used space
+		BACKEND_DIR_AVAIL_SPACE=`df --block-size MB $AOE_STORAGE_SERVER_IMAGE_DIRECTORY | grep -v Used | awk '{ print $2 }' | sed -e "s/MB//g"`
+		BACKEND_DIR_FREE_SPACE=`df --block-size MB $AOE_STORAGE_SERVER_IMAGE_DIRECTORY | grep -v Used | awk '{ print $4 }' | sed -e "s/MB//g"`
+		STORAGE_STATUS_TMP=$resource_id.aoe.stat
+		# send avail + free as first line, all next lines are luns
+		echo "$BACKEND_DIR_AVAIL_SPACE""@""$BACKEND_DIR_FREE_SPACE" > $STORAGE_STATUS_TMP
+		OLD_IFS=$IFS
+IFS='
+'
+		for SHELF_STR in `cat $VBLADECONF | grep -v '^#' | grep $AOE_STORAGE_SERVER_IMAGE_DIRECTORY | sed '/^$/d'`; do
+			INTERFACE=`echo $SHELF_STR | awk {'print $1	'}`
+			V_SHELF=`echo $SHELF_STR | awk {' print $2 '}`
+			V_SLOT=`echo $SHELF_STR | awk {' print $3 '}`
+			V_IMAGE=`echo $SHELF_STR | awk {' print $4 '}`
+			V_IMAGE_SHORT=`basename $V_IMAGE`
+			V_ALLOWED_MAC=`echo $SHELF_STR | awk {' print $5 '}`
+			V_IMAGE_SIZE=`echo $SHELF_STR | awk {' print $7 '} | cut -d'=' -f2`
+			# check for clone-in-progress
+			if [ -f "$V_IMAGE.clone_in_progress" ]; then
+			    V_ALLOWED_MAC="-"
+			    INTERFACE="-"
+			    V_IMAGE_SIZE="clone_in_progress"
+
+			fi
+			echo "$INTERFACE""@""$V_SHELF""@""$V_SLOT""@""$V_IMAGE_SHORT""@""$V_ALLOWED_MAC""@""$V_IMAGE_SIZE" >> $STORAGE_STATUS_TMP
+		done
+		IFS=$OLD_IFS
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$AOE_OPENQRM_USERNAME --http-password=$AOE_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/aoe-storage/aoe-storage-action.php?aoe_storage_command=get_storage; then
+			openqrm_post_event 0 "post_luns" 3 "openqrm-aoe-storage" "Could not post AOE volume list to openQRM at $OPENQRM_SERVER_IP."
+		fi
+		rm -f $STORAGE_STATUS_TMP
+		rm -f $STORAGE_STATUS_TMP.post
+		;;
+	post_identifier)
+		echo "Posting current AOE voluem identifiers to the openQRM-server"
+		STORAGE_STATUS_TMP=$resource_id.aoe.ident
+		> $STORAGE_STATUS_TMP
+		OLD_IFS=$IFS
+IFS='
+'
+		for SHELF_STR in `cat $VBLADECONF | grep -v '^#' | grep $AOE_STORAGE_SERVER_IMAGE_DIRECTORY | sed '/^$/d'`; do
+			INTERFACE=`echo $SHELF_STR | awk {'print $1	'}`
+			V_SHELF=`echo $SHELF_STR | awk {' print $2 '}`
+			V_SLOT=`echo $SHELF_STR | awk {' print $3 '}`
+			V_IMAGE=`echo $SHELF_STR | awk {' print $4 '}`
+			V_IMAGE_SHORT=`basename $V_IMAGE`
+			V_ALLOWED_MAC=`echo $SHELF_STR | awk {' print $5 '}`
+			# check for clone-in-progress
+			if [ -f "$V_IMAGE.clone_in_progress" ]; then
+			    continue
+			fi
+			echo "$V_IMAGE,$V_IMAGE_SHORT:/dev/etherd/e$V_SHELF.$V_SLOT" >> $STORAGE_STATUS_TMP
+		done
+		IFS=$OLD_IFS
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$AOE_OPENQRM_USERNAME --http-password=$AOE_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/aoe-storage/aoe-storage-action.php?aoe_storage_command=get_ident; then
+			openqrm_post_event 0 "post_identifier" 3 "openqrm-aoe-storage" "Could not post AOE volume identifiers to openQRM at $OPENQRM_SERVER_IP."
+		fi
+		rm -f $STORAGE_STATUS_TMP
+		rm -f $STORAGE_STATUS_TMP.post
+		;;
+
+	post_sync_progress)
+		echo "Posting progress of the sync action for volume $AOE_IMAGE_SNAPSHOT_NAME syncing from $AOE_IMAGE_NAME to the openQRM-server"
+		STORAGE_STATUS_TMP=$resource_id.aoe.$AOE_IMAGE_SNAPSHOT_NAME.sync_progress
+
+		while (true); do
+			# if this is a snapshot volume we have to wait until the sync is ready
+			if [ -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_SNAPSHOT_NAME" ] && [ ! -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_SNAPSHOT_NAME.clone_in_progress" ]; then
+				# sync is ready
+				break
+			else
+				if [ ! -f "$AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_SNAPSHOT_NAME" ]; then
+				    # cloning not started yet, waiting for the snapshot to appear
+				    echo "0" > $STORAGE_STATUS_TMP
+				else
+				    SOURCE_VOLUME_SIZE=`ls -l --block-size=M $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_NAME | awk '{ print $5 }' | cut -d'M' -f1`
+				    DESTINATION_VOLUME_SIZE=`ls -l --block-size=M $AOE_STORAGE_SERVER_IMAGE_DIRECTORY/$AOE_IMAGE_SNAPSHOT_NAME | awk '{ print $5 }' | cut -d'M' -f1`
+				    if [ "$DESTINATION_VOLUME_SIZE" == 0 ]; then
+					    DESTINATION_VOLUME_SIZE=1
+				    fi
+				    CURRENT_SYNC_PROGRESS_IN_PERCENT=$(( SOURCE_VOLUME_SIZE / DESTINATION_VOLUME_SIZE ))
+				    CURRENT_SYNC_PROGRESS_IN_PERCENT=$(( 100 / CURRENT_SYNC_PROGRESS_IN_PERCENT ))
+				    # make sure to not send 100%, this is send by clone finished
+				    CURRENT_SYNC_PROGRESS_IN_PERCENT=$(( CURRENT_SYNC_PROGRESS_IN_PERCENT - 1 ))
+					if (( $CURRENT_SYNC_PROGRESS_IN_PERCENT < 0 )); then
+						CURRENT_SYNC_PROGRESS_IN_PERCENT=0
+					fi
+				    echo "$CURRENT_SYNC_PROGRESS_IN_PERCENT" > $STORAGE_STATUS_TMP
+				fi
+				if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$AOE_OPENQRM_USERNAME --http-password=$AOE_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/aoe-storage/aoe-storage-action.php?aoe_storage_command=get_sync_progress; then
+					aoe_storage_log "post_sync_progress" "Could not post the sync progress for volume $AOE_IMAGE_SNAPSHOT_NAME to openQRM at $OPENQRM_SERVER_IP."
+				fi
+				rm -f $STORAGE_STATUS_TMP $STORAGE_STATUS_TMP.post
+			fi
+			sleep 2
+		done
+		;;
+
+
+	post_sync_finished)
+		echo "Posting finished for volume $AOE_IMAGE_NAME to the openQRM-server"
+		STORAGE_STATUS_TMP=$resource_id.aoe.$AOE_IMAGE_NAME.sync_progress
+		echo "100" > $STORAGE_STATUS_TMP
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$AOE_OPENQRM_USERNAME --http-password=$AOE_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/aoe-storage/aoe-storage-action.php?aoe_storage_command=get_sync_finished; then
+			aoe_storage_log "post_sync_finished" "Could not post the sync progress for volume $AOE_IMAGE_NAME to openQRM at $OPENQRM_SERVER_IP."
+		fi
+		rm -f $STORAGE_STATUS_TMP $STORAGE_STATUS_TMP.post
+		;;
+
+
+	*)
+		aoe_storage_usage
+		;;
+
+
+esac
+
