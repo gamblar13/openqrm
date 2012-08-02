@@ -1,0 +1,192 @@
+.htmlobject_td.sort_form {
+	border: 0 none;
+    text-align: right;
+}
+.htmlobject_td.actions {
+    border: 0 none;
+    padding-top: 15px !important;
+    text-align: right;
+}
+.htmlobject_td.storage_edit a {
+	background: url('../../../img/edit.png') no-repeat center top;
+	border: 0px none;
+	width: 32px;
+	height: 32px;
+	display:block;
+	text-align: center;
+	text-decoration: none;
+	line-height: 0px;
+	overflow: hidden;
+	color: transparent;
+}
+a.auth,
+a.clone {
+	border: 0px none;
+	width: 32px;
+	height: 32px;
+	display:block;
+	text-align: center;
+	text-decoration: none;
+	line-height: 0px;
+	overflow: hidden;
+	color: transparent;
+}
+a.auth {
+	background: url('../../../img/auth.png') no-repeat center top;
+}
+a.clone {
+	background: url('../../../img/clone.png') no-repeat center top;
+}
+
+
+.htmlobject_th.state,
+.htmlobject_td.state,
+.htmlobject_th.icon,
+.htmlobject_td.icon,
+.htmlobject_th.storage_edit,
+.htmlobject_td.storage_edit {
+	width: 30px;
+	text-align: center;
+	vertical-align: top;
+}
+.htmlobject_td.storage_id {
+	width: 30px;
+	text-align: right;
+	vertical-align: top;
+}
+.htmlobject_td.storage_name {
+	width: 200px;
+	text-align: left;
+	vertical-align: top;
+}
+.htmlobject_td.auth,
+.htmlobject_td.clone {
+	width: 40px;
+	text-align: center;
+	vertical-align: top;
+}
+.htmlobject_th.storage_data,
+.htmlobject_td.storage_data {
+	width: 240px;
+}
+
+.htmlobject_th.name,
+.htmlobject_td.name{
+	width: 300px;
+}
+
+.htmlobject_box .left {
+	width: 200px;
+}
+
+.pageturn_left a,
+.pageturn_right a {
+	display: block;
+	float: left;
+	background: #F2F1F0;
+	width: 30px;
+	text-align: center;
+	border:1px solid #BABABA;
+	text-decoration: none;
+	margin: 1px;
+	color: black;
+	font-size: 12px;
+}
+.pageturn_middle {
+	font-size: 12px;
+	vertical-align: middle;
+}
+.actiontable input {
+	margin:1px;
+}
+#buttons {
+	margin: 20px 0 0 0;
+}
+
+
+.progress_bar {
+	width: 200px;
+	height: 10px;
+}
+
+.ui-widget-content {
+    background: transparent !important;
+    border: 0px none !important;
+    color: #222222 !important;
+}
+
+.ui-progressbar .ui-progressbar-value {
+    height: 5px !important;
+}
+
+/* Documentation */
+
+fieldset {
+	border: 1px solid #91A7B4;
+	padding: 5px 10px;
+}
+fieldset legend {
+	padding: 5px;
+	font-weight: bold;
+}
+
+#documentation_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 750px;
+}
+
+#plugin_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 255px;
+}
+
+
+
+#introduction_content {
+    padding: 0px 5px !important;
+}
+#provides_content {
+    padding: 0px 10px !important;
+}
+#requirements_content {
+    padding: 0px 10px !important;
+}
+#migration_content {
+    padding: 0px 5px !important;
+}
+
+#storage_mgmt_content {
+    padding: 0px 10px !important;
+}
+
+#vm_mgmt_content {
+    padding: 0px 10px !important;
+}
+
+#plugin_type {
+	width: 240px;
+	height: 40px;
+    top: 0px;
+}
+
+#deployment_type {
+	width: 240px;
+	height: 40px;
+    top: 0px;
+
+}
+
+#tested_with {
+	width: 240px;
+	height: 100px;
+    top: 0px;
+
+}
+
+

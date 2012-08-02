@@ -1,0 +1,393 @@
+#!/bin/bash
+# this script automatically manages nfs
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/nfs-storage/include/openqrm-plugin-nfs-storage-functions
+OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	OPENQRM_SERVER_IP=$resource_openqrmserver
+	OPENQRM_EXEC_PORT=$resource_execdport
+elif [ -f $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf ]; then
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+	openqrm_server_get_config
+	OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+	resource_id=0
+	resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+	openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+fi
+export LANG=C
+# how long to wait for the volume authentication, each loop is 5 secs
+MAX_VOLUME_AUTHENTICATION_LOOP=300
+export MAX_VOLUME_AUTHENTICATION_LOOP
+# dir for progress stats
+SYNC_PROGRESS_DIR="/tmp"
+
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+
+# check for rsync + screen
+if ! which rsync 2>&1 1>/dev/null; then
+	openqrm_post_event 0 "clone" 3 "openqrm-lvm-manager" "rsync tool missing. Please install rsync!"
+	lvm_storage_usage
+fi
+if ! which screen 2>&1 1>/dev/null; then
+	echo "ERROR: The 'screen' utility is not installed! Please install and try again."
+	nfs_storage_log "ERROR: The 'screen' utility is not installed! Please install and try again."
+	exit 6
+fi
+
+# re-run in background via screen
+if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+	if [ -x /usr/bin/screen.real ]; then
+		RUNSCREEN="/usr/bin/screen.real"
+	else
+		RUNSCREEN=`which screen`
+	fi
+	export RUN_IN_BACKGROUND=true
+	SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+	$RUNSCREEN -dmS $SCREEN_NAME $0 $@
+	exit
+fi
+
+
+function nfs_storage_usage() {
+	echo "Usage : $0 add/remove/clone|snap/list <-n image-name>"
+	echo "             [-s image-snapshot-name]"
+	echo "        $0 auth <-r image-rootdevice> <-i ip-address>"
+	echo "        $0 post_exports <-u username> <-p password>"
+	echo "        $0 post_identifier <-u username> <-p password>"
+	echo "        $0 post_sync_progress <-n image-name> <-u username> <-p password>"
+	echo "        $0 post_sync_finished <-n image-name> <-u username> <-p password>"
+	exit 1
+}
+
+
+NFS_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			NFS_IMAGE_NAME=$2
+			shift
+			;;
+		-s)
+			NFS_IMAGE_SNAPSHOT_NAME=$2
+			shift
+			;;
+		-i)
+			NFS_IMAGE_AUTH_IP=$2
+			shift
+			;;
+		-r)
+			NFS_IMAGE_ROOTDEVICE=$2
+			shift
+			;;
+		-t)
+			NFS_IMAGE_TYPE=$2
+			shift
+			;;
+		-u)
+			NFS_OPENQRM_USERNAME=$2
+			shift
+			;;
+		-p)
+			NFS_OPENQRM_PASSWORD=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			nfs_storage_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+
+
+# main
+if [ "$NFS_COMMAND" == "" ]; then
+	nfs_storage_usage
+fi
+
+if [ "$NFS_COMMAND" == "post_exports" ]  || [ "$NFS_COMMAND" == "post_identifier" ]; then
+	if [ "$NFS_OPENQRM_USERNAME" == "" ]; then
+		nfs_storage_usage
+	fi
+	if [ "$NFS_OPENQRM_PASSWORD" == "" ]; then
+		nfs_storage_usage
+	fi
+else
+	if [ "$NFS_COMMAND" != "list" ] && [ "$NFS_COMMAND" != "auth" ]; then
+		if [ "$NFS_IMAGE_NAME" == "" ]; then
+			nfs_storage_usage
+		fi
+	fi
+fi
+
+case "$NFS_COMMAND" in 
+
+	add)
+		if [ -d "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME" ]; then
+			openqrm_post_event 0 "add" 3 "nfs-storage" "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME already exists."
+			exit 1
+		fi
+		echo -n "Creating NFS export for image $NFS_IMAGE_NAME"
+		# add to exports
+		nfs_storage_lock aquire
+		manage_nfs add $OPENQRM_SERVER_IP
+		nfs_storage_lock release
+		# in case we have a username + password post the updated list to the openQRM-server
+		if [ "$NFS_OPENQRM_USERNAME" != "" ] && [ "$NFS_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_exports -u $NFS_OPENQRM_USERNAME -p $NFS_OPENQRM_PASSWORD
+		fi
+		;;
+
+	remove)
+		# check that source fs-images exist
+		if [ ! -d "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME" ]; then
+			openqrm_post_event 0 "remove" 3 "nfs-storage" "Volume $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME does not exists!"
+			exit 1
+		fi
+		# check that it is not in use by a syncing action
+		if ls $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME/.sync_in_progress.* 1>/dev/null 2>&1; then
+			openqrm_post_event 0 "remove" 3 "nfs-storage" "Volume $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME is currently in use by a sync action!"
+			exit 1
+		fi
+		if [ -f "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME/.clone_in_progress" ]; then
+			openqrm_post_event 0 "remove" 3 "nfs-storage" "Volume $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME is currently in use by a clone action!"
+			exit 1
+		fi
+		echo -n "Removing NFS export for image $NFS_IMAGE_NAME"
+		nfs_storage_lock aquire
+		manage_nfs remove
+		nfs_storage_lock release
+		if [ "$NFS_OPENQRM_USERNAME" != "" ] && [ "$NFS_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_exports -u $NFS_OPENQRM_USERNAME -p $NFS_OPENQRM_PASSWORD
+		fi
+		;;
+
+	clone|snap)
+		if [ "$NFS_IMAGE_SNAPSHOT_NAME" == "" ]; then
+			openqrm_post_event 0 "clone" 3 "nfs-storage" "No snapshot name given. Please use the -s cmdline parameter."
+			nfs_storage_usage
+		fi
+		# check that source fs-images exist
+		if [ ! -d "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME" ]; then
+			openqrm_post_event 0 "clone" 3 "nfs-storage" "Source volume $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME does not exists!"
+			exit 1
+		fi
+		if [ -f "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_SNAPSHOT_NAME/.clone_in_progress" ]; then
+			openqrm_post_event 0 "clone" 3 "nfs-storage" "There is already an active cloning action running for snapshot $NFS_IMAGE_SNAPSHOT_NAME!"
+			exit 1
+		fi
+		if [ -d "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_SNAPSHOT_NAME" ]; then
+			openqrm_post_event 0 "clone" 3 "nfs-storage" "Snapshot $NFS_IMAGE_SNAPSHOT_NAME already exists!"
+			exit 1
+		fi
+
+		echo -n "Creating snapshot from image $NFS_IMAGE_NAME -> $NFS_IMAGE_SNAPSHOT_NAME"
+		mkdir -p "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_SNAPSHOT_NAME"
+		# create lock in the origin for clone so remove is not able to remove the origin while syncing
+		touch "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME/.sync_in_progress.$NFS_IMAGE_SNAPSHOT_NAME"
+		# create long-term-action start event
+		openqrm_post_event 0 "$NFS_IMAGE_SNAPSHOT_NAME" 9 "nfs-storage" "Started to clone $NFS_IMAGE_SNAPSHOT_NAME from $NFS_IMAGE_NAME"
+		nfs_storage_lock aquire
+		export ORG_IMAGE_NAME=$NFS_IMAGE_NAME
+		export NFS_IMAGE_NAME=$NFS_IMAGE_SNAPSHOT_NAME
+		manage_nfs add $OPENQRM_SERVER_IP
+		# create a lock in the new created dir for post_exports + identifier
+		touch "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME/.clone_in_progress"
+		nfs_storage_lock release
+
+		# get a list of files to sync
+		rsync -a -vv --list-only --progress --exclude="/.sync_in_progress.*" $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$ORG_IMAGE_NAME/* $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME/ > $SYNC_PROGRESS_DIR/rsync_files.$NFS_IMAGE_NAME.log
+		> $SYNC_PROGRESS_DIR/rsync_progress.$NFS_IMAGE_NAME.log
+		# post exports early, we show the progress in the ui
+		if [ "$NFS_OPENQRM_USERNAME" != "" ] && [ "$NFS_OPENQRM_PASSWORD" != "" ]; then
+			$0 post_sync_progress -n $NFS_IMAGE_NAME -u $NFS_OPENQRM_USERNAME -p $NFS_OPENQRM_PASSWORD &
+		fi
+		# delay start syncing
+		sleep 10
+		rsync -a --progress --exclude="/.sync_in_progress.*" $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$ORG_IMAGE_NAME/* $NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME/ > $SYNC_PROGRESS_DIR/rsync_progress.$NFS_IMAGE_NAME.log
+
+		# remove lock from the origin + snapshot
+		rm -f "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$ORG_IMAGE_NAME/.sync_in_progress.$NFS_IMAGE_NAME"
+		rm -f "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME/.clone_in_progress"
+
+		# stop sync-progress monitor and send sync-finished to openQRM
+		rm -f $SYNC_PROGRESS_DIR/rsync_progress.$NFS_IMAGE_NAME.log $SYNC_PROGRESS_DIR/rsync_files.$NFS_IMAGE_NAME.log
+		$0 post_sync_finished -n $NFS_IMAGE_NAME -u $NFS_OPENQRM_USERNAME -p $NFS_OPENQRM_PASSWORD
+		# create long-term-action finished event
+		openqrm_post_event 0 "$NFS_IMAGE_SNAPSHOT_NAME" 10 "nfs-storage" "Finished to clone $NFS_IMAGE_SNAPSHOT_NAME"
+		;;
+
+	auth)
+		if [ "$NFS_IMAGE_ROOTDEVICE" == "" ]; then
+			NFS_IMAGE_ROOTDEVICE="$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME"
+		fi
+		echo -n "Authenticating NFS export $NFS_IMAGE_ROOTDEVICE to $NFS_IMAGE_AUTH_IP"
+		if [ "$NFS_OPENQRM_USERNAME" != "" ] && [ "$NFS_OPENQRM_PASSWORD" != "" ] && [ "$NFS_IMAGE_NAME" != "" ]; then
+			MAX_AUTH_LOOP=0
+			while (true); do
+				# if this is a snapshot volume we have to wait until the sync is ready
+				if [ -d "$NFS_IMAGE_ROOTDEVICE" ] && [ ! -f "$NFS_IMAGE_ROOTDEVICE/.clone_in_progress" ]; then
+					# sync is ready
+					break
+				fi
+				sleep 5
+				if [ "$MAX_AUTH_LOOP" == "$MAX_VOLUME_AUTHENTICATION_LOOP" ]; then
+					openqrm_post_event 0 "auth" 3 "nfs-storage" "Volume $NFS_IMAGE_ROOTDEVICE does not exists, Cannot auth to $NFS_IMAGE_AUTH_IP."
+					exit 1
+				fi
+				MAX_AUTH_LOOP=$(( MAX_AUTH_LOOP + 1 ))
+			done
+		fi
+		# auth in exports
+		nfs_storage_lock aquire
+		manage_nfs auth $NFS_IMAGE_AUTH_IP
+		nfs_storage_lock release
+		# if we have an image name send back to openQRM that storage auth finished to remvoe the storage-auth-blocker
+		if [ "$NFS_OPENQRM_USERNAME" != "" ] && [ "$NFS_OPENQRM_PASSWORD" != "" ] && [ "$NFS_IMAGE_NAME" != "" ]; then
+			if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$NFS_OPENQRM_USERNAME --http-password=$NFS_OPENQRM_PASSWORD "$openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/nfs-storage/nfs-storage-action.php?nfs_storage_command=auth_finished&nfs_image_name=$NFS_IMAGE_NAME"; then
+				openqrm_post_event 0 "auth" 3 "nfs-storage" "Could not remove the storage-auth-blocker from openQRM at $OPENQRM_SERVER_IP."
+			fi
+			# post exports again
+			$0 post_exports -u $NFS_OPENQRM_USERNAME -p $NFS_OPENQRM_PASSWORD
+		fi
+		;;
+
+	list)
+		ls $NFS_STORAGE_SERVER_IMAGE_DIRECTORY
+		;;
+	post_exports)
+		echo "Posting current nfs-exports to the openQRM-server"
+		BACKEND_DIR_AVAIL_SPACE=`df --block-size MB $NFS_STORAGE_SERVER_IMAGE_DIRECTORY | grep -v Used | awk '{ print $2 }' | sed -e "s/MB//g"`
+		BACKEND_DIR_FREE_SPACE=`df --block-size MB $NFS_STORAGE_SERVER_IMAGE_DIRECTORY | grep -v Used | awk '{ print $4 }' | sed -e "s/MB//g"`
+		STORAGE_STATUS_TMP=$resource_id.nfs.stat
+		# send avail + free as first line, all next lines are luns
+		echo "$BACKEND_DIR_AVAIL_SPACE""@""$BACKEND_DIR_FREE_SPACE" > $STORAGE_STATUS_TMP
+		# take care to only post "our" exports, e.g. not the ones from an lvm-nfs-storage
+		for NFS_EXPORT in `cat /var/lib/nfs/etab | grep ^$NFS_STORAGE_SERVER_IMAGE_DIRECTORY | awk {' print $1"@"$2 '} | sed -e "s/<.*>//g" | sed -e "s/(.*)//g"`; do
+			IMAGE_EXPORT=`echo $NFS_EXPORT | cut -d'@' -f1`
+			# check if a sync action is in progress
+			if [ -f "$IMAGE_EXPORT/.clone_in_progress" ]; then
+				echo "$IMAGE_EXPORT""@""clone_in_progress" >> $STORAGE_STATUS_TMP
+			else
+				echo "$NFS_EXPORT" >> $STORAGE_STATUS_TMP
+			fi
+		done
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$NFS_OPENQRM_USERNAME --http-password=$NFS_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/nfs-storage/nfs-storage-action.php?nfs_storage_command=get_storage; then
+			openqrm_post_event 0 "post_exports" 3 "nfs-storage" "Could not post the nfs-export status to openQRM at $OPENQRM_SERVER_IP."
+		fi
+		rm -f $STORAGE_STATUS_TMP
+		rm -f $STORAGE_STATUS_TMP.post
+		;;
+	post_identifier)
+		echo "Posting current nfs-identifier to the openQRM-server"
+		STORAGE_STATUS_TMP=$resource_id.nfs.ident
+		> $STORAGE_STATUS_TMP
+		for IMAGE_NAME_EXPORT in `cat /var/lib/nfs/etab | grep ^$NFS_STORAGE_SERVER_IMAGE_DIRECTORY | awk {' print $1 '} | sed -e "s/<.*>//g" | sed -e "s/(.*)//g"`; do
+			if [ ! -f "$IMAGE_NAME_EXPORT/.clone_in_progress" ]; then
+				IMAGE_NAME=`basename $IMAGE_NAME_EXPORT`
+				echo "$IMAGE_NAME,$IMAGE_NAME_EXPORT" >> $STORAGE_STATUS_TMP
+			fi
+		done
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$NFS_OPENQRM_USERNAME --http-password=$NFS_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/nfs-storage/nfs-storage-action.php?nfs_storage_command=get_ident; then
+			openqrm_post_event 0 "post_identifier" 3 "nfs-storage" "Could not post the nfs-export identifier to openQRM at $OPENQRM_SERVER_IP."
+		fi
+		rm -f $STORAGE_STATUS_TMP
+		rm -f $STORAGE_STATUS_TMP.post
+		;;
+
+	post_sync_progress)
+		echo "Posting progress of the sync action for volume $NFS_IMAGE_NAME to the openQRM-server"
+		if [ ! -f "$SYNC_PROGRESS_DIR/rsync_files.$NFS_IMAGE_NAME.log" ] || [ ! -f "$SYNC_PROGRESS_DIR/rsync_progress.$NFS_IMAGE_NAME.log" ]; then
+			openqrm_post_event 0 "clone" 3 "nfs-storage" "No sync action active for volume $NFS_IMAGE_NAME!"
+			exit 1
+		fi
+		STORAGE_STATUS_TMP=$resource_id.nfs.$NFS_IMAGE_NAME.sync_progress
+
+		while (true); do
+			# if this is a snapshot volume we have to wait until the sync is ready
+			if [ -d "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME/" ] && [ ! -f "$NFS_STORAGE_SERVER_IMAGE_DIRECTORY/$NFS_IMAGE_NAME/.clone_in_progress" ]; then
+				# sync is ready
+				break
+			else
+				if [ ! -f "$SYNC_PROGRESS_DIR/rsync_files.$NFS_IMAGE_NAME.log" ] || [ ! -f "$SYNC_PROGRESS_DIR/rsync_progress.$NFS_IMAGE_NAME.log" ]; then
+				    # cloning not started yet, waiting for the snapshot to appear
+				    echo "0" > $STORAGE_STATUS_TMP
+				else
+				    # get the size of all changes
+				    COMPLETE_CHANGE_SIZE=`cat $SYNC_PROGRESS_DIR/rsync_files.$NFS_IMAGE_NAME.log | wc -l`
+				    # double up to get around 100 percent
+				    COMPLETE_CHANGE_SIZE=$(( COMPLETE_CHANGE_SIZE * 2 ))
+				    PARTITIAL_CHANGE_SIZE=`cat $SYNC_PROGRESS_DIR/rsync_progress.$NFS_IMAGE_NAME.log | wc -l`
+				    if [ "$PARTITIAL_CHANGE_SIZE" == 0 ]; then
+					    PARTITIAL_CHANGE_SIZE=1
+				    fi
+				    CURRENT_SYNC_PROGRESS_IN_PERCENT=$(( COMPLETE_CHANGE_SIZE / PARTITIAL_CHANGE_SIZE ))
+				    CURRENT_SYNC_PROGRESS_IN_PERCENT=$(( 100 / CURRENT_SYNC_PROGRESS_IN_PERCENT ))
+				    # make sure to not send 100%, this is send by clone finished
+				    CURRENT_SYNC_PROGRESS_IN_PERCENT=$(( CURRENT_SYNC_PROGRESS_IN_PERCENT - 1 ))
+					if (( $CURRENT_SYNC_PROGRESS_IN_PERCENT < 0 )); then
+						CURRENT_SYNC_PROGRESS_IN_PERCENT=0
+					fi
+				    echo "$CURRENT_SYNC_PROGRESS_IN_PERCENT" > $STORAGE_STATUS_TMP
+				fi
+				if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$NFS_OPENQRM_USERNAME --http-password=$NFS_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/nfs-storage/nfs-storage-action.php?nfs_storage_command=get_sync_progress; then
+					nfs_storage_log "post_sync_progress" "Could not post the sync progress for volume $NFS_IMAGE_NAME to openQRM at $OPENQRM_SERVER_IP."
+				fi
+				rm -f $STORAGE_STATUS_TMP $STORAGE_STATUS_TMP.post
+			fi
+			sleep 2
+		done
+		;;
+
+
+	post_sync_finished)
+		echo "Posting finished for volume $NFS_IMAGE_NAME to the openQRM-server"
+		STORAGE_STATUS_TMP=$resource_id.nfs.$NFS_IMAGE_NAME.sync_progress
+		echo "100" > $STORAGE_STATUS_TMP
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$NFS_OPENQRM_USERNAME --http-password=$NFS_OPENQRM_PASSWORD  --post-file=`$OPENQRM_POSTENCODE $STORAGE_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/nfs-storage/nfs-storage-action.php?nfs_storage_command=get_sync_finished; then
+			nfs_storage_log "post_sync_finished" "Could not post the sync progress for volume $NFS_IMAGE_NAME to openQRM at $OPENQRM_SERVER_IP."
+		fi
+		rm -f $STORAGE_STATUS_TMP $STORAGE_STATUS_TMP.post
+		;;
+
+
+
+	*)
+		nfs_storage_usage
+		;;
+
+
+esac
+
