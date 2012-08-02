@@ -1,0 +1,194 @@
+.htmlobject_td.sort_form {
+	border: 0 none;
+    text-align: right;
+}
+.htmlobject_td.actions {
+    border: 0 none;
+    padding-top: 15px !important;
+    text-align: right;
+}
+.htmlobject_td .edit {
+	background: url('../../../img/edit.png') no-repeat center top;
+	padding: 0;
+	border: 0px none;
+	width: 32px;
+	height: 32px;
+	display:block;
+	text-align: center;
+	text-decoration: none;
+	line-height: 0px;
+	overflow: hidden;
+	color: transparent;
+}
+a.resize,
+a.clone,
+a.snap {
+	padding: 0;
+	border: 0px none;
+	width: 32px;
+	height: 32px;
+	display:block;
+	text-align: center;
+	text-decoration: none;
+	line-height: 0px;
+	overflow: hidden;
+	color: transparent;
+}
+a.resize {
+	background: url('../../../img/resize.png') no-repeat center top;
+}
+a.clone {
+	background: url('../../../img/clone.png') no-repeat center top;
+}
+a.snap {
+	background: url('../../../img/snapshot.png') no-repeat center top;
+}
+
+
+
+.htmlobject_th.state,
+.htmlobject_td.state,
+.htmlobject_th.icon,
+.htmlobject_td.icon,
+.htmlobject_th.edit,
+.htmlobject_td.edit,
+.htmlobject_th.snap,
+.htmlobject_td.snap,
+.htmlobject_th.clone,
+.htmlobject_td.clone,
+.htmlobject_th.resize,
+.htmlobject_td.resize {
+	width: 30px;
+	text-align: center;
+	vertical-align: top;
+}
+.htmlobject_td.size,
+.htmlobject_td.vsize,
+.htmlobject_td.vfree {
+	width: 120px;
+	text-align: right;
+	vertical-align: top;
+}
+.htmlobject_td.storage_id {
+	width: 30px;
+	text-align: right;
+}
+.htmlobject_th.name,
+.htmlobject_td.name {
+	width: 120px;
+}
+.htmlobject_th.storage_data,
+.htmlobject_td.storage_data {
+	width: 260px;
+}
+.htmlobject_th.storage_comment,
+.htmlobject_td.storage_comment {
+	width: 220px;
+}
+.htmlobject_th.attr,
+.htmlobject_td.attr {
+	width: 50px;
+}
+.htmlobject_th.deploy,
+.htmlobject_td.deploy {
+	width: 130px;
+}
+.htmlobject_box .left {
+	width: 240px;
+}
+
+.pageturn_left a,
+.pageturn_right a {
+	display: block;
+	float: left;
+	background: #F2F1F0;
+	width: 30px;
+	text-align: center;
+	border:1px solid #BABABA;
+	text-decoration: none;
+	margin: 1px;
+	color: black;
+	font-size: 12px;
+}
+.pageturn_middle {
+	font-size: 12px;
+	vertical-align: middle;
+}
+.actiontable input {
+	margin:1px;
+}
+#buttons {
+	margin: 20px 0 0 0;
+}
+
+/* Documentation */
+
+fieldset {
+	border: 1px solid #91A7B4;
+	padding: 5px 10px;
+}
+fieldset legend {
+	padding: 5px;
+	font-weight: bold;
+}
+
+#documentation_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 750px;
+}
+
+#plugin_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 255px;
+}
+
+
+
+#introduction_content {
+    padding: 0px 5px !important;
+}
+#provides_content {
+    padding: 0px 10px !important;
+}
+#requirements_content {
+    padding: 0px 10px !important;
+}
+#migration_content {
+    padding: 0px 5px !important;
+}
+
+#storage_mgmt_content {
+    padding: 0px 10px !important;
+}
+
+#vm_mgmt_content {
+    padding: 0px 10px !important;
+}
+
+#plugin_type {
+	width: 240px;
+	height: 40px;
+    top: 0px;
+}
+
+#deployment_type {
+	width: 240px;
+	height: 40px;
+    top: 0px;
+
+}
+
+#tested_with {
+	width: 240px;
+	height: 100px;
+    top: 0px;
+
+}
+
+
