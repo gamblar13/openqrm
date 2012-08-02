@@ -1,0 +1,28 @@
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+#	Title
+#	Href
+#	Alt
+#	IMG
+#	Target
+..|OpenVZ-storage
+...|Help|
+....|About|index.php?plugin=openvz-storage&controller=openvz-storage-about|How to use|openvz-storage/plugin.png
+....|Config|index.php?plugin=openvz-storage&controller=openvz-storage-about&openvz_storage_about_action=bootservice|OpenVZ-Storage Host Boot-Service|openvz-storage/../../help.png
+....|VMs|index.php?plugin=openvz-storage&controller=openvz-storage-about&openvz_storage_about_action=vms|Virtual Machine Management|openvz-storage/../../help.png
+....|Storage|index.php?plugin=openvz-storage&controller=openvz-storage-about&openvz_storage_about_action=storage|Storage Management|openvz-storage/../../help.png
+....|Usage|index.php?plugin=openvz-storage&controller=openvz-storage-about&openvz_storage_about_action=usage|Use-cases|openvz-storage/../../help.png
+...|OpenVZ Volumes|index.php?plugin=openvz-storage|OpenVZ Storage Manager|openvz-storage/../../edit.png
+...|OpenVZ VMs|index.php?plugin=openvz-storage&controller=openvz-storage-vm|OpenVZ Storage VM Manager|openvz-storage/../../edit.png
