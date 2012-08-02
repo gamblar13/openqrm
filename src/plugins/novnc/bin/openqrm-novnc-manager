@@ -1,0 +1,141 @@
+#!/bin/bash
+# this script automatically manages novnc
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/novnc/include/openqrm-plugin-novnc-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/novnc/etc/openqrm-plugin-novnc.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+export LANG=C
+
+# novnc defines
+NOVNC_WEBSERVER_PORT_RANGE_START=6000
+NOVNC_WEBSOCKET_PORT_RANGE_START=6800
+
+if ! which screen 1>/dev/null; then
+	echo "ERROR: The 'screen' utility is not installed! Please install and try again."
+	image_shelf_log "ERROR: The 'screen' utility is not installed! Please install and try again."
+	exit 6
+fi
+if [ -x /usr/bin/screen.real ]; then
+	RUNSCREEN="/usr/bin/screen.real"
+else
+	RUNSCREEN=`which screen`
+fi
+
+
+function novnc_manager_usage() {
+	echo "Usage : $0 remoteconsole"
+	exit 1
+}
+
+
+NOVNC_MANAGER_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-n)
+			VM_NAME=$2
+			shift
+			;;
+		-d)
+			VM_RESOURCE_ID=$2
+			shift
+			;;
+		-m)
+			VM_MAC=$2
+			shift
+			;;
+		-v)
+			VM_VNC_PORT_NUMBER=$2
+			shift
+			;;
+		-i)
+			VM_HOST_IP=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			kvm_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+# main
+case "$NOVNC_MANAGER_COMMAND" in
+	remoteconsole)
+
+		# stop if already running
+		for NOVNC_SCREEN_PID in `ps ax | grep -i screen | grep "NOVNC.$VM_NAME.$VM_HOST_IP" | grep -v grep | awk {' print $1 '}`; do
+			kill $NOVNC_SCREEN_PID
+			kill -9 $NOVNC_SCREEN_PID 2>/dev/null
+		done
+		for NOVNC_WSPROXYPID in `ps ax | grep wsproxy.py | grep $VM_HOST_IP:$VM_VNC_PORT_NUMBER  | grep -v grep | awk {' print $1 '}`; do
+			kill $NOVNC_WSPROXYPID
+			kill -9 $NOVNC_WSPROXYPID 2>/dev/null
+		done
+		$RUNSCREEN -wipe NOVNC.$VM_NAME.$VM_HOST_IP.$VM_VNC_PORT_NUMBER 1>/dev/null 2>&1
+
+		# calculate the web + proxy port
+		NOVNC_WEBSERVER_PORT=$(( NOVNC_WEBSERVER_PORT_RANGE_START + VM_RESOURCE_ID ))
+		NOVNC_WEBSOCKET_PORT=$(( NOVNC_WEBSOCKET_PORT_RANGE_START + VM_RESOURCE_ID ))
+		VM_VNC_PORT=$(( VM_VNC_PORT_NUMBER + 5900 ))
+
+		# start new screen session
+		SCREEN_NAME="NOVNC.$VM_NAME.$VM_HOST_IP.$VM_VNC_PORT_NUMBER"
+		cd $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/novnc/vncclient
+		$RUNSCREEN -dmS $SCREEN_NAME ./utils/launch.sh --vnc $VM_HOST_IP:$VM_VNC_PORT --listen $NOVNC_WEBSERVER_PORT
+		echo "$RUNSCREEN -dmS $SCREEN_NAME ./utils/launch.sh --vnc $VM_HOST_IP:$VM_VNC_PORT --listen $NOVNC_WEBSERVER_PORT" | logger
+
+		cd - 1>/dev/null
+
+		;;
+
+	disable-remoteconsole)
+		# stop the remote console connection
+		for NOVNC_SCREEN_PID in `ps ax | grep -i screen | grep "NOVNC.$VM_NAME."  | grep -v grep | awk {' print $1 '}`; do
+			kill $NOVNC_SCREEN_PID
+			kill -9 $NOVNC_SCREEN_PID 2>/dev/null
+		done
+		for NOVNC_WSPROXYPID in `ps ax | grep wsproxy.py | grep $VM_HOST_IP:$VM_VNC_PORT_NUMBER  | grep -v grep | awk {' print $1 '}`; do
+			kill $NOVNC_WSPROXYPID
+			kill -9 $NOVNC_WSPROXYPID 2>/dev/null
+		done
+		# calculate the web + proxy port
+		NOVNC_WEBSERVER_PORT=$(( NOVNC_WEBSERVER_PORT_RANGE_START + VM_RESOURCE_ID ))
+		NOVNC_WEBSOCKET_PORT=$(( NOVNC_WEBSOCKET_PORT_RANGE_START + VM_RESOURCE_ID ))
+		VM_VNC_PORT=$(( VM_VNC_PORT_NUMBER + 5900 ))
+		$RUNSCREEN -wipe NOVNC.$VM_NAME.$VM_HOST_IP.$VM_VNC_PORT_NUMBER 1>/dev/null 2>&1
+		# sanity ...
+		$RUNSCREEN -wipe 1>/dev/null 2>&1
+		exit 0
+		;;
+
+	*)
+		echo "ERROR: Free commandline arguments are not allowed"
+		novnc_manager_usage
+		exit 6
+		;;
+esac
+
