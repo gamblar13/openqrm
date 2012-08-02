@@ -1,0 +1,324 @@
+#!/bin/bash
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+# This script integrates a local (existing) server into openQRM
+# The system then can (should) be set to netboot to gain the full
+# advantages and flexibility of the openQRM management platform
+OPENQRM_RESOURCE_PARAMETER_FILE="/var/openqrm/openqrm-resource.conf"
+export LANGUAGE=C
+export LANG=C
+export LC_ALL=C
+
+
+function usage() {
+		echo "Usage : $0 integrate -u <user> -p <password> -q <ip-address-of-openQRM-server> [ -n <hostname> ] [-i <network-interface>] [-s <http/https>]"
+		echo "        $0 remove -u <user> -p <password> -q <ip-address-of-openQRM-server> [ -n <hostname> ] [-s <http/https>]"
+}
+
+
+function openqrm_integrate_local_server() {
+	echo "Integrating system to openQRM-server at $OPENQRM_SERVER"
+
+	# check for dropbear
+	DROPBEAR=`which dropbear`
+	if test -z $DROPBEAR; then
+		echo "-> could not find dropbear. Trying to automatically install it ..."
+		if [ -f /etc/debian_version ]; then
+			if ! apt-get -y install dropbear; then
+				echo "Failed to install required package dropbear!"
+				echo "Please install dropbear and try again!"
+				return 1
+			fi
+		elif [ -f /etc/redhat-release ]; then
+			# check for rpmforge
+			echo "Checking for rpmforge/DAG repository ..."
+			if rpm -qa | grep rpmforge 1>/dev/null; then
+				echo "-> found rpmforge repository available"
+			else
+				echo "ERROR: Please enable the rpmforge/DAG repository!"
+				return 1
+			fi
+			# check for epel-release
+			echo "Checking for epel-release repository ..."
+			if rpm -qa | grep epel-release 1>/dev/null; then
+				echo "-> found epel-release repository available"
+			else
+				echo "ERROR: Please enable the epel-release repository!"
+				return 1
+			fi
+			if ! yum -y install dropbear; then
+				echo "Failed to install required package dropbear!"
+				echo "Please install dropbear and try again!"
+				return 1
+			fi
+		elif [ -f /etc/SuSE-release ]; then
+			if ! zypper --non-interactive install dropbear; then
+				echo "Failed to install required package dropbear!"
+				echo "Please install dropbear and try again!"
+				return 1
+			fi
+		else
+			echo "Failed to find package manager to automatically install dropbear."
+			echo "Please install dropbear and try again!"
+			return 1
+		fi
+	fi
+
+	mkdir -p `dirname $OPENQRM_RESOURCE_PARAMETER_FILE`
+	if [ "$INTERFACE" == "" ]; then
+		echo "Which network-interface to use for the integration ?"
+		ifconfig | cut -d' ' -f1 | sed '/^$/d' | grep -v lo
+		echo -n "-> : "
+		read INTERFACE
+	fi
+	# check if exists
+	if ! ifconfig $INTERFACE 1>/dev/null; then
+		echo "ERROR: Interface $INTERFACE does not exists !"
+		exit 1
+	fi
+	# name
+	if [ "$APPLIANCE_NAME" == "" ]; then
+		echo "Please give a name for this system"
+		echo -n "-> : "
+		read APPLIANCE_NAME
+	fi
+	local resource_id=-1
+	local resource_ip=`ifconfig $INTERFACE | grep "inet " | cut -d':' -f2 | cut -d' ' -f1`
+	local resource_mac=`ifconfig $INTERFACE | grep HWaddr| sed -e "s/.*HWaddr //g" | head -n1`
+	# define wget to use with https
+	if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
+		WGET_NO_CERT_CHECK="--no-check-certificate"
+	fi
+	# remove whitespaces
+	resource_mac=`echo $resource_mac`
+	echo "Using $INTERFACE $resource_ip/$resource_mac"
+
+	wget -q $WGET_NO_CERT_CHECK -O $OPENQRM_RESOURCE_PARAMETER_FILE "$OPENQRM_WEB_PROTOCOL://$OPENQRM_SERVER/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_id=$resource_id&resource_mac=$resource_mac&resource_ip=$resource_ip"
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+
+	echo "Getting openqrm-client package"
+	# run default openqrm-client boot-service
+	KERNEL_ARCH=`uname -m`
+	if echo $KERNEL_ARCH | grep i.*86 1>/dev/null; then
+		# i386
+		OPENQRM_CLIENT_ARCH=i386
+	else
+		OPENQRM_CLIENT_ARCH=$KERNEL_ARCH
+	fi
+	# find out the short distri name
+	if [ -f /etc/debian_version ]; then
+		# debian or ubuntu, try to find out without lsb-release which may not be installed
+		if grep -i ubuntu /etc/apt/sources.list 1>/dev/null; then
+			OPENQRM_SHORT_DISTRI_NAME="ubuntu"
+		else
+			OPENQRM_SHORT_DISTRI_NAME="debian"
+		fi
+	elif [ -f /etc/redhat-release ]; then
+		OPENQRM_SHORT_DISTRI_NAME="centos"
+	fi
+
+	cd /
+	echo "Getting openqrm-client package"
+	if ! wget -q $WGET_NO_CERT_CHECK -O openqrm-client.tgz "$openqrm_web_protocol://$OPENQRM_SERVER/openqrm/boot-service/openqrm-client.tgz"; then
+		rm -f openqrm-client.tgz
+		echo "ERROR: Failed to get the openqrm-client package!"
+		return 1
+	fi
+
+	tar -xzf openqrm-client.tgz
+	rm -f openqrm-client.tgz
+	ln -sf $resource_basedir/openqrm/etc/init.d/openqrm-client /etc/init.d/openqrm-client
+	export OPENQRM_SERVER_BASE_DIR=$resource_basedir
+	. $resource_basedir/openqrm/include/openqrm-functions
+	openqrm_chkconfig add openqrm-client
+
+	# gather some more details to create the appliance on the openQRM-server
+	local_server_root_device=`mount | grep ' / ' | awk {' print $1 '}`
+	local_server_root_device_type=`mount | grep ' / ' | awk {' print $5 '}`
+	local_server_kernel_version=`uname -r`
+	local_server_name=$APPLIANCE_NAME
+
+	# now we send the local-integration signal to create
+	# the local-server storage, image and appliance
+	if ! wget $WGET_NO_CERT_CHECK -O /dev/null -q --http-user=$USER --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$OPENQRM_SERVER/openqrm/base/plugins/local-server/local-server-action.php?local_server_command=integrate&local_server_id=$resource_id&local_server_root_device=$local_server_root_device&local_server_root_device_type=$local_server_root_device_type&local_server_kernel_version=$local_server_kernel_version&local_server_name=$APPLIANCE_NAME"; then
+		echo "ERROR: Could not create the appliance resource$resouce_id on the openQRM-server!"
+		sleep 2
+		echo "NOTCIE: Removing the system from openQRM because of errors !"
+		openqrm_remove_local_server $USER $PASSWORD $OPENQRM_SERVER
+		return 1
+	fi
+	sleep 2
+
+	# re-get parameters
+	rm -f $OPENQRM_RESOURCE_PARAMETER_FILE
+	wget -q $WGET_NO_CERT_CHECK -O $OPENQRM_RESOURCE_PARAMETER_FILE "$OPENQRM_WEB_PROTOCOL://$OPENQRM_SERVER/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_id=$resource_id&resource_mac=$resource_mac&resource_ip=$resource_ip"
+	# start the openQRM client late to get the new hostname from openQRM
+	$resource_basedir/openqrm/etc/init.d/openqrm-client start
+
+}
+
+function openqrm_remove_local_server() {
+	echo "Removing system from openQRM-server at $OPENQRM_SERVER"
+	if [ ! -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+		echo "NOTICE: This system is not integrated with openQRM"
+		exit 1
+	fi
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	# name
+	if [ "$APPLIANCE_NAME" == "" ]; then
+		echo "Please give the appliance name of this system"
+		echo -n "-> : "
+		read APPLIANCE_NAME
+	fi
+	# define wget to use with https
+	if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
+		WGET_NO_CERT_CHECK="--no-check-certificate"
+	fi
+	# try to remove components from the local-server appliance
+	if ! wget $WGET_NO_CERT_CHECK -O /dev/null -q --http-user=$USER --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$OPENQRM_SERVER/openqrm/base/plugins/local-server/local-server-action.php?local_server_command=remove&local_server_id=$resource_id&local_server_name=$APPLIANCE_NAME"; then
+		echo "WARNING: Could not remove the appliance resource$resouce_id from the openQRM-server!"
+	fi
+	# remove system from openQRM
+	if ! wget $WGET_NO_CERT_CHECK -O /dev/null -q --http-user=$USER --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$OPENQRM_SERVER/openqrm/base/server/resource/resource-action.php?resource_command=remove&resource_id=$resource_id&resource_mac=$resource_mac"; then
+		echo "ERROR: Could not remove system from the openQRM-server!"
+		return 1
+	fi
+
+	export OPENQRM_SERVER_BASE_DIR=$resource_basedir
+	. $resource_basedir/openqrm/include/openqrm-functions
+	openqrm_chkconfig del openqrm-client
+	$resource_basedir/openqrm/etc/init.d/openqrm-client stop
+	rm -f $OPENQRM_RESOURCE_PARAMETER_FILE
+	rm -rf $resource_basedir/openqrm
+	echo "Successfully removed system from openQRM"
+}
+
+
+case "$1" in
+	integrate)
+		shift
+		if [ $# == 0 ]; then
+			usage
+			exit 0
+		fi
+		while [ $# -ne 0 ]; do
+			case "$1" in
+				-u)
+					USER=$2
+					;;
+				-p)
+					PASSWORD=$2
+					;;
+				-q)
+					OPENQRM_SERVER=$2
+					;;
+				-i)
+					INTERFACE=$2
+					;;
+				-n)
+					APPLIANCE_NAME=$2
+					;;
+				-s)
+					OPENQRM_WEB_PROTOCOL=$2
+					;;
+			esac
+			shift
+		done
+		if [ "$USER" == "" ]; then
+			echo "ERROR: Missing username !"
+			usage
+			exit 1
+		fi
+		if [ "$PASSWORD" == "" ]; then
+			echo "PASSWORD: Missing password !"
+			usage
+			exit 1
+		fi
+		if [ "$OPENQRM_SERVER" == "" ]; then
+			echo "OPENQRM_SERVER: Missing openQRM-server ip-address !"
+			usage
+			exit 1
+		fi
+		if [ "$OPENQRM_WEB_PROTOCOL" == "" ]; then
+			OPENQRM_WEB_PROTOCOL=http
+		fi
+		export USER
+		export PASSWORD
+		export OPENQRM_SERVER
+		export INTERFACE
+		export APPLIANCE_NAME
+		export OPENQRM_WEB_PROTOCOL
+		openqrm_integrate_local_server
+		;;
+
+	remove)
+		shift
+		if [ $# == 0 ]; then
+			usage
+			exit 0
+		fi
+		while [ $# -ne 0 ]; do
+			case "$1" in
+				-u)
+					USER=$2
+					;;
+				-p)
+					PASSWORD=$2
+					;;
+				-q)
+					OPENQRM_SERVER=$2
+					;;
+				-n)
+					APPLIANCE_NAME=$2
+					;;
+				-s)
+					OPENQRM_WEB_PROTOCOL=$2
+					;;
+			esac
+			shift
+		done
+		if [ "$USER" == "" ]; then
+			echo "ERROR: Missing username !"
+			usage
+			exit 1
+		fi
+		if [ "$PASSWORD" == "" ]; then
+			echo "PASSWORD: Missing password !"
+			usage
+			exit 1
+		fi
+		if [ "$OPENQRM_SERVER" == "" ]; then
+			echo "OPENQRM_SERVER: Missing openQRM-server ip-address !"
+			usage
+			exit 1
+		fi
+		if [ "$OPENQRM_WEB_PROTOCOL" == "" ]; then
+			OPENQRM_WEB_PROTOCOL=http
+		fi
+		export USER
+		export PASSWORD
+		export OPENQRM_SERVER
+		export APPLIANCE_NAME
+		export OPENQRM_WEB_PROTOCOL
+		openqrm_remove_local_server $USER $PASSWORD $OPENQRM_SERVER
+		;;
+
+	*)
+		usage
+		exit 0
+		;;
+
+esac
