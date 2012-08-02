@@ -1,0 +1,76 @@
+#!/bin/bash
+# this is the functions file for the xen-plugin
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+export LANG=C
+if [ "$OPENQRM_SERVER_BASE_DIR" == "" ]; then
+	echo "ERROR: Please export OPENQRM_SERVER_BASE_DIR before sourcing $0"
+	exit 1
+fi
+
+XEN_VDEVICE_NAME="xendhcp"
+XEN_VIRTUAL_BRIDGE_NAME="xvbr0"
+XEN_LOCK_FILE=/var/run/xen/xen-plugin.lock
+XEN_LOCK_DELAY=5
+XEN_LOCK_RETRY=100
+XEN_LOCK_TIMEOUT=500
+
+################ common xen functions
+
+# logs for xen
+function xen_log() {
+	local COMPONENT=$1
+	shift
+	local MESSAGE=$@
+	logger -i -t "xen plug-in" "$COMPONENT : $MESSAGE"
+}
+
+
+# locking function
+function xen_lock() {
+	local COMMAND=$1
+	local RET=1
+
+	if [ ! -d `dirname $XEN_LOCK_FILE` ]; then
+		mkdir -p `dirname $XEN_LOCK_FILE`
+	fi
+	case "$COMMAND" in
+		aquire)
+				lockfile -s $XEN_LOCK_DELAY -r $XEN_LOCK_RETRY -l $XEN_LOCK_TIMEOUT $XEN_LOCK_FILE
+				RET=$?
+				xen_log xen_lock "Aquired the lock"
+				return $RET
+				;;
+		release)
+				/bin/rm -f $XEN_LOCK_FILE
+				RET=$?
+				xen_log xen_lock "Released the lock"
+				return $RET
+				;;
+		*)
+			xen_log xen_lock "No such command. Try 'aquire' or 'release'"
+			return 1
+			;;
+	esac
+}
+
+
+
+################ xen functions
+
+
+
+

@@ -1,0 +1,41 @@
+#!/bin/bash
+# this is a hook function for the kernel-creation phase
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+function xen_kernel_hook() {
+
+	local KERNEL_NAME=$1
+	local KERNEL_VERSION=$2
+	local KERNEL_LOCATION=$3
+	local KERNEL_TYPE=$4
+
+	echo "xen-plugin: Running xen_kernel_hook $KERNEL_NAME $KERNEL_VERSION $KERNEL_LOCATION $KERNEL_TYPE"
+	echo "xen-plugin: Running xen_kernel_hook $KERNEL_NAME $KERNEL_VERSION $KERNEL_LOCATION $KERNEL_TYPE" | logger
+	echo "xen-plugin: basedir = $OPENQRM_SERVER_BASE_DIR" | logger
+
+	if echo $KERNEL_NAME | grep xen 1>/dev/null; then
+		if ls $KERNEL_LOCATION/boot/xen*.gz* 1>/dev/null 2>&1; then
+			echo "xen-plugin: Found Xen-hypervisor at $KERNEL_LOCATION/boot/"
+			echo "xen-plugin: Copying Xen-hypervisor to $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/"
+			for XENFILE in `ls $KERNEL_LOCATION/boot/xen*.gz*`; do
+				if [ ! -h $XENFILE ]; then
+					cp -f $XENFILE $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/xen-$KERNEL_NAME.gz
+				fi
+			done
+		fi
+	fi
+
+}

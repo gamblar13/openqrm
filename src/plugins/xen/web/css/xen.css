@@ -1,0 +1,254 @@
+a.edit,
+a.console,
+a.resize,
+a.migrate,
+a.clone,
+a.snap {
+	padding: 0;
+	border: 0px none;
+	width: 32px;
+	height: 32px;
+	display:block;
+	text-align: center;
+	text-decoration: none;
+	line-height: 0px;
+	overflow: hidden;
+	color: transparent;
+}
+a.edit {
+	background: url('../../../img/edit.png') no-repeat center top;
+}
+a.console {
+	background: url('../../../img/console.png') no-repeat center top;
+}
+a.resize {
+	background: url('../../../img/resize.png') no-repeat center top;
+}
+a.clone {
+	background: url('../../../img/clone.png') no-repeat center top;
+}
+a.snap {
+	background: url('../../../img/snapshot.png') no-repeat center top;
+}
+a.migrate {
+	background: url('../../../img/migrate.png') no-repeat center top;
+}
+a.add {
+	background: url('../../../img/add.png') no-repeat;
+	padding: 0 0 0 32px;
+	line-height: 32px;
+	display: block;
+}
+
+.htmlobject_th.state,
+.htmlobject_td.state,
+.htmlobject_th.icon,
+.htmlobject_td.icon,
+.htmlobject_th.edit,
+.htmlobject_td.edit,
+.htmlobject_th.clone,
+.htmlobject_td.clone,
+.htmlobject_th.update,
+.htmlobject_td.update,
+.htmlobject_th.migrate,
+.htmlobject_td.migrate,
+.htmlobject_th.console,
+.htmlobject_td.console {
+	width: 30px;
+	text-align: center;
+	vertical-align: top;
+}
+.htmlobject_th.resource,
+.htmlobject_td.resource {
+	width: 25px;
+	text-align: center;
+}
+.htmlobject_th.name,
+.htmlobject_td.name,
+.htmlobject_th.appliance_name,
+.htmlobject_td.appliance_name {
+	width: 120px;
+}
+.htmlobject_th.data,
+.htmlobject_td.data {
+	width: 260px;
+}
+.htmlobject_th.comment,
+.htmlobject_td.comment {
+	width: 220px;
+}
+
+.htmlobject_box .left {
+	width: 140px;
+}
+
+#buttons {
+	margin: 20px 0 0 0;
+}
+
+fieldset {
+	border: 1px solid #91A7B4;
+	padding: 5px 10px;
+}
+fieldset legend {
+	padding: 5px;
+	font-weight: bold;
+}
+#boot_iso_box {
+	width: 200px;
+	float: left;
+}
+#iso_path_box{
+	float:left;
+}
+#iso_path_box.htmlobject_box .left{
+	width: 60px;
+}
+.browse-button {
+	font-size: 11px;
+	padding: 0px 5px 0px 5px !important;
+	margin: 0 0 0 5px;
+}
+.password-button {
+	width: 150px;
+	font-size: 11px;
+	padding: 0px !important;
+	margin: 0 0 5px 0;
+	text-align: center;
+}
+
+/* Documentation */
+
+#documentation_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 750px;
+}
+
+#plugin_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 255px;
+}
+
+
+
+#introduction_content {
+    padding: 0px 5px !important;
+}
+#provides_content {
+    padding: 0px 10px !important;
+}
+#requirements_content {
+    padding: 0px 10px !important;
+}
+#migration_content {
+    padding: 0px 5px !important;
+}
+
+#storage_mgmt_content {
+    padding: 0px 10px !important;
+}
+
+#vm_mgmt_content {
+    padding: 0px 10px !important;
+}
+
+#plugin_type {
+	width: 240px;
+	height: 40px;
+    top: 0px;
+}
+
+#deployment_type {
+	width: 240px;
+	height: 40px;
+    top: 0px;
+
+}
+
+#tested_with {
+	width: 240px;
+	height: 100px;
+    top: 0px;
+
+}
+
+
+/* FUNCTIONBOX */
+.functionbox-capation-box {
+	text-align: right;
+	padding: 5px;
+	background: #333399;
+}
+.functionbox-capation {
+	text-align: left;
+	color: white;
+	cursor: crosshair;
+	font-weight: bold;
+	font-size: 12px;
+	line-height: 20px;
+	padding: 5px !important;
+}
+/* IMAGEBOX */
+#filepicker {
+	z-index: 10;
+	position: absolute;
+	left: 0;
+	top: 0;
+	width:280px;
+	background: white;
+	border: 0px none;
+	border-left: 1px solid #ddd;
+	border-bottom: 1px solid #ddd;
+	box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.30);
+	-moz-box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.30);
+	-webkit-box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.30);
+}
+#filepicker .functionbox-capation input {
+	position: absolute;
+	right: 5px;
+	top: 5px;
+	width:18px;
+	height:18px;
+	font-size: 10px;
+	border: 1px solid;
+	background: #fff;
+	text-align: center;
+	line-height: 18px;
+	padding: 0;
+}
+#filepicker #canvas {
+	vertical-align:middle;
+	text-align:center;
+	height:340px;
+	overflow: auto;
+}
+#filepicker table {
+	width: 100%;
+	border: 0px none;
+}
+#filepicker table td {
+	border-bottom: 1px solid #ccc;
+}
+#filepicker table a {
+	display: block;
+	line-height: 20px;
+	padding: 0 0 0 25px;
+	text-decoration: none;
+	font-size: 11px;
+}
+#filepicker table a.folder {
+	background: url("../img/icons.gif") no-repeat scroll 0 -20px transparent;
+}
+#filepicker table a.file {
+    background: url("../img/icons.gif") no-repeat scroll 0 0 transparent;
+	color: black;
+}
+
+
+
