@@ -1,0 +1,278 @@
+#!/bin/bash
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+# this script automatically manages opsi
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/opsi/include/openqrm-plugin-opsi-functions
+OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
+if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
+	. $OPENQRM_RESOURCE_PARAMETER_FILE
+	OPENQRM_SERVER_IP=$resource_openqrmserver
+else
+	echo "ERROR: This script runs on an integrated Opsi-Server only!"
+	exit 6
+fi
+# location on the opsi server to store the install-info file
+# used by the openQRM client auto-installation
+OPENQRM_CLIENT_OPSI_INSTALL_DIR="/opt/pcbin/install/openqrm-client"
+
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+# this script runs on the integrated opsi-server only
+if [ -f "$OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf" ]; then
+	echo "ERROR: This script runs on an integrated Opsi-Server only!"
+	exit 6
+fi
+# run only on opsi-servers
+if ! which opsi-admin &>/dev/null; then
+	exit 0
+else
+	OPSI_ADMIN=`which opsi-admin`
+fi
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+# functions running on the opsi-server
+function opsi_usage() {
+	echo "Usage : $0 add_opsi_client -i <resource-ip> -m <resource-mac> -d <resource-domain> -n <opsi-resource-name>"
+	echo "        $0 remove_opsi_client -n <opsi-resource-name> -d <resource-domain>"
+	echo "        $0 add_opsi_product_to_client -n <opsi-resource-name> -d <resource-domain> -o <opsi-product-list, comma-separated>"
+	echo "        $0 add_opsi_product_key -n <opsi-resource-name> -d <resource-domain> -o <opsi-product> -k <opsi-product-key>"
+	echo "        $0 add_client_install_info -n <opsi-resource-name> -d <resource-domain> -x <resource-id>"
+	echo "        $0 post_sofware_products -u <openqrm-user-name> -p <openqrm-password>"
+	echo "        $0 post_netboot_products -u <openqrm-user-name> -p <openqrm-password>"
+	exit 1
+}
+
+
+OPSI_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-i)
+			PARAM_RESOURCE_IP=$2
+			shift
+			;;
+		-x)
+			PARAM_RESOURCE_ID=$2
+			shift
+			;;
+		-m)
+			PARAM_RESOURCE_MAC=$2
+			shift
+			;;
+		-n)
+			PARAM_RESOURCE_NAME=$2
+			shift
+			;;
+		-d)
+			PARAM_RESOURCE_DOMAIN=$2
+			shift
+			;;
+		-o)
+			PARAM_OPSI_PRODUCTS=$2
+			shift
+			;;
+		-k)
+			PARAM_OPSI_PRODUCT_KEY=$2
+			shift
+			;;
+		-u)
+			PARAM_OPENQRM_USER=$2
+			shift
+			;;
+		-p)
+			PARAM_OPENQRM_PASS=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			opsi_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+# checks
+if [ "$OPSI_COMMAND" == "" ]; then
+	opsi_usage
+fi
+
+# main
+case "$OPSI_COMMAND" in
+
+	add_opsi_client)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_DOMAIN" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_IP" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_MAC" == "" ]; then
+			opsi_usage
+		fi
+#		openqrm_post_event 0 "opsi" 5 "openqrm-opsi" "Adding Opsi-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		echo "NOTICE: Adding Opsi-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		if ! $OPSI_ADMIN -d method createClient $PARAM_RESOURCE_NAME $PARAM_RESOURCE_DOMAIN "$PARAM_RESOURCE_DESCRIPTION" "" $PARAM_RESOURCE_IP $PARAM_RESOURCE_MAC; then
+			openqrm_post_event 0 "opsi" 2 "openqrm-opsi" "Could not add $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC to Opsi-server $resource_id/$resource_ip."
+			exit 1
+		fi
+		;;
+
+	remove_opsi_client)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_DOMAIN" == "" ]; then
+			opsi_usage
+		fi
+#		openqrm_post_event 0 "opsi" 5 "openqrm-opsi" "Adding Opsi-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		echo "NOTICE: Removing Opsi-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		if ! $OPSI_ADMIN -d method deleteClient $PARAM_RESOURCE_NAME.$PARAM_RESOURCE_DOMAIN; then
+			openqrm_post_event 0 "opsi" 2 "openqrm-opsi" "Could not remove $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC from Opsi-server $resource_id/$resource_ip."
+			exit 1
+		fi
+		;;
+
+	add_opsi_product_to_client)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_DOMAIN" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_OPSI_PRODUCTS" == "" ]; then
+			opsi_usage
+		fi
+#		openqrm_post_event 0 "opsi" 5 "openqrm-opsi" "Adding Products to Opsi-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		for OPSI_PRODUCT in `echo $PARAM_OPSI_PRODUCTS | sed -e "s/,//g"`; do
+			echo "NOTICE: Adding Opsi-product $OPSI_PRODUCT to Opsi-client $PARAM_RESOURCE_NAME"
+			if ! $OPSI_ADMIN -d method setProductActionRequest $OPSI_PRODUCT $PARAM_RESOURCE_NAME.$PARAM_RESOURCE_DOMAIN setup; then
+				openqrm_post_event 0 "opsi" 2 "openqrm-opsi" "Could not add Opsi-product $OPSI_PRODUCT to $PARAM_RESOURCE_NAME on Opsi-server $resource_id/$resource_ip."
+				exit 1
+			fi
+		done
+		;;
+
+
+	add_opsi_product_key)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_DOMAIN" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_OPSI_PRODUCTS" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_OPSI_PRODUCT_KEY" == "" ]; then
+			opsi_usage
+		fi
+#		openqrm_post_event 0 "opsi" 5 "openqrm-opsi" "Adding Product key to Opsi-Client $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC."
+		if ! $OPSI_ADMIN -d method setProductProperty "$PARAM_OPSI_PRODUCTS" "askbeforeinst" "False" "$PARAM_RESOURCE_NAME.$PARAM_RESOURCE_DOMAIN"; then
+			openqrm_post_event 0 "opsi" 2 "openqrm-opsi" "Could not add Opsi-product key to $PARAM_OPSI_PRODUCTS on Opsi-server $resource_id/$resource_ip."
+			exit 1
+		fi
+		# setting aksbeforeinst to False
+		if ! $OPSI_ADMIN -d method setProductProperty "$PARAM_OPSI_PRODUCTS" "productkey" "$PARAM_OPSI_PRODUCT_KEY" "$PARAM_RESOURCE_NAME.$PARAM_RESOURCE_DOMAIN"; then
+			openqrm_post_event 0 "opsi" 2 "openqrm-opsi" "Could not set askbeforeinstall to False on Opsi-server $resource_id/$resource_ip."
+			exit 1
+		fi
+		;;
+
+
+
+	post_netboot_products)
+		if [ "$PARAM_RESOURCE_DOMAIN" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_OPENQRM_USER" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_OPENQRM_PASS" == "" ]; then
+			opsi_usage
+		fi
+		OPSI_SERVER_HOSTNAME=`hostname`
+
+		#echo "Posting current $LOCAL_IMAGE_TYPE logical volume identifier to the openQRM-server"
+		OPSI_STATUS_TMP=$resource_id.opsi-netboot-products.list
+		> $OPSI_STATUS_TMP
+		for NETBOOT_PRODUCT in `opsi-admin -d method getProvidedNetBootProductIds_list $OPSI_SERVER_HOSTNAME.$PARAM_RESOURCE_DOMAIN`; do
+				if [ "$NETBOOT_PRODUCT" == "[" ] || [ "$NETBOOT_PRODUCT" == "]" ]; then
+						continue
+				fi
+				if ! echo $NETBOOT_PRODUCT | grep -i win &>/dev/null; then
+						continue
+				fi
+				NETBOOT_PRODUCT=`echo $NETBOOT_PRODUCT | sed -e "s/,//g" | sed -e "s/\"//g"`
+				echo "$NETBOOT_PRODUCT,$NETBOOT_PRODUCT" >> $OPSI_STATUS_TMP
+		done
+		if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$PARAM_OPENQRM_USER --http-password=$PARAM_OPENQRM_PASS  --post-file=`$OPENQRM_POSTENCODE $OPSI_STATUS_TMP` $openqrm_web_protocol://$OPENQRM_SERVER_IP/openqrm/base/plugins/opsi/opsi-action.php?opsi_command=get_netboot_products; then
+			openqrm_post_event 0 "post_netboot_products" 3 "openqrm-opsi" "Could not post list of templates to the openQRM-server at $OPENQRM_SERVER_IP!"
+		fi
+		rm -f $OPSI_STATUS_TMP
+		rm -f $OPSI_STATUS_TMP.post
+		;;
+
+
+
+
+	add_client_install_info)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_DOMAIN" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_ID" == "" ]; then
+			opsi_usage
+		fi
+		if [ ! -d "$OPENQRM_CLIENT_OPSI_INSTALL_DIR" ]; then
+			openqrm_post_event 0 "post_netboot_products" 3 "openqrm-opsi" "Opsi directory $OPENQRM_CLIENT_OPSI_INSTALL_DIR does not exists!"
+			exit 1
+		fi
+		echo "OPENQRM_SERVER=$OPENQRM_SERVER_IP" > $OPENQRM_CLIENT_OPSI_INSTALL_DIR/$PARAM_RESOURCE_NAME.openqrm-client.conf
+		echo "RESOURCE_ID=$PARAM_RESOURCE_ID" >> $OPENQRM_CLIENT_OPSI_INSTALL_DIR/$PARAM_RESOURCE_NAME.openqrm-client.conf
+		# starte opsi-monitord to send transition to openQRM while the system is installing
+		if [ -x /usr/bin/screen.real ]; then
+			RUNSCREEN="/usr/bin/screen.real"
+		else
+			RUNSCREEN=`which screen`
+		fi
+		$RUNSCREEN -dmS $PARAM_RESOURCE_NAME $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/opsi/sbin/openqrm-opsi-monitord $PARAM_RESOURCE_ID $PARAM_RESOURCE_NAME $PARAM_RESOURCE_DOMAIN
+		;;
+
+
+	*)
+		opsi_usage
+		;;
+
+
+esac
+

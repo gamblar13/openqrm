@@ -1,0 +1,19 @@
+#!/bin/bash
+
+
+/bin/cp -f *.au3 *.ins openqrm-client/CLIENT_DATA/
+/bin/cp -f *.exe openqrm-client/CLIENT_DATA/
+/bin/cp -f *.bmp *.png openqrm-client/CLIENT_DATA/
+/bin/cp -f *.txt *.chm *.dll *.zip *.files openqrm-client/CLIENT_DATA/
+/bin/cp -aR localsetup openqrm-client/CLIENT_DATA/
+
+
+
+cd openqrm-client
+rm -f openqrm-client_4.8.0-1.opsi
+opsi-makeproductfile
+opsi-package-manager -i openqrm-client_4.8.0-1.opsi
+cd -
+
+
+

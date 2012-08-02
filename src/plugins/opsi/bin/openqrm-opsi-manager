@@ -1,0 +1,244 @@
+#!/bin/bash
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+# this script automatically manages opsi
+# and runs on the openQRM serer only
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/opsi/include/openqrm-plugin-opsi-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/opsi/etc/openqrm-plugin-opsi.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+# get the ip config
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export LANG=C
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+
+# also source the dhcpd function for creating a lock
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/include/openqrm-plugin-dhcpd-functions
+DHCPD_CONF="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/dhcpd.conf"
+OPSI_DHCPD_HOST_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/opsi/etc/templates/openqrm-plugin-opsi-host.template"
+DHCPD_HOST_TEMPLATE="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/templates/openqrm-plugin-dhcpd-host.template"
+# seconds to wait for the opsi-auto-installation to start
+OPSI_INSTALL_START_DELAY=120
+
+# functions running on the opsi-server
+function opsi_usage() {
+	echo "Usage : $0 transfer_to_opsi -o <opsi-server-ip> -i <resource-ip> -m <resource-mac> -n <resource-name>"
+	echo "        $0 take_over_from_opsi -i <resource-ip> -m <resource-mac> -n <resource-name>"
+	echo "        $0 set_opsi_client_to_local_boot -m <resource-mac>"
+	exit 1
+}
+
+
+# re-run in background via screen
+if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+	if [ -x /usr/bin/screen.real ]; then
+		RUNSCREEN="/usr/bin/screen.real"
+	else
+		RUNSCREEN=`which screen`
+	fi
+	export RUN_IN_BACKGROUND=true
+	SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+	$RUNSCREEN -dmS $SCREEN_NAME $0 $@
+	exit
+fi
+
+
+OPSI_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-i)
+			PARAM_RESOURCE_IP=$2
+			shift
+			;;
+		-m)
+			PARAM_RESOURCE_MAC=$2
+			shift
+			;;
+		-n)
+			PARAM_RESOURCE_NAME=$2
+			shift
+			;;
+		-o)
+			PARAM_OPSI_SERVER_IP=$2
+			shift
+			;;
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			opsi_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+# checks
+if [ "$OPSI_COMMAND" == "" ]; then
+	opsi_usage
+fi
+
+
+
+# main
+case "$OPSI_COMMAND" in
+
+	transfer_to_opsi)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_IP" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_MAC" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_OPSI_SERVER_IP" == "" ]; then
+			opsi_usage
+		fi
+		echo "NOTICE: Transfering resource $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC to Opsi-server at $PARAM_OPSI_SERVER_IP."
+		dhcpd_lock aquire
+		if ! grep $PARAM_RESOURCE_NAME $DHCPD_CONF 1>/dev/null; then
+			dhcpd_log openqrm-dhcpd-manager "Resource  $PARAM_RESOURCE_NAME not existing in the dhcpd-server."
+			dhcpd_lock release
+			exit 0
+		fi
+		if grep -A 1 $PARAM_RESOURCE_NAME $DHCPD_CONF | grep "# opsi" 1>/dev/null; then
+			dhcpd_log openqrm-dhcpd-manager "Resource  $PARAM_RESOURCE_NAME already assigned to Opsi-server at $PARAM_OPSI_SERVER_IP."
+			dhcpd_lock release
+			exit 0
+		fi
+		dhcpd_log openqrm-dhcpd-manager "Transfering $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC to Opsi-server at $PARAM_OPSI_SERVER_IP."
+		cp -f $DHCPD_CONF $DHCPD_CONF.openqrm-dhcpd-manager
+		# find the resource entry + remove it
+		# first - resource
+		grep -B 10000 -A 4 "^host $PARAM_RESOURCE_NAME {" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/dhcpd.conf | sed -e :a -e '$d;N;2,5ba' -e 'P;D' > $DHCPD_CONF.first_part
+		# after resource
+		grep -A 10000 "^host $PARAM_RESOURCE_NAME {" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/dhcpd.conf | sed '1,5d' > $DHCPD_CONF.last_part
+
+		# now add the resource entry again with the new opsi config
+		cat $OPSI_DHCPD_HOST_TEMPLATE | \
+			sed -e "s/@@@@PARAM_RESOURCE_NAME@@@@/$PARAM_RESOURCE_NAME/g" |	\
+			sed -e "s/@@@@PARAM_RESOURCE_IP@@@@/$PARAM_RESOURCE_IP/g" |	\
+			sed -e "s/@@@@PARAM_RESOURCE_MAC@@@@/$PARAM_RESOURCE_MAC/g" |	\
+			sed -e "s/@@@@PARAM_OPSI_SERVER_IP@@@@/$PARAM_OPSI_SERVER_IP/g" > $DHCPD_CONF.opsi_part
+
+		# create new config
+		cat $DHCPD_CONF.first_part $DHCPD_CONF.opsi_part $DHCPD_CONF.last_part > $DHCPD_CONF
+		# restart dhcpd
+		if [ -f "$OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/dhcpd/.running" ]; then
+			$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd stop
+			if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start; then
+				dhcpd_log openqrm-dhcpd-manager "Adding Resource $PARAM_RESOURCE_NAME failed. Reverting dhcpd-configuration."
+				# restore previous version, better not to add it than to corrupt the config
+				cp -f $DHCPD_CONF.openqrm-dhcpd-manager $DHCPD_CONF
+				$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start
+			fi
+		fi
+		dhcpd_lock release
+
+		# wait a bit until the client started the opsi auto-installation
+		dhcpd_log openqrm-dhcpd-manager "Waiting to take-over $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC from Opsi-server at $PARAM_OPSI_SERVER_IP."
+		sleep $OPSI_INSTALL_START_DELAY
+		# return the client to openQRM PXE -> local-boot
+		dhcpd_log openqrm-dhcpd-manager "Taking over $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC from Opsi-server at $PARAM_OPSI_SERVER_IP."
+		$0 take_over_from_opsi -o $PARAM_OPSI_SERVER_IP -i $PARAM_RESOURCE_IP -m $PARAM_RESOURCE_MAC -n $PARAM_RESOURCE_NAME
+		# set the clients pxe config to local-boot
+		RESOURCE_PXELINUXCFG_FILE=`echo 01-$PARAM_RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
+		sed -i -e "s/^default.*/default local/g" $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		;;
+
+
+
+	take_over_from_opsi)
+		if [ "$PARAM_RESOURCE_NAME" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_IP" == "" ]; then
+			opsi_usage
+		fi
+		if [ "$PARAM_RESOURCE_MAC" == "" ]; then
+			opsi_usage
+		fi
+		echo "NOTICE: Taking over resource $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC from Opsi-server."
+		dhcpd_lock aquire
+		if ! grep $PARAM_RESOURCE_NAME $DHCPD_CONF 1>/dev/null; then
+			dhcpd_log openqrm-dhcpd-manager "Resource  $PARAM_RESOURCE_NAME not existing in the dhcpd-server."
+			dhcpd_lock release
+			exit 0
+		fi
+		if ! grep -A 1 $PARAM_RESOURCE_NAME $DHCPD_CONF | grep "# opsi" 1>/dev/null; then
+			dhcpd_log openqrm-dhcpd-manager "Resource  $PARAM_RESOURCE_NAME is not assigned to Opsi-server."
+			dhcpd_lock release
+			exit 0
+		fi
+		dhcpd_log openqrm-dhcpd-manager "Taking over $PARAM_RESOURCE_NAME/$PARAM_RESOURCE_IP/$PARAM_RESOURCE_MAC"
+		cp -f $DHCPD_CONF $DHCPD_CONF.openqrm-dhcpd-manager
+		# find the resource entry + remove it
+		# first - resource
+		grep -B 10000 -A 4 "^host $PARAM_RESOURCE_NAME {" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/dhcpd.conf | sed -e :a -e '$d;N;2,5ba' -e 'P;D' > $DHCPD_CONF.first_part
+		# after resource
+		grep -A 10000 "^host $PARAM_RESOURCE_NAME {" $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/dhcpd.conf | sed '1,7d' > $DHCPD_CONF.last_part
+		cat $DHCPD_HOST_TEMPLATE | \
+			sed -e "s/DHCPD_RESOURCE_HOSTNAME/$PARAM_RESOURCE_NAME/g" |	\
+			sed -e "s/DHCPD_RESOURCE_MAC/$PARAM_RESOURCE_MAC/g" |	\
+			sed -e "s/DHCPD_RESOURCE_IP/$PARAM_RESOURCE_IP/g" > $DHCPD_CONF.host_part
+		# create new config
+		cat $DHCPD_CONF.first_part $DHCPD_CONF.host_part $DHCPD_CONF.last_part > $DHCPD_CONF
+		# restart dhcpd
+		if [ -f "$OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/dhcpd/.running" ]; then
+			$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd stop
+			if ! $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start; then
+				dhcpd_log openqrm-dhcpd-manager "Adding Resource $PARAM_RESOURCE_NAME failed. Reverting dhcpd-configuration."
+				# restore previous version, better not to add it than to corrupt the config
+				cp -f $DHCPD_CONF $DHCPD_CONF.failed
+				cp -f $DHCPD_CONF.openqrm-dhcpd-manager $DHCPD_CONF
+				$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/etc/init.d/openqrm-plugin-dhcpd start
+			fi
+		fi
+		dhcpd_lock release
+		# set the clients pxe config to net-boot, this is for appliance stop
+		RESOURCE_PXELINUXCFG_FILE=`echo 01-$PARAM_RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
+		sed -i -e "s/^default.*/default linux/g" $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		;;
+
+
+	set_opsi_client_to_local_boot)
+		if [ "$PARAM_RESOURCE_MAC" == "" ]; then
+			opsi_usage
+		fi
+		echo "NOTICE: Setting resource $PARAM_RESOURCE_MAC to local-boot."
+		# set the clients pxe config to local-boot, this is for appliance start
+		RESOURCE_PXELINUXCFG_FILE=`echo 01-$PARAM_RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
+		sed -i -e "s/^default.*/default local/g" $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		;;
+
+
+
+	*)
+		opsi_usage
+		;;
+
+
+esac
+
