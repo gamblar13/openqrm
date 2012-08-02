@@ -1,0 +1,37 @@
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+#	Title
+#	Href
+#	Alt
+#	IMG
+#	Target
+..|Nagios3
+...|Help|
+....|About|index.php?plugin=nagios3&controller=nagios3-about|How to use|nagios3/plugin.png
+...|Config
+....|Services|index.php?plugin=nagios3|Service Configuration|nagios3/../../edit.png
+....|Appliances|index.php?plugin=nagios3&nagios3_action=appliance|Appliance Service Checks|nagios3/../../edit.png
+....|AutoConfig|index.php?plugin=nagios3&nagios3_action=automap|Automatic Nagios Configuration|nagios3/../../manage.png
+...|Overview|index.php?iframe=/nagios3/cgi-bin/tac.cgi|Tactical Data-Center Overview|nagios3/../../datacenter.png
+...|Services|index.php?iframe=/nagios3/cgi-bin/status.cgi?host=all|Service Availability|nagios3/../../manage.png
+...|Hosts|index.php?iframe=/nagios3/cgi-bin/status.cgi?hostgroup=all&style=hostdetail|Resource Availability|nagios3/../../resource.png
+...|Status-Map|index.php?iframe=/nagios3/cgi-bin/statusmap.cgi?host=all|Status Map|nagios3/../../appliance.png
+..|Icinga
+...|Overview|index.php?iframe=/icinga/cgi-bin/tac.cgi|Tactical Data-center Overview|nagios3/../../datacenter.png
+...|Hosts|index.php?iframe=/icinga/cgi-bin/status.cgi?hostgroup=all&style=hostdetail|Resource Availability|nagios3/../../resource.png
+...|Services|index.php?iframe=/icinga/cgi-bin/status.cgi?host=all|Service Availability|nagios3/../../manage.png
+...|Performance|index.php?iframe=/icinga/cgi-bin/extinfo.cgi?&type=4|Performance Informations|nagios3/../../time.png
+...|Queue|index.php?iframe=/icinga/cgi-bin/extinfo.cgi?&type=7|Service Check Queue|nagios3/../../manage.png
+...|Events|index.php?iframe=/icinga/cgi-bin/showlog.cgi|Service Check Queue|nagios3/../../transition.png
