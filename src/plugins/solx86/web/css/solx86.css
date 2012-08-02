@@ -1,0 +1,55 @@
+
+/*-Icon classes ----- */
+a.graphs {
+	padding: 0;
+	border: 0px none;
+	width: 32px;
+	height: 32px;
+	display:block;
+	text-align: center;
+	text-decoration: none;
+	line-height: 0px;
+	overflow: hidden;
+	color: transparent;
+}
+a.graphs {
+	background: url('/openqrm/base/plugins/solx86/img/plugin.png') no-repeat center top;
+}
+
+
+/* Documentation */
+
+#documentation_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 750px;
+}
+#plugin_content {
+    left: 0px;
+    padding: 0 5px !important;
+    position: relative;
+    top: 0px;
+    width: 255px;
+}
+#introduction_content {
+    padding: 0px 5px !important;
+}
+#provides_content {
+    padding: 0px 10px !important;
+}
+#requirements_content {
+    padding: 0px 10px !important;
+}
+#plugin_type {
+	width: 240px;
+	height: 40px;
+    top: 0px;
+}
+#tested_with {
+	width: 240px;
+	height: 100px;
+    top: 0px;
+
+}
