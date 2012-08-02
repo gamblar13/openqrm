@@ -1,0 +1,7 @@
+
+deb @METHOD@ftp.de.debian.org/debian squeeze main contrib non-free
+#deb-src deb @METHOD@ftp.us.debian.org/debian squeeze main contrib non-free
+
+deb @METHOD@security.debian.org/ squeeze/updates main contrib non-free
+#deb-src @METHOD@security.debian.org/ squeeze/updates main contrib non-free
+

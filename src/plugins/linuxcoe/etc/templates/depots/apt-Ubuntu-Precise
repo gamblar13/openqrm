@@ -1,0 +1,4 @@
+
+deb @METHOD@ftp.halifax.rwth-aachen.de/ubuntu precise main
+#deb-src deb @METHOD@archive.ubuntu.com/ubuntu precise main
+
