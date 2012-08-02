@@ -1,0 +1,68 @@
+#!/bin/bash
+# this is the functions file for the vbox-plugin
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+VBOX_SERVER_LOCK_FILE=/var/run/vbox/vbox-plugin.lock
+VBOX_SERVER_LOCK_DELAY=5
+VBOX_SERVER_LOCK_RETRY=100
+VBOX_SERVER_LOCK_TIMEOUT=500
+################ common vbox functions
+
+# logs for vbox
+function vbox_log() {
+	local COMPONENT=$1
+	shift
+	local MESSAGE=$@
+	logger -i -t "vbox plug-in" "$COMPONENT : $MESSAGE"
+}
+
+
+# locking function
+function vbox_lock() {
+	local COMMAND=$1
+	local RET=1
+
+	if [ ! -d `dirname $VBOX_SERVER_LOCK_FILE` ]; then
+		mkdir -p `dirname $VBOX_SERVER_LOCK_FILE`
+	fi
+	case "$COMMAND" in
+		aquire)
+				lockfile -s $VBOX_SERVER_LOCK_DELAY -r $VBOX_SERVER_LOCK_RETRY -l $VBOX_SERVER_LOCK_TIMEOUT $VBOX_SERVER_LOCK_FILE
+				RET=$?
+				vbox_log vbox_lock "Aquired the lock"
+				return $RET
+				;;
+		release)
+				/bin/rm -f $VBOX_SERVER_LOCK_FILE
+				RET=$?
+				vbox_log vbox_lock "Released the lock"
+				return $RET
+				;;
+		*)
+			vbox_log vbox_lock "No such command. Try 'aquire' or 'release'"
+			return 1
+			;;
+	esac
+}
+
+
+
+################ vbox functions
+
+
+
+
+
+
