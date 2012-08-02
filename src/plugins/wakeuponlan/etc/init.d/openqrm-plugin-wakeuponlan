@@ -1,0 +1,123 @@
+#!/bin/bash
+# init script for the openQRM wakeuponlan-plugin
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+
+
+OPENQRM_SERVER_BASE_DIR=$(pushd $(dirname $0)/../../../../.. > /dev/null; echo $PWD; popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/wakeuponlan/include/openqrm-plugin-wakeuponlan-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/wakeuponlan/etc/openqrm-plugin-wakeuponlan.conf
+# get the ip config
+openqrm_server_get_config
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+export LANG=C
+# define wget to use with https
+if [ "$OPENQRM_WEB_PROTOCOL" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+function openqrm_plugin_wakeuponlan_start() {
+	echo "Starting the openQRM wakeuponlan-plugin"
+	touch $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/wakeuponlan/.running
+}
+
+
+function openqrm_plugin_wakeuponlan_stop() {
+	echo "Stopping the openQRM wakeuponlan-plugin"
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/wakeuponlan/.running
+}
+
+function openqrm_plugin_wakeuponlan_uninstall() {
+	local USERNAME=$1
+	local PASSWORD=$2
+	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
+		echo -n "wakeuponlan: Please give a username to uninstall the plugin : "
+		read USERNAME
+		echo
+		echo -n "wakeuponlan: Please give the password for user $USERNAME : "
+		read PASSWORD
+		echo
+	fi
+	echo "Uninstalling the openQRM wakeuponlan-plugin"
+	openqrm_plugin_wakeuponlan_stop
+
+	# removing the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/wakeuponlan/wakeuponlan-action.php?wakeuponlan_command=uninstall"; then
+		wakeuponlan_log init "ERROR: Could not drop the wakeuponlan-plugin tables in the database!"
+		return 1
+	fi
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/wakeuponlan
+	rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-wakeuponlan.tgz
+
+}
+
+function openqrm_plugin_wakeuponlan_init() {
+	local USERNAME=$1
+	local PASSWORD=$2
+	if [ "$USERNAME" == "" ] && [ "$PASSWORD" == "" ]; then
+		echo -n "wakeuponlan: Please give a username to init the plugin : "
+		read USERNAME
+		echo
+		echo -n "wakeuponlan: Please give the password for user $USERNAME : "
+		read PASSWORD
+		echo
+	fi
+	echo "Initializing the openQRM wakeuponlan-plugin"
+	# linking the web dir
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/wakeuponlan/web $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/base/plugins/wakeuponlan
+	# link the boot-service
+	ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/wakeuponlan/web/boot-service-wakeuponlan.tgz $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm/boot-service/boot-service-wakeuponlan.tgz
+
+	# creating the table
+	if ! wget -q $WGET_NO_CERT_CHECK -O /dev/null --http-user=$USERNAME --http-password=$PASSWORD "$OPENQRM_WEB_PROTOCOL://$resource_openqrmserver/openqrm/base/plugins/wakeuponlan/wakeuponlan-action.php?wakeuponlan_command=init"; then
+		wakeuponlan_log init "ERROR: Could not create the wakeuponlan-plugin tables in the database!"
+		return 1
+	fi
+
+}
+
+USER=$2
+PASS=$3
+
+case "$1" in
+	start)
+		openqrm_plugin_wakeuponlan_start
+		;;
+	stop)
+		openqrm_plugin_wakeuponlan_stop
+		;;
+	restart)
+		openqrm_plugin_wakeuponlan_stop
+		sleep 1
+		openqrm_plugin_wakeuponlan_start
+		;;
+	init)
+		openqrm_plugin_wakeuponlan_init $USER $PASS
+		;;
+	uninstall)
+		openqrm_plugin_wakeuponlan_uninstall $USER $PASS
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|init|uninstall}"
+		exit 1
+
+esac
+exit $?
+
+
+
+
