@@ -1,0 +1,28 @@
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+#	Title
+#	Href
+#	Alt
+#	IMG
+#	Target
+..|LXC-storage
+...|Help|
+....|About|index.php?plugin=lxc-storage&controller=lxc-storage-about|How to use|lxc-storage/plugin.png
+....|Config|index.php?plugin=lxc-storage&controller=lxc-storage-about&lxc_storage_about_action=bootservice|LXC-Storage Host Boot-Service|lxc-storage/../../help.png
+....|VMs|index.php?plugin=lxc-storage&controller=lxc-storage-about&lxc_storage_about_action=vms|Virtual Machine Management|lxc-storage/../../help.png
+....|Storage|index.php?plugin=lxc-storage&controller=lxc-storage-about&lxc_storage_about_action=storage|Storage Management|lxc-storage/../../help.png
+....|Usage|index.php?plugin=lxc-storage&controller=lxc-storage-about&lxc_storage_about_action=usage|Use-cases|lxc-storage/../../help.png
+...|LXC Volumes|index.php?plugin=lxc-storage|LXC Storage Manager|lxc-storage/../../edit.png
+...|LXC VMs|index.php?plugin=lxc-storage&controller=lxc-storage-vm|LXC Storage VM Manager|lxc-storage/../../edit.png
