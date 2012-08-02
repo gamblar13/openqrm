@@ -1,0 +1,291 @@
+#!/bin/bash
+# this script automatically manages nfs and iscsi on local
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/include/openqrm-plugin-local-storage-functions
+OPENQRM_POSTENCODE="$OPENQRM_SERVER_BASE_DIR/openqrm/sbin/openqrm-postencode"
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+OPENQRM_SERVER_IP=$OPENQRM_SERVER_IP_ADDRESS
+resource_id=0
+resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+openqrm_web_protocol=$OPENQRM_WEB_PROTOCOL
+export LANG=C
+LINEBR='
+'
+# define wget to use with https
+if [ "$openqrm_web_protocol" == "https" ]; then
+	WGET_NO_CERT_CHECK="--no-check-certificate"
+fi
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	echo "ERROR: Please run this script as root!"
+	exit 6
+fi
+
+function local_storage_manager_usage() {
+	echo "Usage : $0 grab <-m resource-mac> <-i resource-ip> <-d destination> <-n image-name>"
+	echo "        $0 deploy <-m resource-mac> <-i resource-ip> <-x resource-id> <-d destination> <-n image-name>"
+	echo "        $0 set_client_to_local_boot <-m resource-mac>"
+	exit 1
+}
+
+
+# re-run in background via screen
+if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+	if [ -x /usr/bin/screen.real ]; then
+		RUNSCREEN="/usr/bin/screen.real"
+	else
+		RUNSCREEN=`which screen`
+	fi
+	export RUN_IN_BACKGROUND=true
+	SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+	$RUNSCREEN -dmS $SCREEN_NAME $0 $@
+	exit
+fi
+
+
+
+LOCAL_COMMAND=$1
+shift
+
+while [ $# -ne 0 ]; do
+	case "$1" in
+		-d)
+			LOCAL_IMAGE_DESTINATION=$2
+			shift
+			;;
+		-m)
+			LOCAL_RESOURCE_MAC=$2
+			shift
+			;;
+		-i)
+			LOCAL_RESOURCE_IP=$2
+			shift
+			;;
+		-n)
+			LOCAL_IMAGE_NAME=$2
+			shift
+			;;
+		-x)
+			LOCAL_RESOURCE_ID=$2
+			shift
+			;;
+
+
+
+
+		*)
+			echo "ERROR: Free commandline arguments are not allowed"
+			local_storage_manager_usage
+			exit 6
+			;;
+	esac
+	shift
+done
+
+
+
+
+# main
+if [ "$LOCAL_COMMAND" == "" ]; then
+	local_storage_manager_usage
+fi
+
+
+case "$LOCAL_COMMAND" in
+
+	grab)
+
+		if [ "$LOCAL_RESOURCE_MAC" == "" ]; then
+			local_storage_manager_usage
+		fi
+		if [ "$LOCAL_IMAGE_DESTINATION" == "" ]; then
+			local_storage_manager_usage
+		fi
+		if [ "$LOCAL_IMAGE_NAME" == "" ]; then
+			local_storage_manager_usage
+		fi
+		if [ "$LOCAL_RESOURCE_IP" == "" ]; then
+			local_storage_manager_usage
+		fi
+
+		RESOURCE_PXELINUXCFG_FILE=`echo 01-$LOCAL_RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
+		if [ ! -f "$OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE" ]; then
+			local_storage_log grab "ERROR: Could not find resource pxe-configruation file at $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE!"
+			exit 1
+		fi
+		local_storage_log grab  "Running 'grab' phase for resource $LOCAL_RESOURCE_MAC transfer to $LOCAL_IMAGE_DESTINATION"
+
+		if [ ! -f "$OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.idle" ]; then
+			local_storage_log grab  "- backing up $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE"
+			/bin/cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.idle
+		fi
+		local_storage_log grab  "- assigning resource $LOCAL_RESOURCE_MAC to clonezilla"
+		cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/etc/templates/openqrm-clonezilla-pxe |	\
+			sed -e "s/@@@RESOURCE_MAC@@@/$LOCAL_RESOURCE_MAC/g" |	\
+			sed -e "s/@@@OPENQRM_SERVER_IP_ADDRESS@@@/$OPENQRM_SERVER_IP_ADDRESS/g" \
+			> $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+
+		# create custom clonezilla script
+
+		cat > $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/clonezilla/custom-$LOCAL_RESOURCE_MAC << EOF
+#!/bin/bash
+echo "Running openQRM clonezilla-hook!"
+echo "- mounting $LOCAL_IMAGE_DESTINATION"
+if ! mount -t nfs $LOCAL_IMAGE_DESTINATION /home/partimag; then
+	echo "ERROR: Mounting $LOCAL_IMAGE_DESTINATION failed!"
+	exit 1
+fi
+# run save
+ALL_DISKS=""
+for DISK in \`cat /proc/partitions | grep -v major | awk '{ print \$4 }' | grep -v [0-9]\`; do
+        ALL_DISKS="\$ALL_DISKS \$DISK"
+done
+echo "- transferring $ALL_DISKS to $LOCAL_IMAGE_DESTINATION"
+/opt/drbl/sbin/ocs-sr -batch -q2 -j2 -z1 -i 2000 -sc -p true savedisk $LOCAL_IMAGE_NAME.img \$ALL_DISKS
+echo "- transfer finished, rebooting ..."
+# notify openQRM
+EVENT_DESCRIPTION="Started%20to%20grab%20""$LOCAL_RESOURCE_IP""%20to%20""$LOCAL_IMAGE_NAME"
+MESSAGEDATA="resource_id=0&event_name=$LOCAL_IMAGE_DESTINATION&event_priority=10&event_source=local-storage&event_description=\$EVENT_DESCRIPTION";
+OPENQRM_RESOURCE_EVENT_URL="$openqrm_web_protocol://$resource_openqrmserver/openqrm/action/resource-monitor.php?resource_command=post_event&\$MESSAGEDATA"
+wget -q $WGET_NO_CERT_CHECK -O /dev/null "\$OPENQRM_RESOURCE_EVENT_URL"
+sleep 4
+/sbin/reboot -f
+
+EOF
+
+
+		local_storage_log grab  "- assigned resource $LOCAL_RESOURCE_MAC to clonezilla"
+		# send active event
+		openqrm_post_event 0 "$LOCAL_IMAGE_DESTINATION" 9 "local-storage" "Started to grab $LOCAL_RESOURCE_IP to $LOCAL_IMAGE_NAME"
+
+
+		# wait for reboot of resource
+		sleep 120
+		# restore idle pxe-linuxcfg
+		local_storage_log grab  "- restoring resource $LOCAL_RESOURCE_MAC idle pxe-configruation"
+		/bin/cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.idle $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+
+
+		;;
+
+
+	deploy)
+
+		if [ "$LOCAL_RESOURCE_MAC" == "" ]; then
+			local_storage_manager_usage
+		fi
+		if [ "$LOCAL_IMAGE_DESTINATION" == "" ]; then
+			local_storage_manager_usage
+		fi
+		if [ "$LOCAL_IMAGE_NAME" == "" ]; then
+			local_storage_manager_usage
+		fi
+		if [ "$LOCAL_RESOURCE_IP" == "" ]; then
+			local_storage_manager_usage
+		fi
+		if [ "$LOCAL_RESOURCE_ID" == "" ]; then
+			local_storage_manager_usage
+		fi
+
+		RESOURCE_PXELINUXCFG_FILE=`echo 01-$LOCAL_RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
+		if [ ! -f "$OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE" ]; then
+			local_storage_log deploy "ERROR: Could not find resource pxe-configruation file at $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE!"
+			exit 1
+		fi
+		local_storage_log deploy  "Running 'deploy' phase for resource $LOCAL_RESOURCE_MAC restoring from $LOCAL_IMAGE_DESTINATION"
+
+		if [ ! -f "$OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.idle" ]; then
+			local_storage_log deploy  "- backing up $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE"
+			/bin/cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.idle
+		fi
+		local_storage_log deploy  "- assigning resource $LOCAL_RESOURCE_MAC to clonezilla"
+		cat $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/etc/templates/openqrm-clonezilla-pxe |	\
+			sed -e "s/@@@RESOURCE_MAC@@@/$LOCAL_RESOURCE_MAC/g" |	\
+			sed -e "s/@@@OPENQRM_SERVER_IP_ADDRESS@@@/$OPENQRM_SERVER_IP_ADDRESS/g" \
+			> $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+
+		# create custom clonezilla script
+
+		cat > $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/clonezilla/custom-$LOCAL_RESOURCE_MAC << EOF
+#!/bin/bash
+echo "Running openQRM clonezilla-hook!"
+echo "- mounting $LOCAL_IMAGE_DESTINATION"
+if ! mount -t nfs $LOCAL_IMAGE_DESTINATION /home/partimag; then
+	echo "ERROR: Mounting $LOCAL_IMAGE_DESTINATION failed!"
+	exit 1
+fi
+# run restore
+ALL_DISKS=""
+for DISK in \`cat /proc/partitions | grep -v major | awk '{ print \$4 }' | grep -v [0-9]\`; do
+        ALL_DISKS="\$ALL_DISKS \$DISK"
+done
+echo "- restoring $ALL_DISKS from $LOCAL_IMAGE_DESTINATION / $LOCAL_IMAGE_NAME"
+/opt/drbl/sbin/ocs-sr -batch -g auto -e2 -r -j2 -p true restoredisk $LOCAL_IMAGE_NAME.img \$ALL_DISKS
+echo "- restore finished, rebooting ..."
+sleep 4
+# notify openQRM
+EVENT_DESCRIPTION="Started%20to%20deploy%20""$LOCAL_IMAGE_NAME""%20to%20""$LOCAL_RESOURCE_IP"
+MESSAGEDATA="resource_id=0&event_name=$LOCAL_IMAGE_DESTINATION&event_priority=10&event_source=local-storage&event_description=$EVENT_DESCRIPTION";
+OPENQRM_RESOURCE_EVENT_URL="$openqrm_web_protocol://$resource_openqrmserver/openqrm/action/resource-monitor.php?resource_command=post_event&$MESSAGEDATA"
+wget -q $WGET_NO_CERT_CHECK -O /dev/null "$OPENQRM_RESOURCE_EVENT_URL"
+
+/sbin/reboot -f
+
+EOF
+
+		local_storage_log deploy  "- deploying resource $LOCAL_RESOURCE_MAC via clonezilla"
+		openqrm_post_event 0 "$LOCAL_IMAGE_DESTINATION" 9 "local-storage" "Started to deploy $LOCAL_IMAGE_NAME to $LOCAL_RESOURCE_IP"
+
+		# wait for reboot of resource
+		sleep 60
+		# restore idle pxe-linuxcfg
+		local_storage_log deploy  "- restoring resource $LOCAL_RESOURCE_MAC idle pxe-configruation"
+		/bin/cp -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.idle $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		# set to local boot
+		sed -i -e "s/^default.*/default local/g" $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+
+		# start the openqrm-local-storage-monitord to send transaction state to openQRM
+		$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/local-storage/sbin/openqrm-local-storage-monitord $LOCAL_RESOURCE_ID $LOCAL_RESOURCE_MAC
+		;;
+
+	set_client_to_local_boot)
+		if [ "$LOCAL_RESOURCE_MAC" == "" ]; then
+			local_storage_manager_usage
+		fi
+		echo "NOTICE: Setting resource $LOCAL_RESOURCE_MAC to local-boot."
+		# set the clients pxe config to local-boot, this is for appliance start
+		RESOURCE_PXELINUXCFG_FILE=`echo 01-$LOCAL_RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
+		sed -i -e "s/^default.*/default local/g" $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		chmod 777 $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+		;;
+
+
+	*)
+		local_storage_manager_usage
+		;;
+
+
+esac
+
