@@ -1,0 +1,104 @@
+#!/bin/bash
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+
+export `eval cat /proc/cmdline`	2>/dev/null
+. /var/openqrm/openqrm-resource.conf
+export OPENQRM_SERVER_BASE_DIR=$resource_basedir
+. $resource_basedir/openqrm/include/openqrm-functions
+# for including the package functions
+export OPENQRM_SOURCE_DIR="$resource_basedir/openqrm/"
+. $resource_basedir/openqrm/include/openqrm-package-functions
+
+# do not run on idle resources
+if [ "$resource_image" == "idle" ]; then
+	exit 0
+fi
+
+# do not start on the intitrd
+if [ -f /etc/initrd-devices.conf ]; then
+	exit 0
+fi
+
+function zabbix_start() {
+	echo "Starting the openQRM zabbix-plugin"
+	zabbix_stop 1>/dev/null 2>&1
+	# make sure we have the zabbix agent
+	if [ -f /etc/debian_version ]; then
+		apt-get update
+	fi
+	export FORCE_INSTALL=true
+	openqrm_install_os_dependency zabbix-agent
+	# set config
+	if [ -f /etc/zabbix/zabbix_agentd.conf ]; then
+		echo "Setting configuration for the Zabbix-agent -> Zabbix-server $resource_openqrmserver"
+		sed -i -e "s/Server=.*/Server=$resource_openqrmserver/g" /etc/zabbix/zabbix_agentd.conf
+		# set hostname in agent conf
+		zabbix_client_hostname=`hostname`
+		sed -i -e "s/Hostname=.*/Hostname=$zabbix_client_hostname/g" /etc/zabbix/zabbix_agentd.conf
+	else
+		echo "ERROR: Cloud find the Zabbix-agent configuration file!"
+	fi
+
+	# start agent
+	if [ -x "/etc/init.d/zabbix-agent" ]; then
+		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
+			invoke-rc.d zabbix-agent start
+		else
+			/etc/init.d/zabbix-agent start
+		fi
+	else
+		echo "ERROR: Cloud not start the Zabbix-agent !"
+	fi
+	return 0
+}
+
+
+function zabbix_stop() {
+	echo "Stopping the openQRM zabbix plugin"
+	# stop agent
+	if [ -x "/etc/init.d/zabbix-agent" ]; then
+		if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
+			invoke-rc.d zabbix-agent stop
+		else
+			/etc/init.d/zabbix-agent stop
+		fi
+	else
+		echo "ERROR: Cloud not stop the Zabbix-agent !"
+	fi
+	return 0
+}
+
+
+
+case "$1" in
+	start)
+		zabbix_start
+		;;
+	stop)
+		zabbix_stop
+		;;
+	restart)
+		zabbix_stop
+		sleep 1
+		zabbix_start
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+
+esac
+exit $?
+
