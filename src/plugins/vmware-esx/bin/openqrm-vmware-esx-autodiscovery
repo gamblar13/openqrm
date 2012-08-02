@@ -1,0 +1,115 @@
+#!/bin/bash
+# this script automatically manages vmware-esx networks (vswitch + porgroups)
+#
+# openQRM Enterprise developed by openQRM Enterprise GmbH.
+#
+# All source code and content (c) Copyright 2012, openQRM Enterprise GmbH unless specifically noted otherwise.
+#
+# This source code is released under the GNU General Public License version 2, unless otherwise agreed with openQRM Enterprise GmbH.
+# The latest version of this license can be found here: src/doc/LICENSE.txt
+#
+# By using this software, you acknowledge having read this license and agree to be bound thereby.
+#
+#           http://openqrm-enterprise.com
+#
+# Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
+#
+OPENQRM_SERVER_BASE_DIR=$(dirname $0)/../../../..
+OPENQRM_SERVER_BASE_DIR=$(pushd $OPENQRM_SERVER_BASE_DIR > /dev/null && echo $PWD && popd > /dev/null)
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/include/openqrm-plugin-vmware-esx-functions
+. $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/etc/openqrm-plugin-vmware-esx.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+. $OPENQRM_SERVER_BASE_DIR/openqrm/include/openqrm-server-functions
+openqrm_server_get_config
+export resource_openqrmserver=$OPENQRM_SERVER_IP_ADDRESS
+OPENQRM_VMWARE_ESX_HOST_CONF_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/conf/host"
+OPENQRM_VMWARE_ESX_STAT_DIR="$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/vmware-esx/web/vmware-esx-stat/"
+export LANG=C
+ORG_IFS="$IFS"
+
+# http://communities.vmware.com/thread/240659?tstart=0
+export PERL_LWP_SSL_VERIFY_HOSTNAME=0
+
+# let only root run this script
+WHOAMI=`whoami`
+if [ "$WHOAMI" != "root" ]; then
+	vmware_esx_log "ERROR: Please run this script as root!"
+	exit 6
+fi
+# deps installed ?
+if ! which screen 1>/dev/null; then
+	vmware_esx_log "ERROR: The 'screen' utility is not installed! Please install and try again."
+	exit 6
+fi
+if [ ! -d "$OPENQRM_VMWARE_ESX_HOST_CONF_DIR" ]; then
+	mkdir -p $OPENQRM_VMWARE_ESX_HOST_CONF_DIR
+fi
+if [ ! -d "$OPENQRM_VMWARE_ESX_STAT_DIR" ]; then
+	mkdir -p $OPENQRM_VMWARE_ESX_STAT_DIR
+	chmod 777 $OPENQRM_VMWARE_ESX_STAT_DIR
+fi
+
+# re-run in background via screen
+if [ "$RUN_IN_BACKGROUND" != "true" ]; then
+	if [ -x /usr/bin/screen.real ]; then
+		RUNSCREEN="/usr/bin/screen.real"
+	else
+		RUNSCREEN=`which screen`
+	fi
+	export RUN_IN_BACKGROUND=true
+	SCREEN_NAME=`date +%T%x | sed -e "s/://g" | sed -e "s#/##g"`
+	$RUNSCREEN -dmS $SCREEN_NAME $0 $@
+	exit
+fi
+# already running ?
+if [ -f "$VMWARE_SERVER_DISCOVERY_LOCK_FILE" ]; then
+	vmware_esx_log "NOTICE: VMware ESX Host autodiscovery already running. Waiting to aquire the lock"
+	openqrm_post_event 0 "vmware-esx" 9 "auto-discovery-lock" "VMware ESX Host Auto-Discovery already active. Waiting to aquire the lock!"
+fi
+vmware_esx_discovery_lock aquire
+openqrm_post_event 0 "vmware-esx" 10 "auto-discovery-lock" "VMware ESX Host Auto-Discovery already active. Waiting to aquire the lock!"
+openqrm_post_event 0 "vmware-esx" 9 "auto-discovery" "VMware ESX Auto-Discovery active!"
+BASE_IP=`echo $OPENQRM_SERVER_IP_ADDRESS | cut -d'.' -f1-3`
+#if [ "$OPENQRM_SERVER_SUBNET_MASK" == "255.255.255.0" ]; then
+#	BASE_IP=`echo $OPENQRM_SERVER_IP_ADDRESS | cut -d'.' -f1-3`
+#elif [ "$OPENQRM_SERVER_SUBNET_MASK" == "255.255.255.0" ]; then
+#	BASE_IP=`echo $OPENQRM_SERVER_IP_ADDRESS | cut -d'.' -f1-2`
+#else
+#	BASE_IP=`echo $OPENQRM_SERVER_IP_ADDRESS | cut -d'.' -f1-3`
+#fi
+WGET_OUTPUT_FILE=`mktemp /tmp/esx-autodiscovery.XXXXXX` || exit 1
+> $OPENQRM_VMWARE_ESX_STAT_DIR/autodiscovery_finished.tmp
+for LAST_BYTE in `seq 1 255`; do
+	vmware_esx_log auto_discovery "...checking $BASE_IP.$LAST_BYTE"
+	if ! ping -W 1 -c 1 -w 1 $BASE_IP.$LAST_BYTE &>/dev/null; then
+		continue
+	fi
+	wget -T 10 -t 1 -O /dev/null --no-check-certificate https://$BASE_IP.$LAST_BYTE/mob &>/dev/null
+	WGET_RET=$?
+	if [ "$WGET_RET" == "6" ]; then
+		rm -f $WGET_OUTPUT_FILE
+		wget -T 10 -t 1 -O /dev/null --no-check-certificate https://$BASE_IP.$LAST_BYTE/mob 2>$WGET_OUTPUT_FILE
+		if grep -i vmware $WGET_OUTPUT_FILE 1>/dev/null; then
+			nmap -p22 $BASE_IP.$LAST_BYTE > $WGET_OUTPUT_FILE
+			ESX_MAC_ADDRESS=`grep ^MAC $WGET_OUTPUT_FILE | awk '{ print $3 }'`
+			ESX_IP_ADDRESS="$BASE_IP.$LAST_BYTE"
+			vmware_esx_log auto_discovery "...found eventual ESX Host at $ESX_IP_ADDRESS@$ESX_MAC_ADDRESS"
+			echo "$ESX_IP_ADDRESS@$ESX_MAC_ADDRESS" >> $OPENQRM_VMWARE_ESX_STAT_DIR/autodiscovery_finished.tmp
+		fi
+	fi
+
+done
+rm -f $WGET_OUTPUT_FILE
+# let openQRM now that auto-discovery has finished
+chmod 777 $OPENQRM_VMWARE_ESX_STAT_DIR/autodiscovery_finished.tmp
+mv $OPENQRM_VMWARE_ESX_STAT_DIR/autodiscovery_finished.tmp $OPENQRM_VMWARE_ESX_STAT_DIR/autodiscovery_finished
+vmware_esx_discovery_lock release
+openqrm_post_event 0 "vmware-esx" 10 "auto-discovery" "VMware ESX Auto-Discovery active!"
+
+
+
+
+
+
+

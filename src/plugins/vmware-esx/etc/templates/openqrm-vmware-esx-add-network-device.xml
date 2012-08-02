@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+ <Reconfigure-Virtual-Machine>
+   <Name>@@OPENQRM_VMWARE_ESX_VM_NAME@@</Name>
+   <Host>@@OPENQRM_VMWARE_ESX_HOST@@</Host>
+   <Add-Device>
+        <Network-Adapter>
+          <Name>@@OPENQRM_VMWARE_ESX_EXTERNAL_BRIDGE@@</Name>
+        </Network-Adapter>
+   </Add-Device>
+ </Reconfigure-Virtual-Machine>
