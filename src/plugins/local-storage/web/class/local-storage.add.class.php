@@ -94,7 +94,6 @@ var $lang = array();
 		if(isset($response->msg)) {
 			// wizard
 			if(isset($this->user->wizard_name) && $this->user->wizard_name === 'appliance' && $this->user->wizard_step == 3) {
-				$this->controller->reload();
 				$this->response->redirect(
 					$this->response->html->thisfile.'?base=appliance&appliance_action=step'.$this->user->wizard_step.'&appliance_id='.$this->user->wizard_id.'&image_id='.$response->image_id
 				);
