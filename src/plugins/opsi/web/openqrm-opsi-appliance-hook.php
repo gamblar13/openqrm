@@ -43,7 +43,7 @@ function openqrm_opsi_appliance($cmd, $appliance_fields) {
 	global $OPENQRM_SERVER_BASE_DIR;
 	global $OPENQRM_SERVER_IP_ADDRESS;
 	global $OPENQRM_EXEC_PORT;
-	global $openqrm_server;
+	$openqrm_server = new openqrm_server();
 	$appliance_id=$appliance_fields["appliance_id"];
 	$appliance_name=$appliance_fields["appliance_name"];
 	$resource = new resource();

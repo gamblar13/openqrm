@@ -46,11 +46,11 @@ global $event;
 
 function openqrm_local_storage_appliance($cmd, $appliance_fields) {
 	global $event;
-	global $openqrm_server;
 	global $OPENQRM_SERVER_BASE_DIR;
 	global $OPENQRM_SERVER_IP_ADDRESS;
 	global $OPENQRM_EXEC_PORT;
 	global $LOCAL_STORAGE_STATE_TABLE;
+	$openqrm_server = new openqrm_server();
 	// timeout for setting the resource to localboot after an installation started
 	$local_storage_install_timeout=60;
 
