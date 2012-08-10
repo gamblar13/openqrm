@@ -81,27 +81,16 @@ var $lang = array();
 
 		foreach ($enabled_plugins as $index => $plugin_name) {
 			if (strstr($plugin_name, "-storage")) {
-				$new_image_link = "/openqrm/base/index.php?iframe=/openqrm/base/plugins/".$plugin_name."/".$plugin_name."-manager.php";
-
-// TODO - remove old link compatiblity section
+				$new_image_link = "/openqrm/base/index.php?plugin=".$plugin_name;
 				switch ($plugin_name) {
-					case 'nfs-storage':
-					case 'aoe-storage':
-					case 'iscsi-storage':
-					case 'lvm-storage':
-					case 'kvm-storage':
-					case 'xen-storage':
-					case 'local-storage':
-					case 'tmpfs-storage':
-						$new_image_link = "/openqrm/base/index.php?plugin=".$plugin_name;
+					case 'coraid-storage':
+					case 'equallogic-storage':
+					case 'netapp-storage':
+					case 'zfs-storage':
+						$new_image_link = "/openqrm/base/index.php?iframe=/openqrm/base/plugins/".$plugin_name."/".$plugin_name."-manager.php";
 						break;
 				}
-// TODO some of the storage plugins do not have a storage-manager
-				switch ($plugin_name) {
-					default:
-						$storage_link_section .= "<a href='".$new_image_link."' style='text-decoration: none'><img title='".sprintf($this->lang['create_image'], $plugin_name)."' alt='".sprintf($this->lang['create_image'], $plugin_name)."' src='/openqrm/base/plugins/".$plugin_name."/img/plugin.png' border=0> ".$plugin_name." ".$this->lang['volume']."</a><br>";
-						break;
-				}
+				$storage_link_section .= "<a href='".$new_image_link."' style='text-decoration: none'><img title='".sprintf($this->lang['create_image'], $plugin_name)."' alt='".sprintf($this->lang['create_image'], $plugin_name)."' src='/openqrm/base/plugins/".$plugin_name."/img/plugin.png' border=0> ".$plugin_name." ".$this->lang['volume']."</a><br>";
 			}
 		}
 		if (!strlen($storage_link_section)) {
