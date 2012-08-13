@@ -94,6 +94,12 @@ var $lang = array();
 
 // TODO - remove old link compatiblity section
 				switch ($virtualization_plugin_name) {
+					case 'citrix':
+						$new_vm_link = "/openqrm/base/index.php?plugin=".$virtualization_plugin_name;
+						break;
+					case 'citrix-storage':
+						$new_vm_link = "/openqrm/base/index.php?plugin=".$virtualization_plugin_name;
+						break;
 					case 'kvm':
 						$new_vm_link = "/openqrm/base/index.php?plugin=".$virtualization_plugin_name."&controller=kvm-vm";
 						break;
