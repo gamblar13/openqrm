@@ -1594,7 +1594,7 @@ case "$KVM_COMMAND" in
 		# if we are not running on openQRM itself we check for linuxcoe export
 		LINUXCOE_ENABLED=false
 		if [ -f $OPENQRM_RESOURCE_PARAMETER_FILE ]; then
-			if [ -d "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe" ]; then
+			if [ ! -d "$OPENQRM_SERVER_BASE_DIR/openqrm/plugins/linuxcoe" ]; then
 				LINUXCOE_ENABLED=true
 			fi
 		fi
