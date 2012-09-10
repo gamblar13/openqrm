@@ -37,7 +37,7 @@
 ....|Done|index.php?plugin=cloud&controller=cloud-transaction|List of Cloud Transactions|cloud/../../active.png
 ....|Failed|index.php?plugin=cloud&controller=cloud-transaction-failed|List of Failed Cloud Transactions|cloud/../../error.png
 ..|WebService
-...|SOAP|index.php?plugin=cloud&controller=cloud-documentation&cloud_documentation=soap|Documenation for the Cloud SOAP WebService|cloud/../../edit.png
+...|SOAP|index.php?plugin=cloud&controller=cloud-documentation&cloud_documentation=soap|Documentation for the Cloud SOAP WebService|cloud/../../edit.png
 ...|Admin Demo|plugins/cloud/soap/cloudadmin-soap-example-client.php|Demo for the Cloud Admin SOAP WebService|cloud/../../loading.gif|_BLANK
 ...|User Demo|/cloud-portal/user/soap/clouduser-soap-example-client.php|Demo for the Cloud User SOAP WebService|cloud/../../loading.gif|_BLANK
 ...|API|http://www.openqrm.com/drupal/userfiles/docs/openqrm-soap-api/classtrees_openQRM-Cloud%20SOAP%20API.html|The API for the Cloud SOAP WebService|cloud/../../help.png|_BLANK
