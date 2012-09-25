@@ -272,6 +272,16 @@ for module in `/sbin/pcimodules`; do
     echo " -- loading $module"
     modprobe -s -k "$module"
 done
+# bnx2x support, bring up the faster nics first as eth0/1
+if lsmod | grep ^bnx2x 1>/dev/null; then
+	rmmod tg3
+	rmmod bnx2x
+	udevd --daemon
+	modprobe bnx2x
+	ifconfig eth0 up
+	ifconfig eth1 up
+	modprobe tg3
+fi
 eval `cat /proc/cmdline`
 sleep 3
 killall udevd
