@@ -147,24 +147,16 @@ function openqrm_server_create_kernel() {
 	done
 
 	# for bnx2 support
-	for MODULE in `find  $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/ -type f | egrep 'mptbase|mptsas|mptscsih|scsi_transport_sas|jfs|crc32|bnx2|hid|mdio|dca|virtio'`; do
+	for MODULE in `find  $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/ -type f | egrep 'mptbase|mptsas|mptscsih|scsi_transport_sas|jfs|crc32|bnx2|bnx2x|hid|mdio|dca|virtio'`; do
 		MODULE_NAME=`echo $MODULE | sed -e "s/.*\///"`
 		if ! echo $OPENQRM_UNWANTED_MODULES | grep $MODULE_NAME 1>/dev/null; then
 			/bin/cp -f $MODULE $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION
 		fi
 	done
-	# include firmware
-	rm -rf   $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/udev
-	mkdir -p $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/udev/
-	cp -R /lib/udev/* $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/udev/
+	# include firmware for bnx2/bnx2x
 	rm -rf   $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware
-	mkdir -p $FIRMWARE $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware/
-	mkdir -p $FIRMWARE $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware/bnx2
-	for FIRMWARE in `find $OPENQRM_SERVER_KERNEL_LOCATION/lib/firmware/$OPENQRM_SERVER_KERNEL_VERSION/ -type f | egrep 'bnx2|bnx2x'`; do
-		FIRMWARE_NAME=`echo $FIRMWARE | sed -e "s/.*\///"`
-		[ -f $FIRMWARE ] && /bin/cp  -f $FIRMWARE $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware/
-		[ -f $FIRMWARE ] && /bin/cp  -f $FIRMWARE $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware/bnx2
-	done
+	mkdir -p $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware/
+	/bin/cp -aRf  $OPENQRM_SERVER_KERNEL_LOCATION/lib/firmware/bnx2* $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware/
 
 	# also we need to take the modules.pcimap for the hardware detection to work
 	cp -a $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/modules.* $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/
