@@ -128,9 +128,9 @@ var $lang = array();
 		if (!strlen($virtualization_link_section)) {
 			$virtualization_link_section = $this->lang['start_vm_plugin'];
 		}
-		// local-server plugin enabled
-		if (file_exists($_SERVER["DOCUMENT_ROOT"]."/openqrm/base/plugins/local-server/local-server-about.php")) {
-			$local_server_plugin_link = "<a href='/openqrm/base/index.php?iframe=/openqrm/base/plugins/local-server/local-server-about.php' style='text-decoration: none'><img title='".$this->lang['integrate_local_server']."' alt='".$this->lang['integrate_local_server']."' src='/openqrm/base/plugins/local-server/img/plugin.png' border=0> ".$this->lang['integrate_local_server']."</a>";
+		// local-server plugin enabled and started
+		if (file_exists($_SERVER["DOCUMENT_ROOT"]."/openqrm/base/plugins/local-server/.running")) {
+			$local_server_plugin_link = "<a href='/openqrm/base/index.php?plugin=local-server&controller=local-server-about&local_server_about_action=usage' style='text-decoration: none'><img title='".$this->lang['integrate_local_server']."' alt='".$this->lang['integrate_local_server']."' src='/openqrm/base/plugins/local-server/img/plugin.png' border=0> ".$this->lang['integrate_local_server']."</a>";
 		} else {
 			$local_server_plugin_link = $this->lang['start_local_server'];
 		}
