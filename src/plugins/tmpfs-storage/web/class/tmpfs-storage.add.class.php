@@ -169,7 +169,7 @@ var $lang = array();
 					$image_fields['image_rootfstype'] = 'tmpfs';
 					$image_fields['image_storageid'] = $this->storage->id;
 					$image_fields['image_comment'] = "Image Object for volume $name";
-					$image_fields['image_rootdevice'] = 'tmpfs';
+					$image_fields['image_rootdevice'] = $size;
 					$image = new image();
 					$image->add($image_fields);
 					$response->msg = sprintf($this->lang['msg_added'], $name);

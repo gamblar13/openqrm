@@ -174,7 +174,7 @@ var $lang = array();
 				$image_fields['image_rootfstype'] = 'tmpfs';
 				$image_fields['image_storageid'] = $storage->id;
 				$image_fields['image_comment'] = "Image Object for volume $name";
-				$image_fields['image_rootdevice'] = 'tmpfs';
+				$image_fields['image_rootdevice'] = $tmpfs_storage_volume->size;
 				$image = new image();
 				$image->add($image_fields);
 
