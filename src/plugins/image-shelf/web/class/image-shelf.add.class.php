@@ -181,7 +181,7 @@ var $lang = array();
 
 		$d['url']['label']                         = $this->lang['form_url'];
 		$d['url']['required']                      = true;
-		$d['url']['validate']['regex']             = '~^[a-z0-9/._-]+$~i';
+		$d['url']['validate']['regex']             = '~^[a-z0-9:/._-]+$~i';
 		$d['url']['validate']['errormsg']          = sprintf($this->lang['error_url'], 'a-z0-9/._-');
 		$d['url']['object']['type']                = 'htmlobject_input';
 		$d['url']['object']['attrib']['id']        = 'url';
