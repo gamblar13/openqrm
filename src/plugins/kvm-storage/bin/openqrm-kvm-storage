@@ -446,9 +446,9 @@ case "$KVM_STORAGE_COMMAND" in
 					VOLUME_FILENAME=`basename $FILE_BACKEND`
 					VOLUME_FILE_SIZE=`ls -l $FILE_BACKEND | awk '{ print $5 }'`
 					if [ -f "$SYNC_PROGRESS_DIR/$KVM_STORAGE_VOLUME_LOCATION-$VOLUME_FILENAME.clone_in_progress" ]; then
-					    echo "kvm-bf-deployment@$VOLUME_FILENAME@x@file@clone_in_progress@x@x@" >> $STORAGE_STATUS_TMP
+					    echo "kvm-bf-deployment@$VOLUME_FILENAME@$FILE_BACKEND@file@clone_in_progress@x@x@" >> $STORAGE_STATUS_TMP
 					else
-					    echo "kvm-bf-deployment@$VOLUME_FILENAME@x@file@$VOLUME_FILE_SIZE@x@x@" >> $STORAGE_STATUS_TMP
+					    echo "kvm-bf-deployment@$VOLUME_FILENAME@$FILE_BACKEND@file@$VOLUME_FILE_SIZE@x@x@" >> $STORAGE_STATUS_TMP
 					fi
 				done
 			fi
