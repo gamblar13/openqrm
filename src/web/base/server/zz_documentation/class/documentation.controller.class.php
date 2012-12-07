@@ -70,7 +70,7 @@ var $lang = array(
 		'howto3_url' => 'http://www.openqrm-enterprise.com/news/details/article/howto-setup-openqrm-cloud-deploying-physical-windows-systems-on-centos-55.html',
 		'api' => 'openQRM Cloud SOAP API Documentation',
 		'api_description' => 'Please find the API of openQRM at:',
-		'api_url' => 'http://www.openqrm.com/drupal/userfiles/docs/openqrm-soap-api/classtrees_openQRM-Cloud%20SOAP%20API.html',
+		'api_url' => 'http://openqrm-support.de/documentation/openQRM-SOAP-API/',
 		'please_wait' => 'Loading. Please wait ..',
 
 	    
