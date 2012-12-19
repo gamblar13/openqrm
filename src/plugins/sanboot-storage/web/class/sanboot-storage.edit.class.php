@@ -140,7 +140,7 @@ var $lang = array();
 	 */
 	//--------------------------------------------
 	function edit() {
-		if(strpos($this->deployment->type, 'iscsi-san-deployment') !== false) {
+		if((strpos($this->deployment->type, 'iscsi-san-deployment') !== false) || (strpos($this->deployment->type, 'aoe-san-deployment') !== false)) {
 			$resource_icon_default="/img/resource.png";
 			$storage_icon="/plugins/sanboot-storage/img/plugin.png";
 			$state_icon = $this->openqrm->get('baseurl')."/img/".$this->resource->state.".png";
