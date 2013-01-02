@@ -333,7 +333,7 @@ case "$SANBOOT_COMMAND" in
 		# give time to settle
 		sync
 		sleep 2
-		lvchange -a n /dev/$SANBOOT_STORAGE_SERVER_VOLUME_GROUP/$SANBOOT_IMAGE_NAME
+		lvchange -a n -y /dev/$SANBOOT_STORAGE_SERVER_VOLUME_GROUP/$SANBOOT_IMAGE_NAME
 		lvremove -f /dev/$SANBOOT_STORAGE_SERVER_VOLUME_GROUP/$SANBOOT_IMAGE_NAME
 		sanboot_storage_lock release
 
@@ -605,9 +605,16 @@ case "$SANBOOT_COMMAND" in
 			openqrm_post_event 0 "$SANBOOT_IMAGE_SNAPSHOT_NAME" 10 "sanboot-storage" "Finished to clone $SANBOOT_IMAGE_SNAPSHOT_NAME"
 			exit 1
 		fi
+		# add aoe early, we need to have the shelf/lun nr in the image identifiers
+		if [ "$SANBOOT_IMAGE_TYPE" == "aoe-san-deployment" ]; then
+			export SANBOOT_IMAGE_NAME_ORG=$SANBOOT_IMAGE_NAME
+			export SANBOOT_IMAGE_NAME=$SANBOOT_IMAGE_SNAPSHOT_NAME
+			manage_vblade add snap
+			export SANBOOT_IMAGE_NAME=$SANBOOT_IMAGE_NAME_ORG
+		fi
 		# copy content
 		sanboot_storage_lock release
-		lvchange -ay /dev/$SANBOOT_STORAGE_SERVER_VOLUME_GROUP/$SANBOOT_IMAGE_NAME
+		lvchange -ay -y /dev/$SANBOOT_STORAGE_SERVER_VOLUME_GROUP/$SANBOOT_IMAGE_NAME
 		# post exports early, we show the progress in the ui
 		if [ "$SANBOOT_OPENQRM_USERNAME" != "" ] && [ "$SANBOOT_OPENQRM_PASSWORD" != "" ]; then
 			$0 post_sync_progress -n $SANBOOT_IMAGE_SNAPSHOT_NAME -v $SANBOOT_STORAGE_SERVER_VOLUME_GROUP -t $SANBOOT_IMAGE_TYPE -u $SANBOOT_OPENQRM_USERNAME -p $SANBOOT_OPENQRM_PASSWORD &
@@ -632,10 +639,6 @@ case "$SANBOOT_COMMAND" in
 		if [ "$SANBOOT_IMAGE_TYPE" == "iscsi-san-deployment" ]; then
 			sanboot_storage_lock aquire
 			manage_iscsi add snap $SANBOOT_IMAGE_AUTH
-			sanboot_storage_lock release
-		elif [ "$SANBOOT_IMAGE_TYPE" == "aoe-san-deployment" ]; then
-			sanboot_storage_lock aquire
-			manage_vblade add snap
 			sanboot_storage_lock release
 		fi
 

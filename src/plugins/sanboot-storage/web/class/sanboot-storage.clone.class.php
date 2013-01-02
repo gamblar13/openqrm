@@ -23,13 +23,13 @@ class sanboot_storage_clone
 * @access public
 * @var string
 */
-var $actions_name = 'sanboot-storage-action';
+var $actions_name = 'sanboot_storage_action';
 /**
 * message param
 * @access public
 * @var string
 */
-var $message_param = "msg-sanboot-storage";
+var $message_param = "msg_sanboot_storage";
 /**
 * openqrm rootdir
 * @access public
@@ -202,10 +202,11 @@ var $lang = array();
 						if(count($ident_lines) >= 1) {
 							foreach($ident_lines as $ident_line) {
 								if($ident_line !== '') {
-									$ident_line = explode(':', $ident_line);
-									$ident_check = $ident_line[1];
+									$ident_line = explode(',', $ident_line);
+									$ident_root_path = explode(':', $ident_line[1]);
+									$ident_check = $ident_root_path[1];
 									if($name === $ident_check) {
-										$volume_path = $ident_line[2];
+										$volume_path = $ident_line[1];
 										$rootfstype = 'local';
 										break;
 									}
