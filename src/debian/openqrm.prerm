@@ -33,7 +33,8 @@ fi
 set -e
 
 case "$1" in
-    remove|upgrade|deconfigure)
+    remove|deconfigure)
+		/etc/init.d/openqrm stop || echo
         rm -f $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm
         rm -f /etc/apache2/conf.d/openqrm-httpd.conf
         rm -f /etc/apache2/conf.d/openqrm-https.conf
@@ -42,12 +43,12 @@ case "$1" in
         rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm/etc/dropbear
     ;;
 
-    failed-upgrade)
+    abort-upgrade|failed-upgrade|abort-install|upgrade)
     ;;
 
     *)
-        echo "prerm called with unknown argument \`$1'" >&2
-        exit 1
+        echo "prerm called with argument \`$1'" >&2
+        exit 0
     ;;
 esac
 

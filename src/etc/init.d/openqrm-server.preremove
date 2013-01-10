@@ -16,12 +16,6 @@
 #
 
 if [ -x "/etc/init.d/openqrm" ]; then
-	if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
-		invoke-rc.d openqrm stop || exit $?
-		invoke-rc.d openqrm uninstall || exit $?
-	else
-		/etc/init.d/openqrm stop || exit $?
-		/etc/init.d/openqrm uninstall || exit $?
-	fi
+	/etc/init.d/openqrm stop || echo
 fi
 

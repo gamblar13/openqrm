@@ -3,8 +3,7 @@ Upstream-Name: openQRM
 Upstream-Source: http://www.openqrm.org
 Upstream Authors: Matthias Rechenburg <matt@openqrm.com>
 
-This package was debianized by Matthias Rechenburg <matt@openqrm.com>,
-Martin Alfke <martin@ppcnux.de> and Thomas Halinka <mail@thohal.de>.
+This package was debianized by Matthias Rechenburg <matt@openqrm.com>
 
 Files: *
 Copyright: Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
@@ -55,11 +54,6 @@ License: GPL2 / MIT
 Copyright (c) 2000, 2001, 2002, 2003, 2004 John Lim
 X-Comment: On Debian GNU/Linux systems, the complete text of the
  GNU General Public License can be found in /usr/share/common-licenses/GPL-2
-X-Comment: The MIT license text is included below
-
-Files: thirdparty/openqrm-build/kvm-nic-bios/source/kvm-nic-bios-1.1.tgz
-License: MIT
-Copyright: Copyright 2009, Matthias Rechenburg <matt@openqrm.com>
 X-Comment: The MIT license text is included below
 
 Files: plugins/cloud/cloud-portal/web/js/datetimepicker.js

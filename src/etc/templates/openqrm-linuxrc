@@ -144,7 +144,7 @@ function import_kernel() {
 		echo "- Activating logical volumes"
 		for LVOL in `/bin/lvm lvdisplay | grep -i "LV Name" | awk {' print $3 '}`; do
 			echo "- Activating $LVOL"
-			/bin/lvm lvchange -ay $LVOL
+			/bin/lvm lvchange -ay -y $LVOL
 		done
 	fi
 }
@@ -265,6 +265,17 @@ rm -f  /mplog
 if grep -q sysfs /proc/filesystems ; then
     mount -t sysfs none /sys
 fi
+# firmware rules existing ?
+if [ ! -f /etc/udev/rules.d/50-firmware.rules ]; then
+	# debian/ubuntu
+	if [ -x /lib/udev/firmware ]; then
+		echo 'SUBSYSTEM=="firmware", ACTION=="add", RUN+="firmware"' > /etc/udev/rules.d/50-firmware.rules
+	fi
+	# centos/rh
+	if [ -x /lib/udev/firmware.sh ]; then
+		echo 'SUBSYSTEM=="firmware", ACTION=="add", RUN+="firmware.sh"' > /etc/udev/rules.d/50-firmware.rules
+	fi
+fi
 udevd --daemon
 sleep 4
 echo "- (1) Starting hardware detection (network)"
@@ -335,7 +346,7 @@ NETWORKCARD_LOOP=0
 
 while (true); do
 	# try https first
-	if wget --no-check-certificate --random-file=/dev/random -q -O $OPENQRM_RESOURCE_PARAMETER_FILE "https://$OPENQRM_SERVER_IP_ADDRESS/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_id=$id&resource_mac=$OPENQRM_RESOURCE_MAC_ADDRESS&resource_ip=$OPENQRM_RESOURCE_IP_ADDRESS"; then
+	if wget --no-check-certificate --random-file=/dev/random -q -O $OPENQRM_RESOURCE_PARAMETER_FILE "https://$OPENQRM_SERVER_IP_ADDRESS/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_id=$id&resource_mac=$OPENQRM_RESOURCE_MAC_ADDRESS&resource_ip=$OPENQRM_RESOURCE_IP_ADDRESS&resource_subnet=$OPENQRM_RESOURCE_SUBNETMASK"; then
 		if ! grep "<html>" $OPENQRM_RESOURCE_PARAMETER_FILE >/out; then
 			echo "-> got parameters via https"
 			break
@@ -343,7 +354,7 @@ while (true); do
 		rm -f /out
 	fi
 	# try http
-	if wget -q -O $OPENQRM_RESOURCE_PARAMETER_FILE "http://$OPENQRM_SERVER_IP_ADDRESS/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_id=$id&resource_mac=$OPENQRM_RESOURCE_MAC_ADDRESS&resource_ip=$OPENQRM_RESOURCE_IP_ADDRESS"; then
+	if wget -q -O $OPENQRM_RESOURCE_PARAMETER_FILE "http://$OPENQRM_SERVER_IP_ADDRESS/openqrm/action/resource-monitor.php?resource_command=get_parameter&resource_id=$id&resource_mac=$OPENQRM_RESOURCE_MAC_ADDRESS&resource_ip=$OPENQRM_RESOURCE_IP_ADDRESS&resource_subnet=$OPENQRM_RESOURCE_SUBNETMASK"; then
 		if ! grep "<html>" $OPENQRM_RESOURCE_PARAMETER_FILE >/out; then
 			echo "-> got parameter via http"
 			break

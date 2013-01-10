@@ -156,7 +156,9 @@ function openqrm_server_create_kernel() {
 	# include firmware for bnx2/bnx2x
 	rm -rf   $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware
 	mkdir -p $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware/
-	/bin/cp -aRf  $OPENQRM_SERVER_KERNEL_LOCATION/lib/firmware/bnx2* $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware/
+	if ls $OPENQRM_SERVER_KERNEL_LOCATION/lib/firmware/bnx2* 2>/dev/null 1>&2; then
+		/bin/cp -aRf  $OPENQRM_SERVER_KERNEL_LOCATION/lib/firmware/bnx2* $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/firmware/
+	fi
 
 	# also we need to take the modules.pcimap for the hardware detection to work
 	cp -a $OPENQRM_SERVER_KERNEL_LOCATION/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/modules.* $OPENQRM_TEMP_DIR/bootimage/$OPENQRM_SERVER_KERNEL_NAME/lib/modules/$OPENQRM_SERVER_KERNEL_VERSION/
@@ -456,6 +458,7 @@ function openqrm_remove_resource() {
 	local RESOURCE_PXELINUXCFG_FILE=`echo 01-$RESOURCE_MAC | sed -e "s/:/-/g" | tr '[:upper:]' '[:lower:]'`
 	echo "openQRM-server: Removing resource $RESOURCE_ID $RESOURCE_MAC/$RESOURCE_IP_ADDRESS" | logger
 	rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE
+	rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/pxelinux.cfg/$RESOURCE_PXELINUXCFG_FILE.idle
 }
 
 

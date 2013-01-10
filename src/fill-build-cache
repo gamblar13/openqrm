@@ -14,11 +14,6 @@
 # Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
-if [ -f plugins/sshterm/etc/build.conf/sshterm-component.conf ]; then
-	PLUGIN_CONFS="plugins/kvm/etc/build.conf/kvm-nic-bios.conf plugins/sshterm/etc/build.conf/sshterm-component.conf"
-else
-	PLUGIN_CONFS="plugins/kvm/etc/build.conf/kvm-nic-bios.conf"
-fi
 
 export OPENQRM_SERVER_BASE_DIR=`dirname $0`
 export OPENQRM_SOURCE_DIR=$OPENQRM_SERVER_BASE_DIR

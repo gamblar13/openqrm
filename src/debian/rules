@@ -1,5 +1,4 @@
 #!/usr/bin/make -f
-include /usr/share/cdbs/1/rules/simple-patchsys.mk
 export DH_VERBOSE=1
 
 configure:: configure-stamp

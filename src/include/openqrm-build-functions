@@ -282,6 +282,38 @@ function openqrm_create_default_initrd_template() {
 	CURRENT_DIR=`pwd`
 	OPENQRM_SOURCE_DIR_FULL_PATH=`cd $OPENQRM_SOURCE_DIR && pwd && cd $CURRENT_DIR`
 	echo "Creating the default initrd-template"
+	# install build deps
+	export FORCE_INSTALL=true
+	if [ -f /etc/debian_version ]; then
+		openqrm_install_os_dependency gcc
+		openqrm_install_os_dependency rpcbind
+		openqrm_install_os_dependency rsync
+		openqrm_install_os_dependency zlib1g-dev
+		openqrm_install_os_dependency netbase
+		openqrm_install_os_dependency patch
+		openqrm_install_os_dependency lvm2
+		openqrm_install_os_dependency ethtool
+		openqrm_install_os_dependency dropbear
+	elif [ -f /etc/redhat-release ]; then
+		openqrm_install_os_dependency gcc
+		openqrm_install_os_dependency glibc-static
+		openqrm_install_os_dependency rpcbind
+		openqrm_install_os_dependency rsync
+		openqrm_install_os_dependency zlib-devel
+		openqrm_install_os_dependency zlib-static
+		openqrm_install_os_dependency lvm2
+		openqrm_install_os_dependency ethtool
+		openqrm_install_os_dependency dropbear
+	elif [ -f /etc/SuSE-release ]; then
+		openqrm_install_os_dependency gcc
+		openqrm_install_os_dependency rpcbind
+		openqrm_install_os_dependency rsync
+		openqrm_install_os_dependency zlib-devel
+		openqrm_install_os_dependency lvm2
+		openqrm_install_os_dependency ethtool
+		openqrm_install_os_dependency dropbear
+	fi
+
 	# getting + compiling busybox
 	. $OPENQRM_SOURCE_DIR/etc/build.conf/busybox.conf
 	openqrm_cache_or_download busybox
@@ -840,6 +872,10 @@ function openqrm_base_update() {
 	$OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update base -f
 }
 
+# function to update the openQRM initrds
+function openqrm_initrd_update() {
+	$OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update initrds -f
+}
 
 
 

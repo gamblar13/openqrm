@@ -84,7 +84,7 @@ clean:
 realclean:	clean
 	@for SRC_DIR in `find -mindepth 1 -maxdepth 1 -type d -not -name ".svn" -not -name "debian" -not -name "rpm" -not -name "thirdparty"`; do cd $$SRC_DIR && make realclean -s && cd ..; done
 
-rpm:
+rpm: all
 	@whoami | grep root 1>/dev/null 2>&1 || (echo "Please run 'make rpm' as root" && exit 1)
 	@chmod +x make-assistant
 	@. $(OPENQRM_SERVER_CONF) && ./make-assistant openqrm_rpm_package
@@ -96,7 +96,7 @@ reinstall:
 	make install -s
 	make start -s
 
-debsource:
+debsource: all
 	@chmod +x make-assistant
 	@. $(OPENQRM_SERVER_CONF) && ./make-assistant openqrm_create_deb_source
 
@@ -126,6 +126,8 @@ update: all
 	@. $(OPENQRM_SERVER_CONF) && ./make-assistant make install
 	@. $(OPENQRM_SERVER_CONF) && ./make-assistant openqrm_base_update
 	@. $(OPENQRM_SERVER_CONF) && ./make-assistant openqrm_post_update
+	@. $(OPENQRM_SERVER_CONF) && ./make-assistant openqrm_initrd_update
+
 
 .PHONY: all configure compile install start uninstall clean realclean reinstall rpm deb debsource check initrd buildrequirements updatesrc update
 

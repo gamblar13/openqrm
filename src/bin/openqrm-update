@@ -43,6 +43,7 @@ function update_usage() {
 	echo "`basename $0` pre <-f>"
 	echo "`basename $0` base <-f>"
 	echo "`basename $0` post <-f>"
+	echo "`basename $0` initrds <-f>"
 	echo
 }
 
@@ -253,7 +254,13 @@ function post_update() {
 function base_update() {
 	echo "- Running base update phase"
 	# re-source main config
-	. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	if [ ! -f "$OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/etc/openqrm-server.conf" ]; then
+		echo "ERROR: Applying base-update before pre-update phase ! Trying to continue ..."
+		sleep 5
+		. $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf
+	else
+		. $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/etc/openqrm-server.conf
+	fi
 	# source db-functions according db-type
 	echo "- Database shema sanity check (databasetype $OPENQRM_DATABASE_TYPE)"
 	$OPENQRM_SERVER_BASE_DIR/openqrm/etc/db/$OPENQRM_DATABASE_TYPE/openqrm-$OPENQRM_DATABASE_TYPE-functions update
@@ -262,51 +269,102 @@ function base_update() {
 		echo "=> Please press <ENTER> to go on"
 		read
 	fi
+
+	# unpack all new boot-services
+	for OPENQRM_BOOTSERVICE in `find $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/ -name boot-service-*.tgz`; do
+		OPENQRM_BOOTSERVICE_FILENAME=`basename $OPENQRM_BOOTSERVICE`
+		OPENQRM_BOOTSERVICE_DIRNAME=`dirname $OPENQRM_BOOTSERVICE`
+		rm -rf $OPENQRM_BOOTSERVICE_DIRNAME/boot-service.tmp
+		mkdir $OPENQRM_BOOTSERVICE_DIRNAME/boot-service.tmp
+		if ! tar -C $OPENQRM_BOOTSERVICE_DIRNAME/boot-service.tmp -xzf $OPENQRM_BOOTSERVICE; then
+			echo "ERROR: Could not unpack boot-service $OPENQRM_BOOTSERVICE !"
+			sleep 5
+			rm -rf $OPENQRM_BOOTSERVICE_DIRNAME/boot-service.tmp
+		fi
+	done
+
+	# unpack all old boot-services
+	for OPENQRM_OLD_BOOTSERVICE in `find $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/plugins/ -name boot-service-*.tgz`; do
+		OPENQRM_OLD_BOOTSERVICE_FILENAME=`basename $OPENQRM_OLD_BOOTSERVICE`
+		OPENQRM_OLD_BOOTSERVICE_DIRNAME=`dirname $OPENQRM_OLD_BOOTSERVICE`
+		rm -rf $OPENQRM_OLD_BOOTSERVICE_DIRNAME/boot-service.tmp
+		mkdir $OPENQRM_OLD_BOOTSERVICE_DIRNAME/boot-service.tmp
+		if ! tar -C $OPENQRM_OLD_BOOTSERVICE_DIRNAME/boot-service.tmp -xzf $OPENQRM_OLD_BOOTSERVICE; then
+			echo "ERROR: Could not unpack boot-service $OPENQRM_OLD_BOOTSERVICE !"
+			sleep 5
+			rm -rf $OPENQRM_OLD_BOOTSERVICE_DIRNAME/boot-service.tmp
+		fi
+	done
+
 	# config file sanity check
 	for OPENQRM_CONF_FILE in `find $OPENQRM_SERVER_BASE_DIR/openqrm/ -name *.conf | cut -d'/' -f5-`; do
-		echo "  - Checking config file $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE"
-		if ! diff $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE 1>/dev/null 2>/dev/null; then
-			while (true); do
-				echo "  - Changes detected for config file $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE"
-				if [ "$FORCE_UPDATE" == "false" ]; then
-					echo "  - v - View changes"
-					echo "  - a - Try to apply old configuration"
-					echo "  - k - Apply new config file"
-					echo
+		if [ -f "$OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE" ]; then
+			echo "  - Checking config file $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE"
+			if ! diff $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE 1>/dev/null 2>/dev/null; then
+				while (true); do
+					echo "  - Changes detected for config file $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE"
+					if [ "$FORCE_UPDATE" == "false" ]; then
+						echo "  - v - View changes"
+						echo "  - a - Try to apply old configuration"
+						echo "  - k - Apply new config file"
+						echo
 
-					read -n1 APPLY_OLD_CONFIG
-					case "$APPLY_OLD_CONFIG" in
-						v)
-							echo "  - Displaying changes"
-							echo
-							if [ ! -f "$OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE" ]; then
-								echo "NOTICE: $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE does not exist"
-							elif [ !-f "$OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE" ]; then
-								echo "NOTICE: $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE does not exist"
-							else
-								diff $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE
-							fi
-							;;
-						a)
-							echo "  - Trying to apply old configuration"
-							openqrm_apply_old_config  $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE
-							echo
-							break
-							;;
-						k)
-							echo "   - Keeping new configuration"
-							break
-							;;
-					esac
-				else
-					echo
-					echo "  - Force enabled. Trying to apply old configuration"
-					openqrm_apply_old_config  $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE
-					echo
-					break
-				fi
-			done
+						read -n1 APPLY_OLD_CONFIG
+						case "$APPLY_OLD_CONFIG" in
+							v)
+								echo "  - Displaying changes"
+								echo
+								if [ ! -f "$OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE" ]; then
+									echo "NOTICE: $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE does not exist"
+								elif [ !-f "$OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE" ]; then
+									echo "NOTICE: $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE does not exist"
+								else
+									diff $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE
+								fi
+								;;
+							a)
+								echo "  - Trying to apply old configuration"
+								openqrm_apply_old_config  $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE
+								echo
+								break
+								;;
+							k)
+								echo "   - Keeping new configuration"
+								break
+								;;
+						esac
+					else
+						echo
+						echo "  - Force enabled. Trying to apply old configuration"
+						openqrm_apply_old_config  $OPENQRM_SERVER_BASE_DIR/openqrm/$OPENQRM_CONF_FILE $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/$OPENQRM_CONF_FILE
+						echo
+						break
+					fi
+				done
+			fi
 		fi
+	done
+
+	# pack all new boot-services
+	for OPENQRM_BOOTSERVICE in `find $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/ -name boot-service-*.tgz`; do
+		OPENQRM_BOOTSERVICE_FILENAME=`basename $OPENQRM_BOOTSERVICE`
+		OPENQRM_BOOTSERVICE_DIRNAME=`dirname $OPENQRM_BOOTSERVICE`
+		TIMESTAMP=`date +%s`
+		mv -f $OPENQRM_BOOTSERVICE $OPENQRM_BOOTSERVICE.$TIMESTAMP
+		cd $OPENQRM_BOOTSERVICE_DIRNAME/boot-service.tmp/
+		if ! tar -czf $OPENQRM_BOOTSERVICE *; then
+			echo "ERROR: Could not re-pack boot-service $OPENQRM_BOOTSERVICE !"
+			sleep 5
+		fi
+		cd -
+		rm -rf $OPENQRM_BOOTSERVICE_DIRNAME/boot-service.tmp
+	done
+
+	# clean up old boot-services
+	for OPENQRM_OLD_BOOTSERVICE in `find $OPENQRM_SERVER_BASE_DIR/openqrm_pre_update/plugins/ -name boot-service-*.tgz`; do
+		OPENQRM_OLD_BOOTSERVICE_FILENAME=`basename $OPENQRM_OLD_BOOTSERVICE`
+		OPENQRM_OLD_BOOTSERVICE_DIRNAME=`dirname $OPENQRM_OLD_BOOTSERVICE`
+		rm -rf $OPENQRM_OLD_BOOTSERVICE_DIRNAME/boot-service.tmp
 	done
 
 	# custom updates from openQRM 4.6 to 4.7
@@ -326,6 +384,73 @@ function base_update() {
 	rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/web/boot-service/boot-service-linuxcoe.tgz
 
 }
+
+
+
+
+function initrd_update() {
+	echo "- Updating initrds"
+	CURRENT_UPDATE_DIR=`pwd`
+
+
+	for INITRD_FILE in `ls $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/initrd-*.img`; do
+		UPDATE_OPENQRM_INITRD=false
+
+		if [ "$FORCE_UPDATE" == "false" ]; then
+			echo "    - y - Update $INITRD_FILE"
+			echo "    - n - Skip update of $INITRD_FILE"
+			echo
+			read -n1 APPLY_INITRD_UPDATE
+
+			case "$APPLY_INITRD_UPDATE" in
+				y)
+					echo "   - Updateing $INITRD_FILE"
+					UPDATE_OPENQRM_INITRD=true
+					;;
+				*)
+					echo "   - Keeping old initrd $INITRD_FILE"
+					UPDATE_OPENQRM_INITRD=false
+					;;
+			esac
+		else
+			echo "   - Force enabled. Updateing $INITRD_FILE"
+			UPDATE_OPENQRM_INITRD=true
+		fi
+
+		if [ "$UPDATE_OPENQRM_INITRD" == "true" ]; then
+			INITRD_FILENAME=`basename $INITRD_FILE`
+			rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/openqrm-initrd-update
+			mkdir -p $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/openqrm-initrd-update
+			rm -f $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/openqrm-initrd-update/$INITRD_FILENAME
+			cp -f $INITRD_FILE $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/openqrm-initrd-update/$INITRD_FILENAME.gz
+			cd $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/openqrm-initrd-update/
+			# unpack
+			if ! gunzip < $INITRD_FILENAME.gz | cpio --extract --preserve; then
+				rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/openqrm-initrd-update
+				echo "ERROR: Could not gunzip $INITRD_FILE. Continuing ..."
+				continue
+			fi
+			rm -f $INITRD_FILENAME.gz
+			# update linuxrc
+			cp -af $OPENQRM_SERVER_BASE_DIR/openqrm//etc/templates/openqrm-linuxrc init
+			chmod +x init
+			# pack again
+			if ! find . | cpio -o -H newc | gzip -9 > $INITRD_FILE.new; then
+				rm -f $INITRD_FILE.new
+				rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/openqrm-initrd-update
+				echo "ERROR: Could not re-pack $INITRD_FILE. Continuing ..."
+				continue
+			fi
+			cp -f $INITRD_FILE.new $INITRD_FILE
+			rm -f $INITRD_FILE.new
+			# cleanup
+			cd $CURRENT_UPDATE_DIR
+			rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm/tftpboot/boot/openqrm-initrd-update
+		fi
+	done
+
+}
+
 
 
 
@@ -350,6 +475,9 @@ case "$1" in
 		;;
 	base)
 		base_update
+		;;
+	initrds)
+		initrd_update
 		;;
 	*)
 		update_usage

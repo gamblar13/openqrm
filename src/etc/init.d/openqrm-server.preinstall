@@ -1,5 +1,5 @@
 #!/bin/bash
-# this is the postinstall script for the packaging stage
+# this is the preinstall script for the packaging stage
 #
 # openQRM Enterprise developed by openQRM Enterprise GmbH.
 #
@@ -15,20 +15,11 @@
 # Copyright 2012, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
 #
 
-# is this an update ?
-if [ -f "/usr/share/openqrm_pre_update/etc/openqrm-server.conf" ]; then
-	if [ -x "/etc/init.d/openqrm" ]; then
-		/etc/init.d/openqrm stop || echo
-	fi
+if [ -f "/usr/share/openqrm/etc/openqrm-server.conf" ]; then
+	# this is an update
 	if [ -x "/usr/share/openqrm/bin/openqrm-update" ]; then
-		/usr/share/openqrm/bin/openqrm-update base -f
-		/usr/share/openqrm/bin/openqrm-update post -f
-		/usr/share/openqrm/bin/openqrm-update initrds -f
+		/usr/share/openqrm/bin/openqrm-update pre -f
 	fi
 fi
-# add openqrm init
-chmod +x /usr/share/openqrm/etc/init.d/openqrm
-ln -sf /usr/share/openqrm/etc/init.d/openqrm /etc/init.d/openqrm
-/etc/init.d/openqrm start
 
 

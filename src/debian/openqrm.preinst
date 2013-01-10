@@ -1,5 +1,5 @@
 #!/bin/sh
-# postrm script for openqrm
+# openQRM prerm script
 #
 # This file is part of openQRM.
 #
@@ -16,7 +16,6 @@
 # along with openQRM.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright 2011, openQRM Enterprise GmbH <info@openqrm-enterprise.com>
-#
 
 NAME="openqrm"
 DESC="openQRM Cloud Computing Platform"
@@ -33,23 +32,17 @@ fi
 set -e
 
 case "$1" in
-    remove)
-		rm -f /etc/init.d/openqrm
-		rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm
+    install|upgrade)
+		if [ -f "$OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf" ]; then
+			# this is an update
+			if [ -x "$OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update" ]; then
+				$OPENQRM_SERVER_BASE_DIR/openqrm/bin/openqrm-update pre -f
+			fi
+		fi
 		;;
-
-    purge)
-		rm -f /etc/init.d/openqrm
-		rm -f /etc/default/openqrm
-		rm -rf $OPENQRM_SERVER_BASE_DIR/openqrm
-		;;
-
-
-	abort-upgrade|failed-upgrade|abort-install|upgrade)
-	;;
 
     *)
-        echo "postrm called with argument \`$1'" >&2
+        echo "preinst called with argument \`$1'" >&2
         exit 0
     ;;
 esac
