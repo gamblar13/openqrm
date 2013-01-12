@@ -226,7 +226,8 @@ function openqrm_rpm_package() {
 	CDIR=`pwd`
 	# make sure to have some additional deps installed
 	if [ -f /etc/SuSE-release ]; then
-		export FORCE_INSTALL=false
+		export FORCE_INSTALL=true
+		openqrm_install_os_dependency rpm-build
 	else
 		export FORCE_INSTALL=true
 		openqrm_install_os_dependency redhat-rpm-config
@@ -284,25 +285,21 @@ function openqrm_rpm_package() {
 	OPENQRM_PACKAGE_PREINSTALL_SCRIPT="/usr/share/openqrm/etc/init.d/openqrm-server.preinstall"
 	OPENQRM_PACKAGE_POSTINSTALL="sh /usr/share/openqrm/etc/init.d/openqrm-server.postinstall"
 	OPENQRM_PACKAGE_PREREMOVE="sh /usr/share/openqrm/etc/init.d/openqrm-server.preremove"
-	# static deps / removed nagios + puppet from the rpm deps to make install easier
-	#OPENQRM_PACKAGE_DEPENDENCIES="httpd, php, php-mysql, mysql, syslinux, screen, procmail, rsync, expect, dhcp, bind, iscsi-initiator-utils, nagios, nagios-plugins, nagios-plugins-nrpe, nagios-devel, perl-XML-Simple, perl-XML-Parser, nmap, puppet-server, subversion, tftp-server, openssl"
-	if [ -f /etc/SuSE-release ]; then
-		OPENQRM_PACKAGE_DEPENDENCIES="openssl, httpd, php, php-mysql, mysql, syslinux, screen, procmail, rsync, expect, dhcp, bind, open-iscsi, perl-XML-Simple, perl-XML-Parser, nmap, subversion, tftp"
-	else
-		OPENQRM_PACKAGE_DEPENDENCIES="openssl, httpd, mod_ssl, php, php-mysql, mysql, syslinux, screen, procmail, rsync, expect, dhcp, bind, iscsi-initiator-utils, perl-XML-Simple, perl-XML-Parser, nmap, subversion, tftp-server, stunnel, expect"
-	fi
-
-	# for now we remove the puppet + nagios + collectd plugins plus its deps because centos does not include them in their standard distri
-	#if [ -f /etc/SuSE-release ]; then
-	#	print_notice "Removing plugins/collectd from RPM build."
-	#	print_notice "Please build manually after installing collectd on the server."
-	#	OPENQRM_BUILD_POSTINSTALL="$OPENQRM_BUILD_POSTINSTALL rm -rf \$RPM_BUILD_ROOT/usr/share/openqrm/plugins/collectd;"
-	#fi
-	#
-	#	print_notice "Removing plugins/zabbix, plugins/puppet, and plugins/collectd from RPM build."
-	#	print_notice "Please build manually after installing zabbix, puppet and collectd on the server."
-	#	OPENQRM_BUILD_POSTINSTALL="$OPENQRM_BUILD_POSTINSTALL rm -rf \$RPM_BUILD_ROOT/usr/share/openqrm/plugins/collectd;$OPENQRM_BUILD_POSTINSTALL rm -rf \$RPM_BUILD_ROOT/usr/share/openqrm/plugins/puppet;$OPENQRM_BUILD_POSTINSTALL rm -rf \$RPM_BUILD_ROOT/usr/share/openqrm/plugins/zabbix;"
-
+	# get a list of plugins for checking their dependencies
+	. etc/openqrm-server.conf
+	OPENQRM_PACKAGE_DEPENDENCIES="$OPENQRM_SERVER_DEPENDENCIES"
+	OPENQRM_PACKAGE_COMPONENT_LIST=`ls plugins`
+	for OPENQRM_PLUGIN in $OPENQRM_PACKAGE_COMPONENT_LIST; do
+		PLUGIN_CONF="plugins/$OPENQRM_PLUGIN/etc/openqrm-plugin-$OPENQRM_PLUGIN"".conf"
+		if [ -f $PLUGIN_CONF ]; then
+			. $PLUGIN_CONF
+		fi
+		for DEP in `echo $OPENQRM_PLUGIN_DEPENDENCIES | sed -e "s/,//g" | sed -e "s/openqrm-server//g"`; do
+			if ! echo $OPENQRM_PACKAGE_DEPENDENCIES | grep -w $DEP 1>/dev/null; then
+				OPENQRM_PACKAGE_DEPENDENCIES="$OPENQRM_PACKAGE_DEPENDENCIES, $DEP"
+			fi
+		done
+	done
 	# clean up
 	rm -rf /usr/src/$OPENQRM_PACKAGE_SUB_DIR/BUILD/buildtmp /usr/src/$OPENQRM_PACKAGE_SUB_DIR/BUILD/$OPENQRM_PACKAGE_NAME-$OPENQRM_SERVER_VERSION
 	# create the source package

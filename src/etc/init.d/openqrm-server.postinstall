@@ -25,6 +25,8 @@ if [ -f "/usr/share/openqrm_pre_update/etc/openqrm-server.conf" ]; then
 		/usr/share/openqrm/bin/openqrm-update post -f
 		/usr/share/openqrm/bin/openqrm-update initrds -f
 	fi
+	# save state
+	touch /usr/share/openqrm/package-update.state
 fi
 # add openqrm init
 chmod +x /usr/share/openqrm/etc/init.d/openqrm

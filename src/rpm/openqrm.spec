@@ -52,6 +52,10 @@ OPENQRM_PACKAGE_POSTINSTALL
 %preun
 OPENQRM_PACKAGE_PREREMOVE
 
+%postun
+if [ ! -f "/usr/share/openqrm/package-update.state" ]; then rm -rf /usr/share/openqrm; rm -f /etc/init.d/openqrm; fi
+if [ -f "/usr/share/openqrm/package-update.state" ]; then rm -f /usr/share/openqrm/package-update.state; /etc/init.d/openqrm start; fi
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 make clean
