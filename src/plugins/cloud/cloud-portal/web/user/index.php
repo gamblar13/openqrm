@@ -1,6 +1,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
+    <META http-equiv="content-type" content="text/html; charset=UTF-8" />
 <link type="text/css" href="css/htmlobject.css" rel="stylesheet" />
 <link type="text/css" href="js/development-bundle/themes/smoothness/ui.all.css" rel="stylesheet" />
 <link type="text/css" href="css/jquery.css" rel="stylesheet" />
@@ -85,6 +86,7 @@ $lang_de = $lang_arr['cloud_ui_language_german'];
 $lang_it = $lang_arr['cloud_ui_language_italian'];
 $lang_nl = $lang_arr['cloud_ui_language_netherlands'];
 $lang_es = $lang_arr['cloud_ui_language_spain'];
+$lang_cs = $lang_arr['cloud_ui_language_czech'];
 // $lang_ch = $lang_arr['cloud_ui_language_swiss'];
 $lang_de_selected = '';
 $lang_en_selected = '';
@@ -110,6 +112,9 @@ switch ($user->lang) {
 	case 'nl';
 		$lang_nl_selected = "selected='selected'";
 		break;
+        case 'cs';
+		$lang_cs_selected = "selected='selected'";
+		break;
 
 }
 echo "<nobr><label>".$lang_arr['cloud_ui_language']." </label><select id='cloud_lang' name='cloud_lang' onchange='this.form.submit();'>";
@@ -119,6 +124,7 @@ echo "<option value='de' class='imagebacked' style='background-image: url(img/de
 echo "<option value='it' class='imagebacked' style='background-image: url(img/it.gif)'; ".$lang_it_selected.">&nbsp;&nbsp;&nbsp;".$lang_it."</option>";
 echo "<option value='nl' class='imagebacked' style='background-image: url(img/nl.gif)'; ".$lang_nl_selected.">&nbsp;&nbsp;&nbsp;".$lang_nl."</option>";
 echo "<option value='es' class='imagebacked' style='background-image: url(img/es.gif)'; ".$lang_es_selected.">&nbsp;&nbsp;&nbsp;".$lang_es."</option>";
+echo "<option value='cs' class='imagebacked' style='background-image: url(img/cs.gif)'; ".$lang_cs_selected.">&nbsp;&nbsp;&nbsp;".$lang_cs."</option>";
 //echo "<option value='ch' class='imagebacked' style='background-image: url(img/ch.gif)'; ".$lang_ch_selected.">&nbsp;&nbsp;&nbsp;".$lang_ch."</option>";
 
 

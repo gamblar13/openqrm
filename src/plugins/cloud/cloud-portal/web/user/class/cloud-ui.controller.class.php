@@ -245,6 +245,7 @@ var $lang = array(
 	'cloud_ui_language_french' => 'French',
 	'cloud_ui_language_italian' => 'Italian',
 	'cloud_ui_language_netherlands' => 'Netherlands',
+        'cloud_ui_language_czech' => 'Czech',
 
 );
 
