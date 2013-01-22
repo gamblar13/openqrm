@@ -1,4 +1,4 @@
-Source: openqrm
+Source: OPENQRM_PACKAGE_NAME
 Section: admin
 Priority: extra
 Maintainer: openQRM Enterprise GmbH <info@openqrm-enterprise.com>
@@ -6,9 +6,10 @@ Build-Depends: debhelper, bzip2, sudo, rpcbind, rsync, zlib1g-dev, wget, tar, bz
 Standards-Version: 3.8.2
 Homepage: http://www.openqrm.org
 
-Package: openqrm
+Package: OPENQRM_PACKAGE_NAME
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, apache2, php5, php5-mysql, php5-ldap, libphp-adodb, mysql-server, mysql-client, lvm2, syslinux, rpcbind, python, python-openssl, tftpd-hpa, dhcp3-server, screen, nagios-images, nagios-plugins, nmap, default-mta | mail-transport-agent, libxml-simple-perl, open-iscsi, aoetools, openssl, rsync, expect, puppetmaster, subversion, bind9, collectd, stunnel, expect, sudo, dropbear, make, autoconf, automake, genisoimage, sudo, nfs-kernel-server, nfs-common, puppetmaster, subversion, wakeonlan, zabbix-server-mysql, zabbix-frontend-php, zabbix-agent, socat, vlan, e2fsprogs, ntfsprogs, kpartx, ipmitool, apf-client
+Depends: ${shlibs:Depends}, ${misc:Depends}, OPENQRM_PACKAGE_DEPENDENCIES
+Conflicts: OPENQRM_PACKAGE_CONFLICTS
 Description: Cloud Computing Platform
  openQRM is a fully automated, rapid deployment system including
  VM-Management, Monitoring, High-Availability and Storage-Management.

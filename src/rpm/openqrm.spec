@@ -16,7 +16,7 @@ Name: OPENQRM_PACKAGE_NAME
 Summary: OPENQRM_PACKAGE_NAME
 Version: OPENQRM_PACKAGE_VERSION
 Release: OPENQRM_PACKAGE_DISTRIBUTION
-License: GPL
+License: OPENQRM_PACKAGE_LICENSE
 Group: Networking/Admin
 AutoReqProv: no
 Source: OPENQRM_PACKAGE_NAME-OPENQRM_PACKAGE_VERSION.tgz
@@ -24,6 +24,7 @@ Prefix: /
 BuildRoot: /tmp/openqrm-packaging/OPENQRM_PACKAGE_NAME
 Requires : OPENQRM_PACKAGE_DEPENDENCIES
 BuildRequires: OPENQRM_SERVER_BUILD_REQUIREMENTS
+Conflicts: OPENQRM_PACKAGE_CONFLICTS
 %description
 openQRM is the next generation data-center management platform.
 
