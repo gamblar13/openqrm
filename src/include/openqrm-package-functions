@@ -504,12 +504,18 @@ function openqrm_pbuilder() {
 		openqrm_create_deb_source
 	fi
 	cd ..
+	# set proxy env for pbuilder if needed
+	PBUILDER_PROXY=""
+	if grep http_proxy /root/.bashrc 1>/dev/null 2>/dev/null; then
+		PBUILDER_PROXY=`grep http_proxy /root/.bashrc | head -n1 | sed -e "s/.*=//g" | sed -e 's/"//g'`
+		export PBUILDER_PROXY_PARAMETER=" --http-proxy $PBUILDER_PROXY"
+	fi
 	# check if to init pbuilder
 	if [ ! -f /var/cache/pbuilder/base.tgz ]; then
-		pbuilder create --distribution $DISTRIBUTION_VERSION
+		pbuilder create --distribution $DISTRIBUTION_VERSION $PBUILDER_PROXY_PARAMETER
 	fi
 	# run pbuilder
-	pbuilder build $PACKAGE_DESCRIPTION
+	pbuilder build $PACKAGE_DESCRIPTION $PBUILDER_PROXY_PARAMETER
 	echo
 	echo "Packaging finished. Please find the created packages in /var/cache/pbuilder/result"
 	ls -lh /var/cache/pbuilder/result/openqrm*
