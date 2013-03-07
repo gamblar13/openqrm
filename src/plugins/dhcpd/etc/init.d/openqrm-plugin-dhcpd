@@ -118,15 +118,14 @@ function openqrm_plugin_dhcpd_init() {
 	fi
 	if [ "$APPARMOR_DHCPD" != "" ]; then
 		if ! grep openQRM $APPARMOR_DHCPD 1>/dev/null; then
-			cat $APPARMOR_DHCPD |
-			sed -i -e "s#}##g" $APPARMOR_DHCPD
+			sed -i -e "s#^}##g" $APPARMOR_DHCPD
 			echo "  # openQRM" >> $APPARMOR_DHCPD
 			echo "  $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/** rw," >> $APPARMOR_DHCPD
 			if [ -d /etc/openqrm/plugins/dhcpd/ ]; then
 				echo "  /etc/openqrm/plugins/dhcpd/** rw," >> $APPARMOR_DHCPD
 			fi
 			echo "  /var/run/dhcpd.pid rw," >> $APPARMOR_DHCPD
-			echo "  /usr/share/openqrm/plugins/dhcpd/var/state/dhcp/** lrw," >> $APPARMOR_DHCPD
+			echo "  $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dhcpd/var/state/dhcp/** lrw," >> $APPARMOR_DHCPD
 			echo "}" >> $APPARMOR_DHCPD
 			echo >> $APPARMOR_DHCPD
 			if [ -x "/etc/init.d/apparmor" ]; then

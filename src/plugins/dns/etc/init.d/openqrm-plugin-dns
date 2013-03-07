@@ -104,6 +104,12 @@ function openqrm_plugin_dns_init() {
 	ln -sf $DNS_REVDB /etc/bind/zones/$DNS_REVDB_FSNAME
 
 	# check if we have forwarders already
+	NAMED_OPTIONS_EXIST=true
+	if [ -f /etc/redhat-release ]; then
+		touch /etc/bind/named.conf.options
+		NAMED_OPTIONS_EXIST=false
+	fi
+	# check if we have forwarders already
 	CONFIGURED_DNS_FORWARDERS=`cat /etc/bind/named.conf.options | grep -v "//" | grep -A2 forwarders | grep -v forwarders | grep -v "}" | head -n1 | awk {' print $1 '} | sed -e "s/;//g"`
 	if [ "$CONFIGURED_DNS_FORWARDERS" != "" ] && openqrm_validate_ip $CONFIGURED_DNS_FORWARDERS; then
 		echo "NOTICE: Found already configured dns-forwarders $CONFIGURED_DNS_FORWARDERS"
@@ -113,13 +119,17 @@ function openqrm_plugin_dns_init() {
 		else
 			CHECK_FOR_FORWARDERS="/etc/resolv.conf"
 		fi
-		DNS_FORWARDER=`cat $CHECK_FOR_FORWARDERS | grep nameserver | head -n1 | awk {' print $2 '}`
-		if [ "$DNS_FORWARDER" != "" ]; then
+		DNS_FORWARDER=`cat $CHECK_FOR_FORWARDERS | grep -v ^# | grep nameserver | head -n1 | awk {' print $2 '}`
+		if [ "$DNS_FORWARDER" != "" ]  && openqrm_validate_ip $DNS_FORWARDER; then
 			echo "NOTICE: Configuring dns-forwarder to $DNS_FORWARDER"
 			if [ ! -f /etc/bind/named.conf.options.openqrm-dns-plugin.backup ]; then
 				cp -f /etc/bind/named.conf.options /etc/bind/named.conf.options.openqrm-dns-plugin.backup
 			fi
-			cat /etc/bind/named.conf.options | grep -v "^};" > /etc/bind/named.conf.options.new
+			rm -f /etc/bind/named.conf.options.new
+			if [ "$NAMED_OPTIONS_EXIST" == "false" ]; then
+				echo "options {" >> /etc/bind/named.conf.options.new
+			fi
+			cat /etc/bind/named.conf.options | grep -v "^};" >> /etc/bind/named.conf.options.new
 			echo "		forwarders {" >> /etc/bind/named.conf.options.new
 			echo "			$DNS_FORWARDER;" >> /etc/bind/named.conf.options.new
 			echo "		};" >> /etc/bind/named.conf.options.new
@@ -135,6 +145,8 @@ function openqrm_plugin_dns_init() {
 			mv -f /etc/named.conf /etc/named.conf.openqrm-backup
 		fi
 		ln -sf /etc/bind/named.conf.local /etc/named.conf
+		# include options
+		echo 'include "/etc/bind/named.conf.options";' >> /etc/bind/named.conf.local
 	elif [ -f /etc/SuSE-release ]; then
 		# chroot is not supported yet
 		sed -i -e 's/NAMED_RUN_CHROOTED.*/NAMED_RUN_CHROOTED="no"/g' /etc/sysconfig/named
@@ -149,8 +161,7 @@ EOF
 	# enable apparmor if needed
 	if [ -f /etc/apparmor.d/usr.sbin.named ]; then
 		if ! grep openQRM /etc/apparmor.d/usr.sbin.named 1>/dev/null; then
-			cat /etc/apparmor.d/usr.sbin.named |
-			sed -i -e "s#}##g" /etc/apparmor.d/usr.sbin.named
+			sed -i -e "s#^}##g" /etc/apparmor.d/usr.sbin.named
 			echo "  # openQRM" >> /etc/apparmor.d/usr.sbin.named
 			echo "  $OPENQRM_SERVER_BASE_DIR/openqrm/plugins/dns/etc/** rw," >> /etc/apparmor.d/usr.sbin.named
 			if [ -d /etc/openqrm/plugins/dhcpd/ ]; then
@@ -197,6 +208,7 @@ function openqrm_plugin_dns_uninstall() {
 		if [ -f /etc/named.conf.openqrm-backup ]; then
 			mv -f /etc/named.conf.openqrm-backup /etc/named.conf
 		fi
+		rm -f /etc/bind/named.conf.options
 	elif [ -f /etc/SuSE-release ]; then
 		if [ -f /etc/named.conf.include.openqrm-backup ]; then
 			/bin/cp -f /etc/named.conf.include.openqrm-backup /etc/named.conf.include
