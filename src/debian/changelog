@@ -1,3 +1,11 @@
+openqrm (5.0.3-ubuntu1) precise; urgency=low
+
+  [ Matthias Rechenburg ]
+  * New minor release 5.0.3
+  * fixed nasty bug preventing dhcpd/dns to start on Ubuntu
+
+ -- openQRM Enterprise GmbH <info@openqrm-enterprise.com>  Thur, 7 March 2013 15:00:00 +0200
+
 openqrm (5.0.2-ubuntu1) precise; urgency=low
 
   [ Matthias Rechenburg ]
