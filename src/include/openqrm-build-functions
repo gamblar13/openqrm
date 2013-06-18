@@ -101,8 +101,6 @@ function openqrm_build_find_libs() {
 	done
 }
 
-
-
 #
 # Check requirements for the compile phase
 # -> this is for "make all" / compilation phase
@@ -111,6 +109,7 @@ function openqrm_check_build_requirements() {
 	echo "Checking requirements for the compilation phase"
 	export FORCE_INSTALL=true
 	# check which command to use for checking the requirements
+	SILENT="1>/dev/null 2>&1"
 	if [ -f /etc/debian_version ]; then
 		OPENQRM_PACKAGE_TYPE=deb
 		OPENQRM_REQUIREMENTS_CHECK_COMMAND="dpkg -L"
@@ -120,6 +119,10 @@ function openqrm_check_build_requirements() {
 	elif [ -f /etc/SuSE-release ]; then
 		OPENQRM_PACKAGE_TYPE=rpm
 		OPENQRM_REQUIREMENTS_CHECK_COMMAND="rpm -qs"
+	elif [ -f /etc/gentoo-release ]; then
+		OPENQRM_PACKAGE_TYPE=ebuild
+		OPENQRM_REQUIREMENTS_CHECK_COMMAND="gentoo_find_package"
+		SILENT=""
 	else
 		echo "NOTICE: Could not find out which compile-requirements to use"
 		echo "        Please make sure to have all needed components installed!"
@@ -129,20 +132,26 @@ function openqrm_check_build_requirements() {
 	fi
 
 	# check for required packages and install them if possible
+	deps_ok=0
 	echo "openqrm-server requires: $OPENQRM_SERVER_BUILD_REQUIREMENTS"
 	for DEP in `echo $OPENQRM_SERVER_BUILD_REQUIREMENTS | sed -e "s/,//g"`; do
-		if $OPENQRM_REQUIREMENTS_CHECK_COMMAND $DEP 1>/dev/null 2>&1; then
+		if eval $OPENQRM_REQUIREMENTS_CHECK_COMMAND $DEP $SILENT; then
 			print_message "found $DEP installed" bold
 		else
-			print_notice "Trying to automatically install $DEP ..."
-			openqrm_install_os_dependency $DEP
-			if [ $? != 0 ]; then
-				print_error "$DEP could not be installed. Please install manually to continue"
-				return 1
+			if [ -f /etc/gentoo-release ]; then
+				print_message "$DEP is not installed. Please emerge it to continue"
+				deps_ok=1
+			else
+				print_notice "Trying to automatically install $DEP ..."
+				openqrm_install_os_dependency $DEP
+				if [ $? != 0 ]; then
+					print_error "$DEP could not be installed. Please install manually to continue"
+					return 1
+				fi
 			fi
 		fi
 	done
-
+	( [ -f /etc/gentoo-release ] && [ ${deps_ok} != 0 ] ) && return 1
 	# check if the build tmp directory is writable
 	if [ ! -d "$OPENQRM_BUILD_TMP_DIR" ]; then
 		if ! mkdir -p "$OPENQRM_BUILD_TMP_DIR"; then

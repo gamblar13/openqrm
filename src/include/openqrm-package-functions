@@ -81,6 +81,42 @@ function openqrm_update_package_manager() {
 
 
 #
+# Find a package in the gentoo dpk database
+#
+function gentoo_find_package() {
+        local PACKAGE=$1
+        # prepare the input
+        local PACKAGE_USE=( $(echo ${PACKAGE} | sed 's/\(\[\|\]\)/ /g') )
+        local PKGFULL=(${PACKAGE_USE[0]//\// })
+        local CATEGORY=${PKGFULL[0]}
+        local PKGNAME=${PKGFULL[1]}
+
+        # locate the package folder in the dpk database
+        local PGKFOLDER=""
+        return_status=1
+        for pkgdir in $(find /var/db/pkg/${CATEGORY} -maxdepth 1 -name ${PKGNAME}-\*  -type d | sed -e 's|^/var/db/pkg/||' )
+        do
+                # check the cleaned up package name against our wanted package
+                echo ${pkgdir} | perl -pe 's/^(([^\/]+)\/)?((\S+)(-(\d+(\.\d+)*[a-z]?(_(alpha|beta|pre|rc|p)\d*)*(-r\d+)?)?))*?$/$1$4/' | grep ${PACKAGE_USE[0]} >/dev/null
+                if [ $? == 0 ] ; then
+                        # check if we need do scan for the useflags
+                        if [ ! -z ${PACKAGE_USE[1]} ]; then
+                                use_state=0
+                                for USE in $(echo ${PACKAGE_USE[1]} | sed -e "s/,//g"); do
+                                        grep ${USE} /var/db/pkg/${pkgdir}/IUSE > /dev/null
+                                        [ $? == 0 ] || use_state=1
+                                done
+                                [ ${use_state} == 0 ] && return_status=0
+                        else
+                                return_status=0
+                        fi
+                fi
+        done
+        return ${return_status}
+}
+
+
+#
 # Install a system dependency using the system's package manager
 #
 # $1: package name
@@ -138,6 +174,7 @@ function openqrm_check_requirements() {
 		return 1
 	fi
 	export FORCE_INSTALL=true
+	SILENT="1>/dev/null 2>&1"
 	# check which dependencies to use
 	if [ -f /etc/debian_version ]; then
 		print_message "Checking the requirements for Debian/Ubuntu based systems ..."
@@ -170,6 +207,12 @@ function openqrm_check_requirements() {
 		OPENQRM_PACKAGE_TYPE=rpm
 		OPENQRM_DEPENDENCY_CHECK_COMMAND="rpm -qs"
 		OPENQRM_PACKAGE_SYSTEM="suse"
+	elif [ -f /etc/gentoo-relesae ]; then
+		print_message "Checking the requirements fir Gentoo based systems ..."
+		OPENQRM_PACKAGE_TYPE=ebuild
+		OPENQRM_DEPENDENCY_CHECK_COMMAND="gentoo_find_package"
+		OPENQRM_PACKAGE_SYSTEM="portage"
+		SILENT=""
 	else
 		print_notice "NOTICE: Could not find out which dependencies to use" \
 			"Please make sure to have all needed components installed!"
@@ -177,20 +220,27 @@ function openqrm_check_requirements() {
 		print_message "... Continuing anyway"
 		return 0
 	fi
-
+	deps_ok=0
 	print_message "openqrm-server requires: $OPENQRM_SERVER_DEPENDENCIES"
 	for DEP in `echo $OPENQRM_SERVER_DEPENDENCIES | sed -e "s/,//g"`; do
-		if $OPENQRM_DEPENDENCY_CHECK_COMMAND $DEP 1>/dev/null 2>&1; then
+		if eval $OPENQRM_DEPENDENCY_CHECK_COMMAND $DEP $SILENT; then
 			print_message "-> found $DEP installed"
 		else
-			print_notice "Trying to automatically install $DEP ..."
-			openqrm_install_os_dependency $DEP
-			if [ $? != 0 ]; then
-				print_error "$DEP could not be installed. Please install manually to continue"
-				return 1
+			if [ -f /etc/gentoo-release ]; then
+				print_message "$DEP is not installed. Please emerge it to continue"
+				deps_ok=1
+			else
+				print_notice "Trying to automatically install $DEP ..."
+				openqrm_install_os_dependency $DEP
+				if [ $? != 0 ]; then
+					print_error "$DEP could not be installed. Please install manually to continue"
+					return 1
+				fi
 			fi
+
 		fi
 	done
+	( [ -f /etc/gentoo-release ] && [ ${deps_ok} != 0 ] ) && return 1
 
 
 	# get a list of plugins for checking their dependencies
@@ -208,15 +258,21 @@ function openqrm_check_requirements() {
 			if $OPENQRM_DEPENDENCY_CHECK_COMMAND $DEP 1>/dev/null 2>&1; then
 				print_message "-> found $DEP installed"
 			else
-				print_notice "Trying to automatically install $DEP ..."
-				openqrm_install_os_dependency $DEP
-				if [ $? != 0 ]; then
-					print_error "$DEP could not be installed. Please install manually to continue"
-					return 1
+				if [ -f /etc/gentoo-release ]; then
+					print_message "$DEP is not installed. Please emerge it to continue"
+					deps_ok=1
+				else
+					print_notice "Trying to automatically install $DEP ..."
+					openqrm_install_os_dependency $DEP
+					if [ $? != 0 ]; then
+						print_error "$DEP could not be installed. Please install manually to continue"
+						return 1
+					fi
 				fi
 			fi
 		done
 	done
+	( [ -f /etc/gentoo-release ] && [ ${deps_ok} != 0 ] ) && return 1
 	print_message "Checking for required components finished successfully"
 }
 

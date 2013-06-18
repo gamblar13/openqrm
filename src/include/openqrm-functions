@@ -145,6 +145,9 @@ function openqrm_chkconfig() {
 				fi
 			fi
 		fi
+	# gentoo way
+	elif [ -x /sbin/rc-update ] ; then
+		rc-update $action $service default
 	# "Manual".  Uses S91 by default
 	else
 		# Get default runlevel
@@ -296,6 +299,8 @@ function openqrm_get_distro() {
 				echo "debian"
 				;;
 		esac
+	elif [ -f "$ROOT_DIR/etc/gentoo-release" ]; then
+		echo "gentoo"
 	else
 		echo "generic"
 	fi
@@ -321,6 +326,8 @@ function openqrm_get_distro_name() {
 		echo "ubuntu"
 	elif [ -f "$ROOT_DIR/etc/debian_version" ]; then
 		echo "debian"
+	elif [ -f "$ROOT_DIR/etc/gentoo-release" ]; then
+		echo "gentoo"
 	else
 		echo "unknown"
 	fi
@@ -395,7 +402,11 @@ function openqrm_get_distro_version() {
 				fi
 			fi
 			;;
-			*)
+		"gentoo")
+			local VERSION=$(cat "$ROOT_DIR/etc/gentoo-release" | head -n1 | sed 's/.*release \([0-9]\+\).*/\1/')
+			echo $VERSION
+			;;
+		*)
 			echo 0
 			;;
 	esac
