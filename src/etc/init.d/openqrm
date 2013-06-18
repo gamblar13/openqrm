@@ -398,9 +398,8 @@ function openqrm_server_uninstall() {
 	elif [ -f /etc/SuSE-release ]; then
 		rm -f /etc/apache2/conf.d/openqrm-httpd.conf
 		rm -f /etc/apache2/conf.d/openqrm-https.conf
-	elif [ -f /etc/gentoo-release ];
+	elif [ -f /etc/gentoo-release ]; then
 		rm -f /etc/apache2/vhosts.d/openqrm-https.conf
-
 	fi
 	$OPENQRM_WEBSERVER_INIT reload
 
