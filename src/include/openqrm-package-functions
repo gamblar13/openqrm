@@ -222,7 +222,7 @@ function openqrm_check_requirements() {
 	fi
 	deps_ok=0
 	print_message "openqrm-server requires: $OPENQRM_SERVER_DEPENDENCIES"
-	for DEP in `echo $OPENQRM_SERVER_DEPENDENCIES | sed -e "s/,//g"`; do
+	for DEP in `echo $OPENQRM_SERVER_DEPENDENCIES | sed -e "s/, / /g"`; do
 		if eval $OPENQRM_DEPENDENCY_CHECK_COMMAND $DEP $SILENT; then
 			print_message "-> found $DEP installed"
 		else
