@@ -102,7 +102,7 @@ function gentoo_find_package() {
                         # check if we need do scan for the useflags
                         if [ ! -z ${PACKAGE_USE[1]} ]; then
                                 use_state=0
-                                for USE in $(echo ${PACKAGE_USE[1]} | sed -e "s/;//g"); do
+                                for USE in $(echo ${PACKAGE_USE[1]} | sed -e "s/,/ /g"); do
                                         grep ${USE} /var/db/pkg/${pkgdir}/IUSE > /dev/null
                                         [ $? == 0 ] || use_state=1
                                 done
