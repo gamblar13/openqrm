@@ -201,7 +201,7 @@ function openqrm_server_init() {
 				mv -f $NEW_CONF $DEFAULT_CONF
 			fi
 		fi
-	elif [ -f /etc/gentoo-release ]
+	elif [ -f /etc/gentoo-release ]; then
 		ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/web/ $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm
 	fi
 
