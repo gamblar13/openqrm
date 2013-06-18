@@ -201,7 +201,10 @@ function openqrm_server_init() {
 				mv -f $NEW_CONF $DEFAULT_CONF
 			fi
 		fi
+	elif [ -f /etc/gentoo-release ]
+		ln -sf $OPENQRM_SERVER_BASE_DIR/openqrm/web/ $OPENQRM_WEBSERVER_DOCUMENT_ROOT/openqrm
 	fi
+
 
 	# ssl ?
 	echo -n " Checking $OPENQRM_SERVER_BASE_DIR/openqrm/etc/openqrm-server.conf for OPENQRM_WEB_PROTOCOL=https.."
