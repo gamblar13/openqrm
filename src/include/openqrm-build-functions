@@ -863,7 +863,7 @@ function openqrm_install_initrd_templates() {
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.ubuntu.x86_64/source/openqrm-initrd-template.$CLIENT_VERSION.ubuntu.x86_64.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-template.ubuntu.x86_64.tgz
 	# set the default initrd template for creating the default kernel during init
 	if [ $OPENQRM_SHORT_DISTRI_NAME == "gentoo" ] ; then # fix for gentoo, without an default initramfs *grml*
-		cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.ubuntu.$OPENQRM_CLIENT_ARCH/source/openqrm-initrd-template.$CLIENT_VERSION.$OPENQRM_SHORT_DISTRI_NAME.$OPENQRM_CLIENT_ARCH.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz
+		cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.ubuntu.$OPENQRM_CLIENT_ARCH/source/openqrm-initrd-template.${CLIENT_VERSION}.gentoo.$OPENQRM_CLIENT_ARCH.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz
 	else
 		cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.$OPENQRM_SHORT_DISTRI_NAME.$OPENQRM_CLIENT_ARCH/source/openqrm-initrd-template.$CLIENT_VERSION.$OPENQRM_SHORT_DISTRI_NAME.$OPENQRM_CLIENT_ARCH.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-default.tgz
 	fi
