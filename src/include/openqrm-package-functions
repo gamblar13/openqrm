@@ -207,7 +207,7 @@ function openqrm_check_requirements() {
 		OPENQRM_PACKAGE_TYPE=rpm
 		OPENQRM_DEPENDENCY_CHECK_COMMAND="rpm -qs"
 		OPENQRM_PACKAGE_SYSTEM="suse"
-	elif [ -f /etc/gentoo-relesae ]; then
+	elif [ -f /etc/gentoo-release ]; then
 		print_message "Checking the requirements fir Gentoo based systems ..."
 		OPENQRM_PACKAGE_TYPE=ebuild
 		OPENQRM_DEPENDENCY_CHECK_COMMAND="gentoo_find_package"
