@@ -94,7 +94,7 @@ function gentoo_find_package() {
         # locate the package folder in the dpk database
         local PGKFOLDER=""
         return_status=1
-        for pkgdir in $(find /var/db/pkg/${CATEGORY} -maxdepth 1 -name ${PKGNAME}-\*  -type d | sed -e 's|^/var/db/pkg/||' )
+        for pkgdir in $(find /var/db/pkg/${CATEGORY} -maxdepth 1 -name ${PKGNAME}-\*  -type d 2>/dev/null | sed -e 's|^/var/db/pkg/||' )
         do
                 # check the cleaned up package name against our wanted package
                 echo ${pkgdir} | perl -pe 's/^(([^\/]+)\/)?((\S+)(-(\d+(\.\d+)*[a-z]?(_(alpha|beta|pre|rc|p)\d*)*(-r\d+)?)?))*?$/$1$4/' | grep ${PACKAGE_USE[0]} >/dev/null
@@ -102,7 +102,7 @@ function gentoo_find_package() {
                         # check if we need do scan for the useflags
                         if [ ! -z ${PACKAGE_USE[1]} ]; then
                                 use_state=0
-                                for USE in $(echo ${PACKAGE_USE[1]} | sed -e "s/,//g"); do
+                                for USE in $(echo ${PACKAGE_USE[1]} | sed -e "s/;//g"); do
                                         grep ${USE} /var/db/pkg/${pkgdir}/IUSE > /dev/null
                                         [ $? == 0 ] || use_state=1
                                 done
