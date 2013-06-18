@@ -583,6 +583,8 @@ function openqrm_pack_default_initrd_template() {
 		fi
 	elif [ -f /etc/redhat-release ]; then
 		OPENQRM_SHORT_DISTRI_NAME="centos"
+	elif [ -f /etc/gentoo-release ]; then
+		OPENQRM_SHORT_DISTRI_NAME="gentoo"
 	fi
 	rm -f $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-template.$OPENQRM_SHORT_DISTRI_NAME.$OPENQRM_CLIENT_ARCH.tgz
 	cd $OPENQRM_BUILD_TMP_DIR/openqrm-build/initroot/
@@ -849,6 +851,8 @@ function openqrm_install_initrd_templates() {
 		OPENQRM_SHORT_DISTRI_NAME="centos"
 	elif [ -f /etc/SuSE-release ]; then
 		OPENQRM_SHORT_DISTRI_NAME="centos"
+	elif [ -f /etc/gentoo-release ]; then
+		OPENQRM_SHORT_DISTRI_NAME="gentoo"
 	fi
 
 	cp -a $OPENQRM_BUILD_TMP_DIR/openqrm-build/openqrm-initrd-template.centos.i386/source/openqrm-initrd-template.$CLIENT_VERSION.centos.i386.tgz $DESTINATION_DIR$OPENQRM_SERVER_BASE_DIR/openqrm/etc/templates/openqrm-initrd-template.centos.i386.tgz
