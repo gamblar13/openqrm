@@ -134,7 +134,7 @@ function openqrm_check_build_requirements() {
 	# check for required packages and install them if possible
 	deps_ok=0
 	echo "openqrm-server requires: $OPENQRM_SERVER_BUILD_REQUIREMENTS"
-	for DEP in `echo $OPENQRM_SERVER_BUILD_REQUIREMENTS | sed -e "s/,//g"`; do
+	for DEP in `echo $OPENQRM_SERVER_BUILD_REQUIREMENTS | sed -e "s/,/ /g"`; do
 		if eval $OPENQRM_REQUIREMENTS_CHECK_COMMAND $DEP $SILENT; then
 			print_message "found $DEP installed" bold
 		else
