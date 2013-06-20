@@ -49,7 +49,7 @@ function openqrm_plugin_tftpd_uninstall() {
 function openqrm_plugin_tftpd_init() {
 	echo "Initializing the openQRM tftpd-plugin"
 	# make sure tftp is not running already
-	if [ -f /etc/debian_version ]; then
+	if [ -f /etc/debian_version -o -f /etc/gentoo-release ]; then
 		if [ -x "/etc/init.d/tftpd-hpa" ]; then
 			if [ -x "`which invoke-rc.d 2>/dev/null`" ]; then
 				invoke-rc.d tftpd-hpa stop
@@ -57,6 +57,8 @@ function openqrm_plugin_tftpd_init() {
 				/etc/init.d/tftpd-hpa stop
 			fi
 		fi
+	fi
+	if [ -f /etc/debian_version ]; then
 		# empty config to avoid start at init
 		if [ -f /etc/default/tftpd-hpa ]; then
 			mv -f /etc/default/tftpd-hpa /etc/default/tftpd-hpa.disabled
@@ -68,6 +70,8 @@ function openqrm_plugin_tftpd_init() {
 			INETDPID=`ps ax | grep inetd | grep -v grep | awk {' print $1 '}`
 			kill -HUP $INETDPID 1>/dev/null 2>&1
 		fi
+	elif [ -f /etc/gentoo-release ]; then
+		rc-update del tftpd-hpa default
 	fi
 	if [ -f /etc/xinetd.d/tftp ]; then
 		sed -i -e "s/disable.*/disable = yes/" /etc/xinetd.d/tftp
