@@ -72,6 +72,8 @@ if [ -f /etc/debian_version ]; then
 	fi
 elif [ -f /etc/redhat-release ]; then
 	OPENQRM_SHORT_DISTRI_NAME="centos"
+elif [ -f /etc/gentoo-release ]; then
+	OPENQRM_SHORT_DISTRI_NAME="gentoo"
 fi
 
 cd /
